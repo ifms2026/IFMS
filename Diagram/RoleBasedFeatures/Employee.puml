@@ -1,0 +1,72 @@
+@startmindmap
+' --- CẤU HÌNH CƠ BẢN (SAFE MODE) ---
+skinparam shadowing false
+skinparam BackgroundColor white
+skinparam NodeBackgroundColor #F5F5F5
+skinparam NodeBorderColor #333333
+skinparam FontName Arial
+
+' --- MÀU SẮC ---
+<style>
+mindmapDiagram {
+  .root { BackgroundColor #2C3E50; FontColor white; FontSize 16; FontStyle bold }
+  .security { BackgroundColor #E74C3C; FontColor white }
+  .wallet { BackgroundColor #3498DB; FontColor white }
+  .request { BackgroundColor #F1C40F; FontColor black }
+  .noti { BackgroundColor #9B59B6; FontColor white }
+  .payroll { BackgroundColor #27AE60; FontColor white }
+}
+</style>
+
+* <&aperture> **SME Internal Wallet System**\n(Role Employee - Final Updated)
+
+' --- NHÁNH CHÍNH ---
+** <&person> **ROLE: EMPLOYEE**\n(Nhân viên)
+
+' 1. BẢO MẬT
+*** <&key> **Định danh & Bảo mật** <<security>>
+**** Đăng nhập & Đổi Pass
+**** **Thiết lập PIN Giao dịch**
+**** Xem Hồ sơ (Profile)
+
+' 2. VÍ ĐIỆN TỬ
+*** <&wallet> **Ví điện tử (Core Wallet)** <<wallet>>
+**** Dashboard (Real-time)
+**** **Nạp tiền (Deposit)**
+*****_ Nhập số tiền + **Mã PIN**
+*****_ Quét QR
+**** **Rút tiền (Withdraw)**
+*****_ Nhập TK nhận + **Mã PIN**
+*****_ Kết quả: Thành công/Chờ duyệt
+**** Lịch sử Giao dịch
+
+' 3. LƯƠNG & THU NHẬP
+*** <&spreadsheet> **Lương & Thu nhập** <<payroll>>
+**** Danh sách Kỳ lương
+*****_ Tháng/Năm & Thực nhận
+**** **Chi tiết Phiếu lương**
+*****_ Lương/Thưởng/Phạt
+*****_ Trừ nợ Tạm ứng
+**** Tải Phiếu lương (PDF)
+
+' 4. QUẢN LÝ YÊU CẦU (UPDATED)
+*** <&document> **Quản lý Yêu cầu** <<request>>
+**** **Tạo Yêu cầu (Chi/Ứng)**
+*****_ Chọn Đề án (Chỉ hiện Active)
+*****_ **Xem Giai đoạn (Phase) hiện tại**
+*****_ Check hạn mức khả dụng của Phase
+*****_ Upload ảnh chứng từ
+**** Tạo Hoàn ứng (Reimbursement)
+*****_ Chọn phiếu Ứng cũ
+*****_ Trigger Auto-Netting
+**** Theo dõi Trạng thái
+*****_ Pending / Approved / Rejected
+*****_ **Xem Lý do Từ chối**
+
+' 5. THÔNG BÁO
+*** <&bell> **Thông báo** <<noti>>
+**** Biến động số dư
+**** Kết quả duyệt Request
+**** **"Ting ting" Lương về**
+
+@endmindmap

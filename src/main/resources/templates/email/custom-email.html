@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IFMS Notification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f7f8fa;
+            color: #1f2937;
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+        }
+        .title {
+            font-size: 20px;
+            margin: 0 0 12px;
+        }
+        .content {
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 12px 0;
+        }
+        .footer {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="title" th:text="${title}">Thong bao he thong</h1>
+    <p class="content">Xin chao <strong th:text="${fullName}">User</strong>,</p>
+    <p class="content" th:text="${message}">Noi dung thong bao.</p>
+    <p class="footer">IFMS - Internal Financial Management System</p>
+</div>
+</body>
+</html>
+

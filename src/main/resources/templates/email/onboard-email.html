@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chào mừng đến với IFMS</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #f4f7f6;
+            padding: 40px 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #0f62fe, #5eb2f3);
+            color: #ffffff;
+            text-align: center;
+            padding: 36px 20px;
+        }
+        .header h2 {
+            margin: 0 0 6px;
+            font-size: 26px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 0;
+            font-size: 15px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 36px 32px;
+            color: #333333;
+        }
+        .greeting {
+            font-size: 17px;
+            font-weight: 600;
+            color: #111111;
+            margin-bottom: 12px;
+        }
+        .intro {
+            font-size: 15px;
+            color: #555555;
+            line-height: 1.7;
+            margin-bottom: 28px;
+        }
+        .credentials-box {
+            background-color: #f8faff;
+            border: 1px solid #d0e2ff;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+        }
+        .credentials-box h3 {
+            margin: 0 0 16px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #0f62fe;
+        }
+        .credential-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e8f0fe;
+            font-size: 14px;
+        }
+        .credential-row:last-child {
+            border-bottom: none;
+        }
+        .credential-label {
+            color: #777777;
+            min-width: 140px;
+        }
+        .credential-value {
+            color: #111111;
+            font-weight: 600;
+            word-break: break-all;
+        }
+        .credential-value.password {
+            color: #0f62fe;
+            font-family: 'Courier New', monospace;
+            font-size: 15px;
+            letter-spacing: 1px;
+        }
+        .notice {
+            font-size: 14px;
+            color: #5a4000;
+            background-color: #fff8e1;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .steps {
+            font-size: 14px;
+            color: #333333;
+            line-height: 1.8;
+            margin-bottom: 8px;
+        }
+        .steps ol {
+            margin: 8px 0 0;
+            padding-left: 20px;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #999999;
+            border-top: 1px solid #eeeeee;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <table class="container" align="center" border="0" cellpadding="0" cellspacing="0" width="100%"
+               style="max-width: 600px;">
+            <tr>
+                <td class="header">
+                    <h2>Chào mừng đến với IFMS</h2>
+                    <p>Hệ thống Quản Lý Tài Chính Nội Bộ</p>
+                </td>
+            </tr>
+            <tr>
+                <td class="content">
+                    <p class="greeting">Xin chào, <span th:text="${fullName}">Nguyễn Văn A</span>!</p>
+                    <p class="intro">
+                        Tài khoản của bạn đã được tạo thành công trên hệ thống IFMS.
+                        Vui lòng sử dụng thông tin bên dưới để đăng nhập lần đầu.
+                    </p>
+
+                    <div class="credentials-box">
+                        <h3>Thông tin tài khoản</h3>
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #e8f0fe;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td class="credential-label" style="color:#777; font-size:14px; width:140px;">Mã nhân viên</td>
+                                            <td class="credential-value" style="color:#111; font-weight:600; font-size:14px;" th:text="${employeeCode}">MK011</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #e8f0fe;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td class="credential-label" style="color:#777; font-size:14px; width:140px;">Email đăng nhập</td>
+                                            <td class="credential-value" style="color:#111; font-weight:600; font-size:14px;" th:text="${email}">user@ifms.vn</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #e8f0fe;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td class="credential-label" style="color:#777; font-size:14px; width:140px;">Mật khẩu tạm thời</td>
+                                            <td style="color:#0f62fe; font-weight:700; font-size:15px; font-family:'Courier New',monospace; letter-spacing:1px;" th:text="${temporaryPassword}">Ifms@1234</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #e8f0fe;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td class="credential-label" style="color:#777; font-size:14px; width:140px;">Vai trò</td>
+                                            <td class="credential-value" style="color:#111; font-weight:600; font-size:14px;" th:text="${role}">EMPLOYEE</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td class="credential-label" style="color:#777; font-size:14px; width:140px;">Phòng ban</td>
+                                            <td class="credential-value" style="color:#111; font-weight:600; font-size:14px;" th:text="${departmentName}">Phòng Công Nghệ</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="notice">
+                        <strong>Lưu ý quan trọng:</strong> Mật khẩu tạm thời này chỉ sử dụng được <strong>một lần</strong>.
+                        Khi đăng nhập lần đầu, hệ thống sẽ yêu cầu bạn đặt mật khẩu mới và mã PIN giao dịch trước khi tiếp tục.
+                    </div>
+
+                    <div class="steps">
+                        <strong>Các bước đăng nhập lần đầu:</strong>
+                        <ol>
+                            <li>Truy cập hệ thống IFMS và đăng nhập bằng email + mật khẩu tạm thời</li>
+                            <li>Đặt mật khẩu mới (tối thiểu 8 ký tự)</li>
+                            <li>Thiết lập mã PIN giao dịch (5 chữ số)</li>
+                            <li>Bắt đầu sử dụng hệ thống</li>
+                        </ol>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td class="footer">
+                    <p style="margin: 0;">© 2026 Nội Bộ Công Ty.<br>Hệ thống Quản Lý Tài Chính — IFMS.</p>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

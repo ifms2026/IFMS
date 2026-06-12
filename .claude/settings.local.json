@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn compile:*)",
+      "Bash(xargs grep:*)",
+      "Bash(git worktree *)",
+      "Bash(xargs cat *)",
+      "Bash(./mvnw compile *)"
+    ]
+  }
+}

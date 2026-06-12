@@ -1,0 +1,1052 @@
+# Deposit & Withdraw — Implementation Plan
+
+**Scope:** Nạp tiền (VNPay Sandbox) + Rút tiền (MockBank — Corporate Banking API)
+**Target:** IFMS Backend + MockBank Service (Option A — separate Spring Boot app)
+**Date:** 2026-04-05
+
+---
+
+## 1. Concept & Kiến trúc
+
+### MockBank là gì
+
+MockBank mô phỏng một ngân hàng thương mại thật (VietcomBank, BIDV…) nhưng chỉ
+implement đúng phần **Corporate Internet Banking API** mà IFMS cần. Về bản chất:
+
+- IFMS (công ty) có **một tài khoản doanh nghiệp** tại MockBank
+- Tài khoản đó đại diện cho toàn bộ tiền mặt của hệ thống — khớp với `FLOAT_MAIN`
+- Khi user rút tiền: IFMS gọi MockBank API để chuyển từ tài khoản công ty sang
+  **số tài khoản ngân hàng thật của user** (lưu trong UserProfile)
+- MockBank **không lưu tài khoản user** — user dùng tài khoản ngân hàng thật ngoài đời
+- MockBank **không validate** số tài khoản đích — giống thực tế: ngân hàng cứ chuyển,
+  nếu sai số tài khoản là vấn đề của bên gửi
+- Kết quả SUCCESS/FAILED được điều khiển bằng **biến môi trường** để test
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         IFMS Backend (:8080)                         │
+│                                                                      │
+│  Wallet(FLOAT_MAIN) ←→ "Tài khoản doanh nghiệp tại MockBank"        │
+│                                                                      │
+│  ┌──────────────┐    ┌─────────────────┐    ┌──────────────────────┐ │
+│  │ VnpayService │    │ BankingService  │    │   WalletService      │ │
+│  │ (deposit)    │    │ (HTTP client)   │    │   deposit()          │ │
+│  └──────┬───────┘    └───────┬─────────┘    │   withdraw()         │ │
+│         │                   │              └──────────────────────┘ │
+└─────────┼───────────────────┼────────────────────────────────────────┘
+          │                   │
+          │ HTTPS             │ HTTPS + API Key
+          ▼                   ▼
+   ┌─────────────┐    ┌──────────────────────────────────────────────┐
+   │ VNPay       │    │  MockBank Service (:8081)                    │
+   │ Sandbox     │    │                                              │
+   │ (external)  │    │  Chỉ lưu 1 tài khoản: IFMS Corporate Account│
+   └──────┬──────┘    │                                              │
+          │           │  POST /v1/transfers         (chuyển khoản)   │
+          │ callback  │  GET  /v1/transactions/{ref} (tra cứu GD)    │
+          ▼           │  GET  /v1/account/balance   (xem số dư)      │
+   IFMS callback      └──────────────────────────────────────────────┘
+```
+
+### FLOAT_MAIN ↔ MockBank company account
+
+```
+MockBank: corporate_account.balance  (số dư thực tế tại "ngân hàng")
+IFMS:     Wallet(FLOAT_MAIN).balance (tổng tiền trong toàn bộ IFMS)
+
+Invariant: hai con số này luôn bằng nhau vì:
+  - SYSTEM_TOPUP:  FLOAT_MAIN +=  →  company account += (do Accountant topup thủ công)
+  - WITHDRAW:      FLOAT_MAIN -=  →  MockBank tự deduct khi IFMS gọi transfer
+```
+
+> Trong môi trường demo, balance MockBank được seed bằng `INITIAL_FUND` (50 tỷ).
+> Không có cơ chế auto-sync — chấp nhận drift nhỏ, phù hợp với đồ án.
+
+---
+
+## 2. MockBank Service
+
+### 2.1 Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Framework | Spring Boot 3.4.1 |
+| DB | H2 in-memory |
+| Port | 8081 |
+| Auth | Bearer API Key — header `Authorization: Bearer {token}` |
+| Response format | Mô phỏng VCB Open API response envelope |
+| Build | Maven, project riêng |
+
+### 2.2 Package structure
+
+```
+com.mockbank/
+├── config/
+│   ├── ApiKeyAuthFilter.java       # Validate Bearer token
+│   ├── SecurityConfig.java
+│   └── MockBankProperties.java     # @ConfigurationProperties
+├── entity/
+│   └── CorporateAccount.java       # Tài khoản doanh nghiệp IFMS (singleton)
+│   └── BankTransaction.java        # Lịch sử giao dịch
+├── repository/
+│   ├── CorporateAccountRepository.java
+│   └── BankTransactionRepository.java
+├── dto/
+│   ├── TransferRequest.java
+│   ├── TransferResponse.java       # Format VCB-style
+│   └── BalanceResponse.java
+├── exception/
+│   └── GlobalBankExceptionHandler.java
+├── service/
+│   └── TransferService.java
+└── controller/
+    └── BankingController.java
+```
+
+### 2.3 Entities
+
+```java
+// CorporateAccount.java — Singleton, chỉ có đúng 1 row
+@Entity @Table(name = "corporate_account")
+public class CorporateAccount {
+    @Id
+    private String accountNumber;        // "9704366000000001" (format VCB fake)
+    private String accountHolderName;    // "CONG TY TNHH IFMS"
+    private String bankCode;             // "VCB"
+    private String bankName;             // "Vietcombank"
+    @Column(precision = 19, scale = 2)
+    private BigDecimal balance;
+    private String currency;             // "VND"
+    private LocalDateTime openedAt;
+}
+
+// BankTransaction.java — Append-only, không UPDATE/DELETE
+@Entity @Table(name = "bank_transactions")
+public class BankTransaction {
+    @Id
+    private String transactionId;        // "VCB20260405103000000001" — generated by MockBank
+
+    @Column(unique = true, nullable = false)
+    private String referenceNumber;      // idempotency key — từ IFMS (withdrawCode)
+
+    private String debitAccount;         // "9704366000000001" (IFMS corporate)
+    private String creditAccount;        // số tài khoản thật của user (e.g. "0011004000005")
+    private String creditAccountName;    // tên chủ tài khoản user (không validate, chỉ log)
+    private String creditBankCode;       // "VCB", "TCB", "MBB"... (không validate)
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal amount;
+    private String currency;             // "VND"
+
+    @Enumerated(EnumType.STRING)
+    private BankTxnStatus status;        // SUCCESS | FAILED
+
+    private String responseCode;         // "00" | "96" | "51"
+    private String responseMessage;      // "Giao dich thanh cong" | reason lỗi
+    private String description;
+    private LocalDateTime transactionTime;
+}
+```
+
+### 2.4 Environment Variables (core feature)
+
+```yaml
+# application.yml — MockBank
+server:
+  port: 8081
+
+spring:
+  application:
+    name: ifms-mock-bank
+  datasource:
+    url: jdbc:h2:mem:mockbankdb;DB_CLOSE_DELAY=-1
+  h2:
+    console:
+      enabled: true
+
+mockbank:
+  api-key: mock-bank-secret-key-2026
+
+  # Corporate account seed
+  corporate-account-number: "9704366000000001"
+  corporate-account-name: "CONG TY TNHH IFMS"
+  corporate-initial-balance: 50000000000   # 50 tỷ VND
+
+  # === TRANSFER SIMULATION ===
+  # Điều khiển kết quả transfer để test các scenario
+  # SUCCESS  → luôn thành công (default)
+  # FAILED   → luôn thất bại (test lỗi)
+  # RANDOM   → ngẫu nhiên 80% success / 20% fail (test retry)
+  transfer-result: ${MOCKBANK_TRANSFER_RESULT:SUCCESS}
+
+  # Khi FAILED, response code trả về
+  # 51 = Insufficient funds | 96 = System error | 14 = Invalid account
+  failure-code: ${MOCKBANK_FAILURE_CODE:96}
+```
+
+```java
+@ConfigurationProperties(prefix = "mockbank")
+@Component
+public class MockBankProperties {
+    private String apiKey;
+    private String corporateAccountNumber;
+    private String corporateAccountName;
+    private BigDecimal corporateInitialBalance;
+    private String transferResult;   // SUCCESS | FAILED | RANDOM
+    private String failureCode;
+}
+```
+
+### 2.5 API Spec — Format VCB-style
+
+Tất cả responses đều có **envelope chung**:
+
+```json
+{
+  "responseCode": "00",
+  "responseMessage": "Giao dich thanh cong",
+  "data": { ... }
+}
+```
+
+Response codes (mô phỏng VCB):
+
+| Code | Ý nghĩa |
+|---|---|
+| `00` | Thành công |
+| `51` | Tài khoản nguồn không đủ số dư |
+| `96` | Lỗi hệ thống ngân hàng |
+| `14` | Số tài khoản không hợp lệ |
+| `09` | Giao dịch trùng lặp (reference đã tồn tại) |
+
+---
+
+#### POST /v1/transfers — Chuyển khoản ra ngoài
+
+```
+Authorization: Bearer mock-bank-secret-key-2026
+Content-Type: application/json
+
+Request:
+{
+  "debitAccount":      "9704366000000001",  // tài khoản công ty IFMS tại MockBank
+  "creditAccount":     "0011004000005",     // số TK ngân hàng thật của user
+  "creditAccountName": "DO QUOC BAO",       // tên user (không validate)
+  "creditBankCode":    "VCB",               // mã ngân hàng (không validate)
+  "amount":            5000000,
+  "currency":          "VND",
+  "referenceNumber":   "WD-2026-000012",    // idempotency key từ IFMS
+  "description":       "Chuyen khoan thu nhap - WD-2026-000012"
+}
+
+Response 200 — SUCCESS (transferResult=SUCCESS):
+{
+  "responseCode":    "00",
+  "responseMessage": "Giao dich thanh cong",
+  "data": {
+    "transactionId":    "VCB20260405103000000001",
+    "referenceNumber":  "WD-2026-000012",
+    "debitAccount":     "9704366000000001",
+    "creditAccount":    "0011004000005",
+    "amount":           5000000,
+    "currency":         "VND",
+    "remainingBalance": 49995000000.00,
+    "transactionTime":  "2026-04-05T10:30:00Z"
+  }
+}
+
+Response 200 — FAILED (transferResult=FAILED):
+{
+  "responseCode":    "51",
+  "responseMessage": "Tai khoan nguon khong du so du",
+  "data": null
+}
+
+Response 409 — Duplicate reference:
+{
+  "responseCode":    "09",
+  "responseMessage": "Giao dich da duoc xu ly",
+  "data": {
+    "transactionId":   "VCB20260405103000000001",
+    "referenceNumber": "WD-2026-000012",
+    "status":          "SUCCESS",
+    "processedAt":     "2026-04-05T10:30:00Z"
+  }
+}
+```
+
+---
+
+#### GET /v1/transactions/{referenceNumber} — Tra cứu giao dịch
+
+```
+Authorization: Bearer mock-bank-secret-key-2026
+
+Response 200:
+{
+  "responseCode": "00",
+  "responseMessage": "Thanh cong",
+  "data": {
+    "transactionId":   "VCB20260405103000000001",
+    "referenceNumber": "WD-2026-000012",
+    "status":          "SUCCESS",
+    "amount":          5000000,
+    "debitAccount":    "9704366000000001",
+    "creditAccount":   "0011004000005",
+    "transactionTime": "2026-04-05T10:30:00Z"
+  }
+}
+
+Response 404:
+{
+  "responseCode": "14",
+  "responseMessage": "Khong tim thay giao dich",
+  "data": null
+}
+```
+
+---
+
+#### GET /v1/account/balance — Số dư tài khoản công ty
+
+```
+Authorization: Bearer mock-bank-secret-key-2026
+
+Response 200:
+{
+  "responseCode": "00",
+  "responseMessage": "Thanh cong",
+  "data": {
+    "accountNumber":     "9704366000000001",
+    "accountHolderName": "CONG TY TNHH IFMS",
+    "balance":           49995000000.00,
+    "currency":          "VND",
+    "asOf":              "2026-04-05T10:35:00Z"
+  }
+}
+```
+
+### 2.6 TransferService Logic
+
+```java
+@Service
+@RequiredArgsConstructor
+public class TransferService {
+
+    private final CorporateAccountRepository accountRepo;
+    private final BankTransactionRepository  txnRepo;
+    private final MockBankProperties         props;
+
+    @Transactional
+    public TransferResponse transfer(TransferRequest req) {
+
+        // 1. Idempotency check
+        txnRepo.findByReferenceNumber(req.referenceNumber())
+               .ifPresent(existing -> {
+                   throw new DuplicateReferenceException(existing);
+               });
+
+        // 2. Validate debitAccount là tài khoản công ty
+        CorporateAccount account = accountRepo
+            .findById(req.debitAccount())
+            .orElseThrow(() -> new BankException("14", "Tai khoan nguon khong ton tai"));
+
+        // 3. Simulate result based on env var
+        boolean success = switch (props.getTransferResult().toUpperCase()) {
+            case "FAILED" -> false;
+            case "RANDOM" -> Math.random() < 0.8;  // 80% success
+            default       -> true;                  // SUCCESS (default)
+        };
+
+        String transactionId = generateTransactionId();  // VCB + timestamp + seq
+
+        if (success) {
+            // Deduct balance from corporate account
+            if (account.getBalance().compareTo(req.amount()) < 0) {
+                // Override: thực tế insufficient funds
+                return buildFailedResponse("51", "Tai khoan nguon khong du so du", req);
+            }
+            account.setBalance(account.getBalance().subtract(req.amount()));
+            accountRepo.save(account);
+
+            BankTransaction txn = buildTransaction(req, transactionId, "SUCCESS", "00",
+                                                   "Giao dich thanh cong", account.getBalance());
+            txnRepo.save(txn);
+            return buildSuccessResponse(txn, account.getBalance());
+
+        } else {
+            String failCode = props.getFailureCode();  // "51" | "96" | "14"
+            String failMsg  = resolveFailureMessage(failCode);
+
+            BankTransaction txn = buildTransaction(req, transactionId, "FAILED",
+                                                   failCode, failMsg, account.getBalance());
+            txnRepo.save(txn);
+            return buildFailedResponse(failCode, failMsg, req);
+        }
+    }
+
+    private String generateTransactionId() {
+        // VCB + yyyyMMddHHmmss + 6-digit seq
+        return "VCB" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+               + String.format("%06d", seq.incrementAndGet());
+    }
+}
+```
+
+### 2.7 Seed Data — chỉ 1 account
+
+```java
+// DataSeeder.java — chạy khi startup
+@Component @RequiredArgsConstructor
+public class DataSeeder implements CommandLineRunner {
+
+    private final CorporateAccountRepository repo;
+    private final MockBankProperties props;
+
+    @Override
+    public void run(String... args) {
+        if (repo.count() == 0) {
+            repo.save(CorporateAccount.builder()
+                .accountNumber(props.getCorporateAccountNumber())     // "9704366000000001"
+                .accountHolderName(props.getCorporateAccountName())   // "CONG TY TNHH IFMS"
+                .bankCode("VCB")
+                .bankName("Vietcombank")
+                .balance(props.getCorporateInitialBalance())          // 50,000,000,000
+                .currency("VND")
+                .openedAt(LocalDateTime.now())
+                .build());
+        }
+    }
+}
+```
+
+---
+
+## 3. IFMS — Thay đổi cần thực hiện
+
+### 3.1 Tổng quan thay đổi
+
+| Hạng mục | File / Class | Loại thay đổi |
+|---|---|---|
+| `PaymentProvider` | enum | Thêm `MOCK_BANK` |
+| `ReferenceType` | enum | Thêm `WITHDRAWAL`, `DEPOSIT` |
+| `WalletService` | interface + impl | Thêm `deposit()`, `withdraw()` |
+| `BankingService` | interface + impl (mới) | HTTP client → MockBank |
+| `VnpayService` | service (mới) | Tạo URL, verify IPN callback |
+| `WithdrawRequest` | entity (mới) | Bảng `withdrawal_requests` |
+| `WithdrawStatus` | enum (mới) | PENDING → PROCESSING → COMPLETED |
+| `WithdrawService` | service (mới) | Business logic rút tiền |
+| `WithdrawController` | controller (mới) | REST endpoints |
+| `VnpayController` | controller (mới) | Callback + create URL |
+| `application.yml` | config | Thêm `app.vnpay.*`, `app.banking.*` |
+| Migration V13 | SQL | Bảng `withdrawal_requests` |
+| `WalletServiceImpl` | constant | Thêm DEPOSIT, WITHDRAW vào `BOUNDARY_TYPES` |
+
+---
+
+### 3.2 PaymentProvider — thêm MOCK_BANK
+
+```java
+public enum PaymentProvider {
+    PAYOS,
+    MOMO,
+    VNPAY,
+    MOCK_BANK,   // ← withdraw qua MockBank corporate banking API
+    INTERNAL
+}
+```
+
+### 3.3 ReferenceType — thêm WITHDRAWAL, DEPOSIT
+
+```java
+public enum ReferenceType {
+    REQUEST,
+    PAYSLIP,
+    PROJECT,
+    DEPARTMENT,
+    ADVANCE_BALANCE,
+    SYSTEM,
+    WITHDRAWAL,   // ← referenceId = WithdrawRequest.id
+    DEPOSIT       // ← referenceId = DepositLog.id
+}
+```
+
+### 3.4 WalletService — thêm 2 boundary methods
+
+```java
+// WalletService.java (interface)
+
+/**
+ * Boundary CREDIT — tiền vào USER wallet từ VNPay.
+ * 1 LedgerEntry (CREDIT) + FLOAT_MAIN += amount.
+ */
+Transaction deposit(Long userId, BigDecimal amount, String paymentRef, Long depositRefId);
+
+/**
+ * Boundary DEBIT — tiền ra USER wallet về ngân hàng qua MockBank.
+ * settle() locked funds + 1 LedgerEntry (DEBIT) + FLOAT_MAIN -= amount.
+ */
+Transaction withdraw(Long userId, BigDecimal amount, String bankTxnId, Long withdrawReqId);
+```
+
+**WalletServiceImpl — thêm vào BOUNDARY_TYPES và implement:**
+
+```java
+private static final Set<TransactionType> BOUNDARY_TYPES = Set.of(
+    TransactionType.SYSTEM_TOPUP,
+    TransactionType.DEPOSIT,
+    TransactionType.WITHDRAW
+);
+
+@Override
+@Transactional
+public Transaction deposit(Long userId, BigDecimal amount, String paymentRef, Long depositRefId) {
+    validateAmount(amount);
+    Wallet userWallet = getWalletForUpdate(WalletOwnerType.USER, userId);
+    userWallet.credit(amount);
+
+    Transaction txn = Transaction.builder()
+            .transactionCode(codeGenerator.generate(BusinessCodeType.TRANSACTION))
+            .amount(amount)
+            .type(TransactionType.DEPOSIT)
+            .status(TransactionStatus.SUCCESS)
+            .gatewayProvider(PaymentProvider.VNPAY)
+            .referenceType(ReferenceType.DEPOSIT)
+            .referenceId(depositRefId)
+            .paymentRef(paymentRef)
+            .description("Nap tien qua VNPay - " + paymentRef)
+            .build();
+
+    txn.getEntries().add(LedgerEntry.credit(txn, userWallet, amount, userWallet.getBalance()));
+    walletRepository.save(userWallet);
+    Transaction saved = transactionRepository.save(txn);
+    updateFloatMain(amount, true);
+    return saved;
+}
+
+@Override
+@Transactional
+public Transaction withdraw(Long userId, BigDecimal amount, String bankTxnId, Long withdrawReqId) {
+    validateAmount(amount);
+    Wallet userWallet = getWalletForUpdate(WalletOwnerType.USER, userId);
+    userWallet.settle(amount);   // unlock + debit (funds đã lock lúc PENDING)
+
+    Transaction txn = Transaction.builder()
+            .transactionCode(codeGenerator.generate(BusinessCodeType.TRANSACTION))
+            .amount(amount)
+            .type(TransactionType.WITHDRAW)
+            .status(TransactionStatus.SUCCESS)
+            .gatewayProvider(PaymentProvider.MOCK_BANK)
+            .referenceType(ReferenceType.WITHDRAWAL)
+            .referenceId(withdrawReqId)
+            .paymentRef(bankTxnId)
+            .description("Rut tien - " + bankTxnId)
+            .build();
+
+    txn.getEntries().add(LedgerEntry.debit(txn, userWallet, amount, userWallet.getBalance()));
+    walletRepository.save(userWallet);
+    Transaction saved = transactionRepository.save(txn);
+    updateFloatMain(amount, false);
+    return saved;
+}
+```
+
+---
+
+### 3.5 BankingService — HTTP client gọi MockBank
+
+**Vị trí:** `modules/wallet/service/banking/`
+
+```java
+// BankingService.java (interface)
+public interface BankingService {
+    /**
+     * Chuyển khoản từ tài khoản doanh nghiệp sang tài khoản cá nhân user.
+     * Gọi MockBank POST /v1/transfers.
+     */
+    BankTransferResult transfer(String creditAccount, String creditAccountName,
+                                String creditBankCode, BigDecimal amount,
+                                String referenceNumber, String description);
+
+    /**
+     * Tra cứu kết quả giao dịch theo referenceNumber.
+     * Dùng để re-check khi network timeout.
+     */
+    BankTransferResult getTransaction(String referenceNumber);
+}
+```
+
+```java
+// BankingServiceImpl.java
+@Service
+public class BankingServiceImpl implements BankingService {
+
+    @Value("${app.banking.base-url}")
+    private String baseUrl;
+
+    @Value("${app.banking.api-key}")
+    private String apiKey;
+
+    @Value("${app.banking.company-account}")
+    private String companyAccount;
+
+    private final RestClient restClient;
+
+    public BankingServiceImpl(RestClient.Builder builder,
+                               @Value("${app.banking.base-url}") String baseUrl,
+                               @Value("${app.banking.api-key}") String apiKey) {
+        this.restClient = builder
+                .baseUrl(baseUrl)
+                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .defaultHeader("Content-Type", "application/json")
+                .build();
+    }
+
+    @Override
+    public BankTransferResult transfer(String creditAccount, String creditAccountName,
+                                       String creditBankCode, BigDecimal amount,
+                                       String referenceNumber, String description) {
+        Map<String, Object> body = Map.of(
+            "debitAccount",      companyAccount,
+            "creditAccount",     creditAccount,
+            "creditAccountName", creditAccountName,
+            "creditBankCode",    creditBankCode,
+            "amount",            amount,
+            "currency",          "VND",
+            "referenceNumber",   referenceNumber,
+            "description",       description
+        );
+        try {
+            return restClient.post()
+                    .uri("/v1/transfers")
+                    .body(body)
+                    .retrieve()
+                    .body(BankTransferResult.class);
+        } catch (HttpClientErrorException.Conflict e) {
+            // 409 Duplicate — parse body và trả về
+            return parseConflictResponse(e.getResponseBodyAsString());
+        } catch (Exception e) {
+            throw new InternalSystemException("Không thể kết nối MockBank: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public BankTransferResult getTransaction(String referenceNumber) {
+        try {
+            return restClient.get()
+                    .uri("/v1/transactions/{ref}", referenceNumber)
+                    .retrieve()
+                    .body(BankTransferResult.class);
+        } catch (Exception e) {
+            throw new InternalSystemException("Lỗi tra cứu GD MockBank: " + e.getMessage());
+        }
+    }
+}
+```
+
+**DTOs:**
+
+```java
+// BankTransferResult.java — map từ MockBank response envelope
+public record BankTransferResult(
+    String responseCode,     // "00" = success, khác = failed
+    String responseMessage,
+    BankTransferData data    // null nếu failed
+) {
+    public boolean isSuccess() { return "00".equals(responseCode); }
+    public boolean isDuplicate() { return "09".equals(responseCode); }
+    public String transactionId() {
+        return data != null ? data.transactionId() : null;
+    }
+}
+
+public record BankTransferData(
+    String transactionId,
+    String referenceNumber,
+    BigDecimal remainingBalance,
+    String transactionTime
+) {}
+```
+
+---
+
+### 3.6 application.yml — IFMS (thêm vào)
+
+```yaml
+app:
+  banking:
+    base-url: ${BANK_API_URL:http://localhost:8081}
+    api-key: ${BANK_API_KEY:mock-bank-secret-key-2026}
+    company-account: ${COMPANY_BANK_ACCOUNT:9704366000000001}
+    connect-timeout-ms: 5000
+    read-timeout-ms: 10000
+
+  vnpay:
+    tmn-code: ${VNPAY_TMN_CODE:DEMO1234}
+    hash-secret: ${VNPAY_HASH_SECRET:change_me}
+    payment-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+    return-url: ${VNPAY_RETURN_URL:http://localhost:5173/payment/vnpay/result}
+    ipn-url: ${VNPAY_IPN_URL:http://localhost:8080/api/v1/payments/vnpay/ipn}
+    version: "2.1.0"
+    command: pay
+    order-type: other
+```
+
+---
+
+### 3.7 WithdrawRequest Entity
+
+**Vị trí:** `modules/wallet/entity/WithdrawRequest.java`
+
+```java
+@Entity
+@Table(name = "withdrawal_requests",
+       indexes = {
+           @Index(name = "idx_wr_user_id",   columnList = "user_id"),
+           @Index(name = "idx_wr_status",     columnList = "status"),
+           @Index(name = "idx_wr_created_at", columnList = "created_at")
+       })
+public class WithdrawRequest extends BaseEntity {
+
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "withdraw_code", unique = true, nullable = false, length = 30)
+    private String withdrawCode;                    // WD-2026-000012
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "amount", precision = 19, scale = 2, nullable = false)
+    private BigDecimal amount;
+
+    // Snapshot tài khoản ngân hàng user lúc submit (từ UserProfile)
+    @Column(name = "credit_account", nullable = false, length = 30)
+    private String creditAccount;                   // "0011004000005"
+
+    @Column(name = "credit_account_name", nullable = false, length = 100)
+    private String creditAccountName;               // "DO QUOC BAO"
+
+    @Column(name = "credit_bank_code", nullable = false, length = 20)
+    private String creditBankCode;                  // "VCB"
+
+    @Column(name = "credit_bank_name", nullable = false, length = 100)
+    private String creditBankName;                  // "Vietcombank"
+
+    @Column(name = "user_note", length = 500)
+    private String userNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private WithdrawStatus status;
+
+    // Filled by MockBank khi COMPLETED
+    @Column(name = "bank_transaction_id", length = 50)
+    private String bankTransactionId;               // "VCB20260405103000000001"
+
+    @Column(name = "accountant_note", length = 500)
+    private String accountantNote;
+
+    @Column(name = "executed_by")
+    private Long executedBy;
+
+    @Column(name = "executed_at")
+    private LocalDateTime executedAt;
+
+    @Column(name = "transaction_id")
+    private Long transactionId;                     // FK → transactions.id
+
+    @Column(name = "failure_reason", length = 500)
+    private String failureReason;                   // MockBank responseCode + message
+}
+```
+
+### 3.8 WithdrawStatus enum
+
+```java
+public enum WithdrawStatus {
+    PENDING,       // Vừa tạo (vượt hạn mức) — lockedBalance += amount
+    COMPLETED,     // MockBank SUCCESS — lockedBalance -= amount, balance -= amount
+    FAILED,        // MockBank FAILED — lockedBalance -= amount (unlock, không debit)
+    REJECTED,      // Accountant từ chối — lockedBalance -= amount
+    CANCELLED      // User tự hủy khi PENDING — lockedBalance -= amount
+}
+```
+
+### 3.9 WithdrawService — executeWithdraw logic
+
+```java
+@Override
+@Transactional
+public WithdrawRequestDto executeWithdraw(Long accountantId, Long requestId, String note) {
+    WithdrawRequest req = findById(requestId);
+
+    if (req.getStatus() != WithdrawStatus.PENDING) {
+        throw new BadRequestException("Chỉ có thể execute ở trạng thái PENDING");
+    }
+
+    req.setAccountantNote(note);
+    req = doExecuteWithdraw(req, accountantId);
+    return withdrawMapper.toDto(req);
+}
+
+private WithdrawRequest doExecuteWithdraw(WithdrawRequest req, Long executedBy) {
+    req.setExecutedBy(executedBy);
+    req.setExecutedAt(LocalDateTime.now());
+
+    // Gọi MockBank — lấy thông tin từ snapshot trong WithdrawRequest
+    BankTransferResult result = bankingService.transfer(
+        req.getCreditAccount(),
+        req.getCreditAccountName(),
+        req.getCreditBankCode(),
+        req.getAmount(),
+        req.getWithdrawCode(),      // idempotency key
+        "Chuyen khoan thu nhap - " + req.getWithdrawCode()
+    );
+
+    if (result.isSuccess() || result.isDuplicate()) {
+        // isDuplicate: đã gọi trước nhưng IFMS chưa nhận response → coi là thành công
+        Transaction txn = walletService.withdraw(
+            req.getUserId(), req.getAmount(),
+            result.transactionId(), req.getId()
+        );
+        req.setStatus(WithdrawStatus.COMPLETED);
+        req.setBankTransactionId(result.transactionId());
+        req.setTransactionId(txn.getId());
+    } else {
+        // MockBank failed → unlock funds
+        walletService.unlockFunds(WalletOwnerType.USER, req.getUserId(), req.getAmount());
+        req.setStatus(WithdrawStatus.FAILED);
+        req.setFailureReason("[" + result.responseCode() + "] " + result.responseMessage());
+    }
+
+    return withdrawRequestRepository.save(req);
+}
+
+```
+
+### 3.10 WithdrawController endpoints
+
+```
+POST   /api/v1/withdrawals
+       Body: { amount, userNote? }           ← bank info lấy tự động từ UserProfile
+       Auth: WALLET_WITHDRAW
+       → Tự động đọc bankAccountNum, bankName, bankAccountOwner từ profile user
+       → Tự động execute nếu amount <= limit của role
+
+DELETE /api/v1/withdrawals/{id}
+       Auth: WALLET_WITHDRAW (chỉ owner của request)
+       → cancelRequest() — chỉ khi PENDING
+
+GET    /api/v1/withdrawals/my?page=0&size=10
+       Auth: WALLET_WITHDRAW
+
+GET    /api/v1/withdrawals?status=PENDING&page=0&size=20
+       Auth: TRANSACTION_APPROVE_WITHDRAW
+
+PUT    /api/v1/withdrawals/{id}/execute
+       Body: { note? }
+       Auth: TRANSACTION_APPROVE_WITHDRAW
+
+PUT    /api/v1/withdrawals/{id}/reject
+       Body: { reason }
+       Auth: TRANSACTION_APPROVE_WITHDRAW
+```
+
+> **Bank info từ UserProfile:** Khi user submit, service tự đọc `userProfile.bankAccountNum`,
+> `userProfile.bankName`, `userProfile.bankAccountOwner` và snapshot vào WithdrawRequest.
+> User không cần nhập lại — họ đã setup profile rồi.
+
+---
+
+### 3.11 VNPay Deposit (tóm tắt — chi tiết riêng)
+
+```
+POST /api/v1/payments/vnpay/create  { amount, orderInfo }
+    → VnpayService.createPaymentUrl() → redirect URL
+    → Tạo DepositLog(PENDING)
+
+GET  /api/v1/payments/vnpay/ipn   ← VNPay server gọi (server-to-server)
+    → Verify HMAC-SHA512
+    → walletService.deposit(userId, amount, vnp_TransactionNo, depositLogId)
+    → credit USER wallet + FLOAT_MAIN +=
+    → Trả { "RspCode": "00" }
+
+GET  /api/v1/payments/vnpay/return  ← Browser redirect
+    → Chỉ đọc kết quả, KHÔNG credit ở đây
+```
+
+---
+
+### 3.12 Migration V13
+
+```sql
+-- V13__add_withdrawal_requests.sql
+
+CREATE SEQUENCE IF NOT EXISTS seq_withdraw_code START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE IF NOT EXISTS withdrawal_requests
+(
+    id                   BIGINT GENERATED BY DEFAULT AS IDENTITY NOT NULL,
+    withdraw_code        VARCHAR(30)    NOT NULL,
+    user_id              BIGINT         NOT NULL,
+    amount               DECIMAL(19, 2) NOT NULL,
+    credit_account       VARCHAR(30)    NOT NULL,
+    credit_account_name  VARCHAR(100)   NOT NULL,
+    credit_bank_code     VARCHAR(20)    NOT NULL,
+    credit_bank_name     VARCHAR(100)   NOT NULL,
+    user_note            VARCHAR(500),
+    status               VARCHAR(20)    NOT NULL,
+    bank_transaction_id  VARCHAR(50),
+    accountant_note      VARCHAR(500),
+    executed_by          BIGINT,
+    executed_at          TIMESTAMP WITHOUT TIME ZONE,
+    transaction_id       BIGINT,
+    failure_reason       VARCHAR(500),
+    created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    updated_at           TIMESTAMP WITHOUT TIME ZONE,
+    created_by           BIGINT,
+    updated_by           BIGINT,
+    CONSTRAINT pk_withdrawal_requests PRIMARY KEY (id),
+    CONSTRAINT uk_wr_withdraw_code UNIQUE (withdraw_code),
+    CONSTRAINT wr_status_check CHECK (status IN (
+        'PENDING', 'COMPLETED', 'FAILED', 'REJECTED', 'CANCELLED'
+    ))
+);
+
+CREATE INDEX IF NOT EXISTS idx_wr_user_id   ON withdrawal_requests (user_id);
+CREATE INDEX IF NOT EXISTS idx_wr_status    ON withdrawal_requests (status);
+CREATE INDEX IF NOT EXISTS idx_wr_created   ON withdrawal_requests (created_at);
+```
+
+---
+
+## 4. End-to-End Flow
+
+### 4.1 Withdraw — Happy Path
+
+```
+[User]  POST /api/v1/withdrawals { amount: 5,000,000, userNote: "Lương tháng 4" }
+            ↓
+[IFMS]  WithdrawService.createRequest()
+        1. Đọc UserProfile → creditAccount="0011004000005", creditBankCode="VCB"
+        2. validateAmount: 5M <= USER wallet available balance
+        3. walletService.lockFunds(USER, userId, 5M)  →  lockedBalance += 5M
+        4. Tạo WithdrawRequest(PENDING, code="WD-2026-000012")
+        → Response: WithdrawRequestDto
+            ↓
+[Accountant]  GET /api/v1/withdrawals?status=PENDING
+[Accountant]  PUT /api/v1/withdrawals/{id}/execute
+            ↓
+[IFMS]  WithdrawService.executeWithdraw()
+        1. status = PROCESSING
+        2. POST MockBank /v1/transfers {
+               debitAccount:      "9704366000000001",
+               creditAccount:     "0011004000005",
+               creditAccountName: "DO QUOC BAO",
+               creditBankCode:    "VCB",
+               amount:            5000000,
+               referenceNumber:   "WD-2026-000012"
+           }
+            ↓
+[MockBank]  (MOCKBANK_TRANSFER_RESULT=SUCCESS)
+        1. Idempotency check → reference chưa tồn tại → OK
+        2. corporate_account.balance -= 5,000,000  (49,995,000,000)
+        3. Lưu BankTransaction(status=SUCCESS, txnId="VCB20260405103000000001")
+        4. Response: { responseCode:"00", data: { transactionId:"VCB20260405..." } }
+            ↓
+[IFMS]  result.isSuccess() = true
+        3. walletService.withdraw(userId, 5M, "VCB20260405103000000001", reqId)
+           → userWallet.settle(5M)  [lockedBalance-=5M, balance-=5M]
+           → LedgerEntry(DEBIT, USER wallet, 5M)
+           → FLOAT_MAIN.balance -= 5M
+        4. WithdrawRequest.status = COMPLETED
+        → Response: WithdrawRequestDto(COMPLETED)
+```
+
+### 4.2 Withdraw — MockBank FAILED
+
+```
+[MockBank]  (MOCKBANK_TRANSFER_RESULT=FAILED)
+        → Response: { responseCode:"96", responseMessage:"Loi he thong ngan hang" }
+            ↓
+[IFMS]  result.isSuccess() = false
+        → walletService.unlockFunds(USER, userId, 5M)  [lockedBalance -= 5M]
+        → WithdrawRequest.status = FAILED
+        → failureReason = "[96] Loi he thong ngan hang"
+        → User thấy request FAILED, tiền được unlock
+```
+
+### 4.3 Withdraw — Network Timeout Retry
+
+```
+[IFMS]  Gọi MockBank → timeout (không nhận được response)
+            ↓ (Accountant retry: PUT /execute lại)
+[IFMS]  bankingService.transfer() với cùng referenceNumber "WD-2026-000012"
+            ↓
+[MockBank]  reference đã tồn tại → 409 DUPLICATE
+        Response: { responseCode:"09", data: { transactionId:"VCB20260405...", status:"SUCCESS" } }
+            ↓
+[IFMS]  result.isDuplicate() = true
+        → Lấy transactionId từ response.data
+        → walletService.withdraw() bình thường
+        → COMPLETED — không bị deduct 2 lần
+```
+
+---
+
+## 5. Thứ tự Implement
+
+### Phase 1 — MockBank Service
+1. Tạo Spring Boot project mới (`ifms-mock-bank`)
+2. `CorporateAccount` + `BankTransaction` entity
+3. `MockBankProperties` (@ConfigurationProperties)
+4. API Key filter (`ApiKeyAuthFilter`)
+5. `TransferService` (transfer + idempotency + env-var simulation)
+6. `BankingController` (3 endpoints)
+7. `DataSeeder` (seed corporate account)
+8. Test manual với Postman — test cả 3 mode: SUCCESS, FAILED, RANDOM
+
+### Phase 2 — IFMS Infrastructure
+1. Thêm `PaymentProvider.MOCK_BANK`, `ReferenceType.WITHDRAWAL/DEPOSIT`
+2. Migration V13 (`withdrawal_requests` + `seq_withdraw_code`)
+3. `WithdrawRequest` entity + `WithdrawStatus` enum
+4. Thêm `WITHDRAWAL` vào `BusinessCodeType`
+
+### Phase 3 — IFMS Withdraw
+1. `BankingService` interface + `BankingServiceImpl` (RestClient)
+2. `WalletService.withdraw()` + `WalletService.deposit()` + update `BOUNDARY_TYPES`
+3. `WithdrawService` + `WithdrawServiceImpl`
+4. `WithdrawMapper` + `WithdrawController`
+5. Test end-to-end: MockBank SUCCESS → FLOAT_MAIN invariant đúng
+
+### Phase 4 — IFMS Deposit (VNPay)
+1. `VnpayService` (createUrl, processIpn, processReturn)
+2. `VnpayController` (`/create`, `/ipn`, `/return`)
+3. Test với VNPay sandbox + ngrok (expose IPN endpoint ra ngoài)
+
+---
+
+## 6. Checklist trước Demo
+
+**MockBank:**
+- [ ] Port 8081, H2 console tại `/h2-console`
+- [ ] Corporate account seed: `9704366000000001` balance 50 tỷ
+- [ ] Đổi `MOCKBANK_TRANSFER_RESULT=SUCCESS` → transaction thành công
+- [ ] Đổi `MOCKBANK_TRANSFER_RESULT=FAILED` → transaction thất bại, funds unlock
+- [ ] Đổi `MOCKBANK_TRANSFER_RESULT=RANDOM` → test retry scenario
+- [ ] Gọi cùng `referenceNumber` 2 lần → 409 DUPLICATE, không deduct 2 lần
+
+**IFMS + MockBank integration:**
+- [ ] `app.banking.base-url=http://localhost:8081`
+- [ ] `app.banking.company-account=9704366000000001`
+- [ ] Withdraw SUCCESS: USER wallet giảm, MockBank corporate account giảm, FLOAT_MAIN giảm
+- [ ] Withdraw FAILED: USER wallet không đổi (funds unlocked), MockBank không thay đổi
+- [ ] FLOAT_MAIN invariant sau mỗi operation: `systemDiscrepancy = 0` tại `/company-fund/reconciliation`
+- [ ] Idempotency: retry sau timeout không deduct 2 lần
+
+**VNPay Deposit:**
+- [ ] Ngrok expose port 8080 cho IPN callback
+- [ ] Dùng thẻ test VNPay, credit USER wallet thành công
+- [ ] FLOAT_MAIN tăng sau deposit
+- [ ] IPN gọi 2 lần với cùng txnRef → chỉ credit 1 lần

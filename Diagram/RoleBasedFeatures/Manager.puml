@@ -1,0 +1,73 @@
+@startmindmap
+' --- CẤU HÌNH GIAO DIỆN ---
+skinparam linestyle ortho
+skinparam shadowing false
+skinparam BackgroundColor white
+skinparam NodeBackgroundColor #F5F5F5
+skinparam NodeBorderColor #333333
+skinparam FontName Arial
+
+' --- MÀU SẮC ---
+<style>
+mindmapDiagram {
+  .root { BackgroundColor #E67E22; FontColor white; FontSize 16; FontStyle bold }
+  .inherit { BackgroundColor #95A5A6; FontColor white }
+  .project { BackgroundColor #2ECC71; FontColor white }
+  .approval { BackgroundColor #E74C3C; FontColor white }
+  .dept { BackgroundColor #34495E; FontColor white }
+}
+</style>
+
+* <&people> **ROLE: MANAGER**\n(Trưởng phòng)
+
+' 1. KẾ THỪA
+left side
+** <&person> **Kế thừa quyền Employee** <<inherit>>
+***_ Đăng nhập & Bảo mật (PIN)
+***_ Ví cá nhân & Lương
+***_ Tạo yêu cầu cá nhân
+
+' 2. QUẢN LÝ ĐỀ ÁN & TIẾN ĐỘ (UPDATED)
+right side
+** <&briefcase> **Quản lý Đề án (Lifecycle)** <<project>>
+*** Khởi tạo Đề án
+****_ Thông tin chung (Tên, Deadline)
+****_ **Thiết lập Giai đoạn 1 (Phase)**
+*****_ Định nghĩa mục tiêu Phase
+*****_ **Cấp vốn Giai đoạn (Phase Budget)**
+*** Quản lý Tiến độ (Progress)
+****_ **Chuyển Giai đoạn (Next Phase)**
+*****_ Đóng Phase cũ -> Mở Phase mới
+*****_ Cấp vốn tiếp cho Phase mới
+*** Quản lý Thành viên
+****_ Thêm/Xóa nhân viên
+*** Kiểm soát Trạng thái
+****_ **Tạm dừng (Pause)** -> Chặn chi tiêu
+****_ Đóng Đề án (Close) -> Thu hồi vốn dư
+
+' 3. XÉT DUYỆT
+right side
+** <&check> **Xét duyệt (Approval)** <<approval>>
+*** Danh sách Chờ duyệt
+****_ Cảnh báo phiếu giá trị cao
+****_ **Cảnh báo lệch Giai đoạn**
+*** Xem chi tiết
+****_ Soi chứng từ/Hóa đơn
+*** **Thao tác Duyệt**
+****_ Check Hạn mức Manager
+****_ < Hạn mức: Chuyển Kế toán
+****_ > Hạn mức: Chuyển Admin (Leo thang)
+*** **Thao tác Từ chối**
+****_ Nhập lý do (Bắt buộc)
+
+' 4. QUẢN TRỊ PHÒNG BAN
+right side
+** <&graph> **Quản trị Phòng ban** <<dept>>
+*** Dashboard Phòng
+****_ Tổng ngân sách (Admin cấp)
+****_ Tiền khả dụng (Chưa cấp cho DA)
+*** Báo cáo
+****_ Biểu đồ chi tiêu theo Dự án
+****_ Hiệu quả sử dụng vốn theo Phase
+
+@endmindmap

@@ -1,0 +1,55 @@
+@startmindmap
+' --- CẤU HÌNH ---
+skinparam shadowing false
+skinparam BackgroundColor white
+skinparam NodeBackgroundColor #F5F5F5
+skinparam NodeBorderColor #333333
+skinparam FontName Arial
+
+' --- MÀU SẮC ---
+<style>
+mindmapDiagram {
+  .root { BackgroundColor #2C3E50; FontColor white; FontSize 16; FontStyle bold }
+  .user { BackgroundColor #E74C3C; FontColor white }
+  .dept { BackgroundColor #2980B9; FontColor white }
+  .risk { BackgroundColor #F39C12; FontColor white }
+  .monitor { BackgroundColor #8E44AD; FontColor white }
+}
+</style>
+
+* <&cog> **ROLE: ADMIN**\n(Quản trị viên)
+
+' 1. QUẢN TRỊ NHÂN SỰ
+left side
+** <&people> **Quản trị Nhân sự** <<user>>
+*** Danh sách Nhân viên
+****_ Filter & Search
+*** Cấp tài khoản (Onboarding)
+*** Chỉnh sửa & Điều chuyển
+*** Khóa/Mở khóa (Lock)
+
+' 2. TỔ CHỨC & NGÂN SÁCH
+left side
+** <&graph> **Tổ chức & Ngân sách** <<dept>>
+*** Quản lý Phòng ban
+*** Cấp vốn (Top-up Quota)
+****_ Cấp tiền tổng cho Manager
+
+' 3. CẤU HÌNH RỦI RO (UPDATED)
+right side
+** <&shield> **Cấu hình Rủi ro** <<risk>>
+*** Hạn mức Rút tiền (Withdraw)
+****_ Set limit auto-approve
+*** Hạn mức Duyệt (Approval)
+****_ Set ngưỡng duyệt của Manager
+****_ > Ngưỡng -> Cần Admin duyệt
+*** Whitelist (Ngoại lệ)
+
+' 4. GIÁM SÁT
+right side
+** <&pulse> **Giám sát & Log** <<monitor>>
+*** Dashboard Tổng
+****_ Dòng tiền & Dư nợ
+*** Audit Logs (Nhật ký)
+
+@endmindmap

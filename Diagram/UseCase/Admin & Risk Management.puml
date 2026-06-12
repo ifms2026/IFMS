@@ -1,0 +1,109 @@
+@startuml
+title UC-Detail: Phân hệ Admin & Quản trị Rủi ro (Admin System)
+
+' --- 1. CẤU HÌNH GIAO DIỆN ---
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype polyline
+
+skinparam usecase {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2C3E50
+    FontName Arial
+}
+skinparam actor {
+    BackgroundColor White
+    BorderColor #2C3E50
+    FontName Arial
+}
+skinparam note {
+    BackgroundColor #FEF9E7
+    BorderColor #F1C40F
+    FontSize 11
+}
+
+' --- 2. ACTORS ---
+actor "Admin\n(Quản trị viên)" as Adm #E74C3C
+
+rectangle "Admin & Risk Management System" {
+
+    ' --- NHÓM 1: QUẢN TRỊ NHÂN SỰ (HRM) ---
+    package "1. Quản trị Nhân sự (User Mgmt)" {
+        usecase "Quản lý DS Nhân viên (CRUD)" as UC_UserCRUD
+        usecase "Cấp tài khoản mới (Onboard)" as UC_Onboard
+        usecase "Khóa/Mở khóa User" as UC_LockUser
+        usecase "Reset Mật khẩu" as UC_ResetPass
+    }
+
+    ' --- NHÓM 2: TỔ CHỨC & NGÂN SÁCH ---
+    package "2. Tổ chức & Ngân sách (Org)" {
+        usecase "Quản lý Phòng ban" as UC_ManageDept
+        usecase "Cấp vốn Phòng ban (Top-up)" as UC_TopUp
+        usecase "Khóa Phòng ban" as UC_LockDept
+    }
+
+    ' --- NHÓM 3: CẤU HÌNH RỦI RO (RISK CONFIG) ---
+    package "3. Cấu hình Rủi ro & Luật" {
+        usecase "Cấu hình Hạn mức Rút (Withdraw)" as UC_ConfigWithdraw
+        usecase "Cấu hình Hạn mức Duyệt (Approval)" as UC_ConfigApproval
+        usecase "Cấu hình Ngoại lệ (Whitelist)" as UC_Whitelist
+    }
+
+    ' --- NHÓM 4: GIÁM SÁT ---
+    package "4. Giám sát & Tra soát" {
+        usecase "Xem Dashboard Dòng tiền" as UC_Dashboard
+        usecase "Xem Nhật ký (Audit Log)" as UC_ViewLog
+        usecase "Tra soát Giao dịch (Investigate)" as UC_Investigate
+    }
+
+    ' Layout Ordering (Giữ cho gọn)
+    UC_UserCRUD -[hidden]- UC_ManageDept
+    UC_ManageDept -[hidden]- UC_ConfigWithdraw
+    UC_ConfigWithdraw -[hidden]- UC_Dashboard
+}
+
+' --- 3. LIÊN KẾT (CONNECTIONS) ---
+
+' === 1. QUẢN LÝ USER ===
+Adm -- UC_UserCRUD
+' Logic: Onboard và Lock là các hành động cụ thể của quản lý user
+UC_UserCRUD <.. UC_Onboard : <<extend>>
+UC_UserCRUD <.. UC_LockUser : <<extend>>
+UC_UserCRUD <.. UC_ResetPass : <<extend>>
+
+' === 2. TỔ CHỨC & VỐN ===
+Adm -- UC_ManageDept
+' Logic: Cấp vốn là hành động quan trọng nhất với phòng ban
+UC_TopUp ..> UC_ManageDept : <<include>>
+UC_LockDept .u.> UC_ManageDept : <<extend>>
+
+' === 3. RỦI RO (QUAN TRỌNG) ===
+Adm -- UC_ConfigWithdraw
+Adm -- UC_ConfigApproval
+Adm -- UC_Whitelist
+
+' Logic: Whitelist thường override các config rút tiền
+UC_Whitelist .u.> UC_ConfigWithdraw : <<extend>>
+
+' === 4. GIÁM SÁT ===
+Adm -- UC_Dashboard
+Adm -- UC_ViewLog
+' Logic: Thấy bất thường trên Dashboard -> Mới đi Tra soát
+UC_Investigate .u.> UC_Dashboard : <<extend>>
+
+' --- NOTES ---
+note right of UC_ConfigApproval
+  <b>Dynamic Approval Rule:</b>
+  Quy định số tiền tối đa
+  Manager được phép duyệt.
+  Vượt quá -> Admin duyệt.
+end note
+
+note right of UC_LockUser
+  Ngăn chặn truy cập
+  khi nhân viên nghỉ việc.
+end note
+
+@enduml

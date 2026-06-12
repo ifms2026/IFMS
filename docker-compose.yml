@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ifms-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: IFMSdb
+      POSTGRES_USER: IFMSadmin
+      POSTGRES_PASSWORD: IFMS
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ifms-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ifms-rabbitmq
+    ports:
+      - "5672:5672"   # Cổng gọi giao thức AMQP cho Spring Boot
+      - "15672:15672" # Cổng giao diện quản trị Management UI (Truy cập bằng browser tại http://localhost:15672)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:

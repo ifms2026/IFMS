@@ -1,0 +1,114 @@
+@startuml
+title UC-Detail: Phân hệ Kế toán & Lương (Accounting & Payroll)
+
+' --- 1. CẤU HÌNH GIAO DIỆN ---
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype polyline
+' polyline: Giúp đường dây đi vuông góc, gọn gàng
+
+skinparam usecase {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2C3E50
+    FontName Arial
+}
+skinparam actor {
+    BackgroundColor White
+    BorderColor #2C3E50
+    FontName Arial
+}
+skinparam note {
+    BackgroundColor #FEF9E7
+    BorderColor #F1C40F
+    FontSize 11
+}
+
+' --- 2. ACTORS ---
+actor "Employee" as Emp
+actor "Accountant\n(Kế toán)" as Acc
+actor "Mock Bank System\n(Quỹ Công ty)" as Bank <<System>>
+
+rectangle "Accounting & Payroll System" {
+
+    ' --- NHÓM 1: QUẢN LÝ QUỸ (FUND MANAGEMENT) ---
+    package "1. Quản trị Quỹ (Fund)" {
+        usecase "Xem Số dư Quỹ (Mock Bank)" as UC_ViewFund
+        usecase "Nạp vốn vào Quỹ (Top-up)" as UC_TopUpFund
+    }
+
+    ' --- NHÓM 2: HOÀN ỨNG & BÙ TRỪ ---
+    package "2. Hoàn ứng & Auto-Netting" {
+        usecase "Tạo Đề nghị Hoàn ứng" as UC_CreateReimburse
+        usecase "Quyết toán (Auto-Netting)" as UC_Netting
+        usecase "Tính toán Bù trừ Công nợ" as UC_CalcDebt
+    }
+
+    ' --- NHÓM 3: GIẢI NGÂN & CHI TIÊU ---
+    package "3. Giải ngân (Disbursement)" {
+        usecase "Giải ngân Yêu cầu (Approve Payment)" as UC_Payout
+        usecase "Trừ Quỹ & Cộng Ví User" as UC_Transfer
+    }
+
+    ' --- NHÓM 4: LƯƠNG & RỦI RO ---
+    package "4. Lương & Duyệt Rút tiền" {
+        usecase "Chi lương theo Lô (Batch Payroll)" as UC_Payroll
+        usecase "Import Excel & Validate" as UC_ImportExcel
+        usecase "Duyệt Rút tiền (High Value)" as UC_ApproveWithdraw
+    }
+
+    ' Sắp xếp layout
+    UC_ViewFund -[hidden]- UC_Netting
+    UC_Netting -[hidden]- UC_Payout
+    UC_Payout -[hidden]- UC_Payroll
+}
+
+' --- 3. LIÊN KẾT (CONNECTIONS) ---
+
+' === EMPLOYEE SIDE ===
+Emp -- UC_CreateReimburse
+
+' === ACCOUNTANT SIDE (CHÍNH) ===
+
+' 1. Quản lý Quỹ
+Acc -- UC_ViewFund
+Acc -- UC_TopUpFund
+UC_TopUpFund -- Bank : (Tăng tiền ảo)
+
+' 2. Hoàn ứng (Auto-Netting)
+Acc -- UC_Netting
+' Logic: Quyết toán xử lý yêu cầu của NV và chạy thuật toán tính nợ
+UC_Netting ..> UC_CreateReimburse : <<process>>
+UC_Netting ..> UC_CalcDebt : <<include>>
+
+' 3. Giải ngân (Payout)
+Acc -- UC_Payout
+' Logic: Giải ngân = Trừ Quỹ Cty + Cộng Ví User
+UC_Payout ..> UC_Transfer : <<include>>
+UC_Transfer -- Bank : (Trừ tiền)
+
+' 4. Lương (Payroll)
+Acc -- UC_Payroll
+' Logic: Import Excel -> Validate xem đủ tiền ko -> Mới chi
+UC_Payroll ..> UC_ImportExcel : <<include>>
+UC_Payroll -- Bank : (Trừ tiền hàng loạt)
+
+' 5. Duyệt rút tiền
+Acc -- UC_ApproveWithdraw
+UC_ApproveWithdraw -- Bank : (Release tiền bị hold)
+
+' --- NOTES ---
+note right of UC_Netting
+  <b>Auto-Netting:</b>
+  So sánh [Thực chi] vs [Đã ứng].
+  Tự động xóa nợ hoặc trừ ví.
+end note
+
+note right of UC_Transfer
+  Transaction Atomic:
+  Đảm bảo tiền trừ ở Quỹ
+  phải bằng tiền cộng vào Ví.
+end note
+
+@enduml

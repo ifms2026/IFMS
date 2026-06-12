@@ -1,0 +1,88 @@
+@startuml
+title UC-Detail: Phân hệ Quản lý Chi tiêu & Đề án (Expense & Project)
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+' --- CẤU HÌNH GIAO DIỆN ---
+skinparam usecase {
+    BackgroundColor White
+    BorderColor Black
+    ArrowColor Black
+}
+skinparam actor {
+    BackgroundColor White
+    BorderColor Black
+}
+
+' --- ACTORS ---
+actor "Employee" as Emp
+actor "Manager\n(Trưởng phòng)" as Mgr
+actor "Admin" as Adm
+
+rectangle "Expense & Project Management System" {
+
+    ' --- 1. NHÓM QUẢN TRỊ ĐỀ ÁN (PROJECT GOVERNANCE) ---
+    usecase "Tạo Đề án mới" as UC_CreateProject
+    usecase "Phân bổ Ngân sách Đề án" as UC_AllocateBudget
+    usecase "Thêm/Xóa thành viên (Member)" as UC_AddMember
+    usecase "Đóng Đề án" as UC_CloseProject
+    usecase "Kiểm tra Quỹ Phòng ban" as UC_CheckDeptFund
+
+    ' --- 2. NHÓM TẠO YÊU CẦU (REQUEST CREATION) ---
+    usecase "Tạo Yêu cầu Chi tiêu" as UC_CreateReq
+    usecase "Upload Hóa đơn/Chứng từ" as UC_Upload
+    usecase "Kiểm tra Ngân sách Đề án" as UC_CheckProjFund
+
+    ' --- 3. NHÓM XÉT DUYỆT (APPROVAL FLOW) ---
+    usecase "Duyệt Yêu cầu (Approve)" as UC_Approve
+    usecase "Từ chối (Reject)" as UC_Reject
+    usecase "Nhập lý do từ chối" as UC_Reason
+    usecase "Chuyển cấp duyệt (Escalate)" as UC_Escalate
+}
+
+' --- LIÊN KẾT (ASSOCIATIONS) ---
+
+' === MANAGER FLOW ===
+Mgr -- UC_CreateProject
+Mgr -- UC_AddMember
+Mgr -- UC_CloseProject
+Mgr -- UC_Approve
+Mgr -- UC_Reject
+
+' Logic: Tạo dự án bao gồm việc Phân bổ tiền
+UC_CreateProject ..> UC_AllocateBudget : <<include>>
+' Logic: Muốn phân bổ tiền phải check xem Phòng còn tiền ko
+UC_AllocateBudget ..> UC_CheckDeptFund : <<include>>
+
+' === EMPLOYEE FLOW ===
+Emp -- UC_CreateReq
+
+' Logic: Tạo yêu cầu phải Upload ảnh và Hệ thống tự check tiền dự án
+UC_CreateReq ..> UC_Upload : <<include>>
+UC_CreateReq ..> UC_CheckProjFund : <<include>>
+
+' Note về các loại yêu cầu
+note right of UC_CreateReq
+  Bao gồm:
+  1. Xin Cấp tiền (Expense)
+  2. Xin Tạm ứng (Advance)
+  3. Hoàn ứng (Reimbursement)
+end note
+
+' === APPROVAL FLOW (QUAN TRỌNG) ===
+' Admin tham gia duyệt các phiếu lớn
+Adm -- UC_Approve
+Adm -- UC_Reject
+
+' Logic Reject
+UC_Reject ..> UC_Reason : <<include>>
+
+' Logic Dynamic Approval
+UC_Approve <.. UC_Escalate : <<extend>>
+
+note "<b>Luồng Duyệt Động:</b>\n1. Nếu Tiền < Hạn mức Manager: Manager duyệt -> Done.\n2. Nếu Tiền > Hạn mức Manager: Manager duyệt -> Hệ thống chuyển trạng thái\n'Chờ Admin duyệt' (Escalate)." as NoteDynamic
+UC_Escalate .. NoteDynamic
+
+@enduml

@@ -1,0 +1,117 @@
+@startuml
+title OVERVIEW: SME Internal Wallet System
+
+' --- 1. CẤU HÌNH GIAO DIỆN ---
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype polyline
+' polyline giúp đường dây đi gọn hơn, ít cong vòng vèo
+
+skinparam usecase {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2C3E50
+    FontName Arial
+}
+skinparam actor {
+    BorderColor #2C3E50
+    BackgroundColor White
+    FontName Arial
+}
+skinparam note {
+    BackgroundColor #FDFEFE
+    BorderColor #2C3E50
+}
+
+' --- 2. ĐỊNH NGHĨA ACTORS ---
+' Nhóm Vận hành (Bên Trái)
+actor "Employee\n(Nhân viên)" as Emp
+actor "Manager\n(Trưởng phòng)" as Mgr
+actor "Accountant\n(Kế toán)" as Acc
+
+' Nhóm Quản trị (Bên Phải - Để giảm chéo dây)
+actor "Admin\n(Quản trị viên)" as Adm #E74C3C
+
+' --- 3. QUAN HỆ THỪA KẾ ---
+Emp <|-- Mgr
+Emp <|-- Acc
+
+rectangle "SME Internal Wallet System" {
+
+    ' --- Sắp xếp layout từ trên xuống dưới ---
+
+    package "1. Identity & Personal Security" {
+        usecase "Đăng nhập & Đổi mật khẩu" as UC_Login
+        usecase "Thiết lập PIN Giao dịch" as UC_PIN
+    }
+
+    package "2. Personal Wallet (Ví Cá nhân)" {
+        usecase "Xem Ví & Lịch sử GD" as UC_Wallet
+        usecase "Nạp tiền (Sandbox)" as UC_Deposit
+        usecase "Rút tiền (Smart Withdraw)" as UC_Withdraw
+        usecase "Xem Phiếu lương" as UC_Payslip
+    }
+
+    package "3. Request & Project (Nghiệp vụ)" {
+        usecase "Tạo Yêu cầu\n(Chi/Ứng/Hoàn ứng)" as UC_Request
+        usecase "Quản lý Đề án\n& Ngân sách DA" as UC_Project
+        usecase "Duyệt Yêu cầu\n(Approval)" as UC_Approve
+    }
+
+    package "4. Accounting & Fund (Kế toán)" {
+        usecase "Giải ngân &\nChi lương (Batch)" as UC_Payout
+        usecase "Quyết toán\n(Auto-Netting)" as UC_Netting
+        usecase "Quản lý Quỹ\n(Mock Bank)" as UC_SystemFund
+        usecase "Duyệt Rút tiền\n(Rủi ro cao)" as UC_RiskApprove
+    }
+
+    package "5. Administration (Quản trị)" {
+        usecase "Quản lý Nhân sự\n(CRUD/Lock)" as UC_UserMgmt
+        usecase "Quản lý Phòng ban\n& Cấp vốn" as UC_DeptQuota
+        usecase "Cấu hình Rủi ro\n(Risk Config)" as UC_RiskConfig
+        usecase "Xem Dashboard\n& Audit Log" as UC_Report
+    }
+}
+
+' --- 4. LIÊN KẾT (CONNECTIONS) ---
+
+' === NHÓM TRÁI (VẬN HÀNH) ===
+
+' Employee (Kết nối vào nhóm 1 & 2 & 3)
+Emp -- UC_Login
+Emp -- UC_PIN
+Emp -- UC_Wallet
+Emp -- UC_Deposit
+Emp -- UC_Withdraw
+Emp -- UC_Payslip
+Emp -- UC_Request
+
+' Manager (Kết nối vào nhóm 3)
+Mgr -- UC_Project
+Mgr -- UC_Approve : (Cấp 1)
+
+' Accountant (Kết nối vào nhóm 4)
+Acc -- UC_Payout
+Acc -- UC_Netting
+Acc -- UC_SystemFund
+Acc -- UC_RiskApprove
+
+' === NHÓM PHẢI (ADMIN) ===
+' Admin kết nối từ bên phải vào nhóm 1 & 5 & nhóm duyệt
+UC_Login -- Adm
+UC_UserMgmt -- Adm
+UC_DeptQuota -- Adm
+UC_RiskConfig -- Adm
+UC_Report -- Adm
+UC_Approve -- Adm : (Cấp 2)
+
+' Note
+note left of Emp
+  <b>Inheritance Note:</b>
+  Manager & Accountant
+  kế thừa toàn bộ quyền
+  của Employee.
+end note
+
+@enduml

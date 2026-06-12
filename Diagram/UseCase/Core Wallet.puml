@@ -1,0 +1,110 @@
+@startuml
+title UC-Detail: Phân hệ Ví điện tử & Giao dịch (Core Wallet)
+
+' --- 1. CẤU HÌNH GIAO DIỆN ---
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype polyline
+' polyline: Giúp đường dây đi vuông góc, tránh rối
+
+skinparam usecase {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2C3E50
+    FontName Arial
+}
+skinparam actor {
+    BackgroundColor White
+    BorderColor #2C3E50
+    FontName Arial
+}
+skinparam note {
+    BackgroundColor #FEF9E7
+    BorderColor #F1C40F
+    FontSize 11
+}
+
+' --- 2. ACTORS ---
+actor "Employee" as Emp
+actor "Payment Gateway\n(PayOS/VNPay)" as Gateway <<System>>
+actor "Mock Bank System\n(Quỹ Công ty)" as MockBank <<System>>
+
+rectangle "Core Wallet Engine" {
+
+    ' --- Sắp xếp vị trí các nhóm (Layout) ---
+
+    package "1. Tra cứu thông tin" {
+        usecase "Xem số dư (Real-time)" as UC_ViewBalance
+        usecase "Xem lịch sử giao dịch" as UC_ViewHistory
+    }
+
+    package "2. Bảo mật Giao dịch" {
+        usecase "Xác thực Mã PIN (Cấp 2)" as UC_VerifyPIN
+    }
+
+    package "3. Luồng Nạp tiền (Deposit)" {
+        usecase "Nạp tiền (Tạo yêu cầu)" as UC_Deposit
+        usecase "Sinh mã QR Thanh toán" as UC_GenQR
+        usecase "Xử lý Webhook (IPN)" as UC_Webhook
+    }
+
+    package "4. Luồng Rút tiền (Withdraw)" {
+        usecase "Rút tiền về NH" as UC_Withdraw
+        usecase "Kiểm tra Số dư & Quỹ" as UC_CheckBalance
+        usecase "Kiểm tra Hạn mức Rủi ro" as UC_CheckRisk
+        usecase "Rút tự động (Auto-Payout)" as UC_AutoPayout
+        usecase "Chuyển trạng thái Chờ duyệt" as UC_QueueApproval
+    }
+
+    ' --- KỸ THUẬT CĂN CHỈNH (Hidden Links) ---
+    ' Ép thứ tự hiển thị từ trên xuống dưới để dây không chéo nhau
+    UC_ViewBalance -[hidden]- UC_VerifyPIN
+    UC_VerifyPIN -[hidden]- UC_Deposit
+    UC_Deposit -[hidden]- UC_Withdraw
+}
+
+' --- 3. LIÊN KẾT (CONNECTIONS) ---
+
+' === NHÓM 1: TRA CỨU ===
+Emp -- UC_ViewBalance
+Emp -- UC_ViewHistory
+
+' === NHÓM 2: NẠP TIỀN ===
+Emp -- UC_Deposit
+UC_Deposit ..> UC_VerifyPIN : <<include>>
+UC_Deposit ..> UC_GenQR : <<include>>
+
+' Gateway (Bên Phải)
+UC_GenQR -- Gateway
+Gateway -- UC_Webhook
+' Webhook update trạng thái cho Deposit (nhưng vẽ ẩn hoặc ghi chú để đỡ rối)
+UC_Webhook ..> UC_Deposit : <<update status>>
+
+' === NHÓM 3: RÚT TIỀN ===
+Emp -- UC_Withdraw
+UC_Withdraw ..> UC_VerifyPIN : <<include>>
+UC_Withdraw ..> UC_CheckBalance : <<include>>
+UC_Withdraw ..> UC_CheckRisk : <<include>>
+
+' Logic mở rộng của Rút tiền
+UC_AutoPayout .u.> UC_Withdraw : <<extend>>
+UC_QueueApproval .u.> UC_Withdraw : <<extend>>
+
+' MockBank (Bên Phải)
+UC_AutoPayout -- MockBank
+
+' --- NOTES ---
+note right of UC_QueueApproval
+  <b>Condition:</b>
+  Risk > Limit
+  (Treo lệnh)
+end note
+
+note right of UC_AutoPayout
+  <b>Condition:</b>
+  Risk OK
+  (Trừ quỹ thật)
+end note
+
+@enduml

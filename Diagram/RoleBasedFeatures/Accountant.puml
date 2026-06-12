@@ -1,0 +1,61 @@
+@startmindmap
+' --- CẤU HÌNH ---
+skinparam shadowing false
+skinparam BackgroundColor white
+skinparam NodeBackgroundColor #F5F5F5
+skinparam NodeBorderColor #333333
+skinparam FontName Arial
+
+' --- MÀU SẮC ---
+<style>
+mindmapDiagram {
+  .root { BackgroundColor #8E44AD; FontColor white; FontSize 16; FontStyle bold }
+  .inherit { BackgroundColor #95A5A6; FontColor white }
+  .payout { BackgroundColor #E67E22; FontColor white }
+  .payroll { BackgroundColor #27AE60; FontColor white }
+  .risk { BackgroundColor #C0392B; FontColor white }
+  .fund { BackgroundColor #2980B9; FontColor white }
+}
+</style>
+
+* <&calculator> **ROLE: ACCOUNTANT**\n(Kế toán)
+
+' 1. KẾ THỪA
+left side
+** <&person> **Kế thừa quyền Employee** <<inherit>>
+***_ Ví cá nhân
+***_ Lương thưởng cá nhân
+***_ Hồ sơ cá nhân
+' 2. GIẢI NGÂN & BÙ TRỪ
+right side
+** <&briefcase> **Giải ngân & Bù trừ** <<payout>>
+*** Danh sách Chờ chi (Pending)
+****_ Phiếu đã được Sếp duyệt
+****_ **Thao tác: Thanh toán**
+*****_ Trừ Quỹ Cty -> Cộng Ví NV
+*** Quyết toán (Auto-Netting)
+****_ Xử lý Hoàn ứng
+****_ **Thuật toán Bù trừ**
+*****_ Tự động xóa nợ / Cộng ví
+
+' 3. CHI LƯƠNG
+right side
+** <&spreadsheet> **Chi lương (Payroll)** <<payroll>>
+*** Tạo Kỳ lương mới
+*** **Chi lương theo Lô (Batch)**
+****_ Upload Excel
+****_ Preview & Validate
+****_ Confirm chuyển tiền hàng loạt
+
+' 4. RỦI RO & QUỸ
+right side
+** <&shield> **Rủi ro & Quỹ** <<risk>>
+*** Duyệt Rút tiền lớn
+****_ Xử lý lệnh bị treo (Pending)
+****_ Duyệt -> Trừ tiền thật
+****_ Từ chối -> Hoàn tiền ví
+*** **Quản lý Quỹ (Fund)** <<fund>>
+****_ Xem số dư Mock Bank
+****_ Nạp tiền Quỹ (Top-up)
+
+@endmindmap
