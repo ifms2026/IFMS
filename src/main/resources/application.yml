@@ -7,7 +7,7 @@ spring:
   # Tối ưu cho ~1000 concurrent requests
   # Formula: pool-size = (core_count * 2) + disk_spindles ≈ 20-30 cho production
   datasource:
-    url: jdbc:postgresql://db.ernzepnkvyyksjojgays.supabase.co:5432/postgres?sslmode=require
+    url: ${DATABASE_URL}
     username: ${DB_USERNAME:IFMSadmin}
     password: ${DB_PASSWORD:IFMS}
     driver-class-name: org.postgresql.Driver
