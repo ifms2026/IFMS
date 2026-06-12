@@ -86,10 +86,7 @@ spring:
       max-request-size: 20MB
   # ── rabbitMQ ────────────────────────────
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
+    addresses: ${RABBITMQ_PRIVATE_URL}
     mail:
       exchange: ${RABBITMQ_MAIL_EXCHANGE:mailExchange}
       dlx: ${RABBITMQ_MAIL_DLX:mailDLX}
