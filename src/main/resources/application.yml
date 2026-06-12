@@ -60,15 +60,13 @@ spring:
   # ── Redis (Message Queue for Email, Caching) ────────────────
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}           # Blank = no auth (dev mode)
+      url: ${REDIS_URL}
       timeout: 5000ms
       lettuce:
         pool:
           min-idle: 2
           max-idle: 8
-          max-active: 16                     # Max concurrent Redis connections
+          max-active: 16
           max-wait: 3000ms
 
 
