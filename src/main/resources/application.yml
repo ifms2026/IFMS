@@ -12,12 +12,12 @@ spring:
     password: ${DB_PASSWORD:IFMS}
     driver-class-name: org.postgresql.Driver
     hikari:
-      minimum-idle: 10                   # Connections giữ sẵn khi idle
-      maximum-pool-size: 30              # Max connections trong pool (1000 req / ~30-50ms per query)
-      idle-timeout: 300000               # 5 phút — đóng idle connection sau thời gian này
-      max-lifetime: 1800000              # 30 phút — recycle connection tránh DB timeout
-      connection-timeout: 5000           # 5 giây — throw exception nếu không lấy được connection
-      leak-detection-threshold: 30000    # 30 giây — log warning nếu connection bị giữ quá lâu
+      minimum-idle: 1
+      maximum-pool-size: 2
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
       pool-name: IFMS-HikariPool
 
   jpa:
