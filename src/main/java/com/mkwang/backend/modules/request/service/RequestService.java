@@ -68,7 +68,7 @@ public interface RequestService {
 
     ManagerRejectResponse rejectManagerRequest(Long id, Long managerId, RejectRequestRequest req);
 
-    PageResponse<CfoApprovalSummaryResponse> getCfoApprovals(String search, int page, int size);
+    PageResponse<CfoApprovalSummaryResponse> getCfoApprovals(RequestStatus status, String search, int page, int size);
 
     CfoApprovalDetailResponse getCfoApprovalDetail(Long id);
 

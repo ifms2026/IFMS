@@ -45,11 +45,12 @@ public class ManagerProjectController {
     public ResponseEntity<ApiResponse<PageResponse<DepartmentMemberSummaryResponse>>> getDepartmentMembers(
             @AuthenticationPrincipal UserDetailsAdapter principal,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
 
         return ResponseEntity.ok(ApiResponse.success(managerProjectService.getDepartmentMembers(
-                principal.getUser().getId(), search, page, limit
+                principal.getUser().getId(), search, role, page, limit
         )));
     }
 

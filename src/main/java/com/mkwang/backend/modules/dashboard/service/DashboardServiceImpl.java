@@ -80,6 +80,11 @@ public class DashboardServiceImpl implements DashboardService {
         long employeesWithDebt     = requestService.countDeptEmployeesWithDebt(deptId);
 
         return ManagerDashboardResponse.builder()
+                .department(ManagerDashboardResponse.DepartmentSnapshot.builder()
+                        .id(manager.getDepartment().getId())
+                        .name(manager.getDepartment().getName())
+                        .code(manager.getDepartment().getCode())
+                        .build())
                 .departmentBudget(ManagerDashboardResponse.DepartmentBudget.builder()
                         .totalProjectQuota(totalQuota)
                         .totalAvailableBalance(totalAvailable)

@@ -50,12 +50,16 @@ public class UserSpecification {
         };
     }
 
-    public static Specification<User> filterDepartmentMembers(Long departmentId, Long excludedUserId, String search) {
+    public static Specification<User> filterDepartmentMembers(Long departmentId, Long excludedUserId, String roleName, String search) {
         Specification<User> spec = Specification.where(fetchProfile())
                 .and(hasDepartmentId(departmentId));
 
         if (excludedUserId != null) {
             spec = spec.and(excludeUserId(excludedUserId));
+        }
+
+        if (roleName != null && !roleName.isBlank()) {
+            spec = spec.and(hasRoleName(roleName));
         }
 
         if (search != null && !search.isBlank()) {

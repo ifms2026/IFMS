@@ -17,7 +17,7 @@ import java.util.Map;
 public interface ManagerProjectService {
 
     PageResponse<DepartmentMemberSummaryResponse> getDepartmentMembers(
-            Long managerId, String search, int page, int limit);
+            Long managerId, String search, String role, int page, int limit);
 
     DepartmentMemberDetailResponse getDepartmentMemberDetail(Long managerId, Long memberId);
 

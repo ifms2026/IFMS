@@ -67,7 +67,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('REQUEST_VIEW_DEPT')")
     public PageResponse<DepartmentMemberSummaryResponse> getDepartmentMembers(
-            Long managerId, String search, int page, int limit) {
+            Long managerId, String search, String role, int page, int limit) {
 
         User manager = getManagerOrThrow(managerId);
         int safePage = Math.max(page, 1);
@@ -77,6 +77,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         Page<User> memberPage = userService.getDepartmentMembers(
                 manager.getDepartment().getId(),
                 manager.getId(),
+                normalizeRole(role),
                 normalizeSearch(search),
                 pageable
         );
@@ -460,6 +461,14 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
 
     private String normalizeSearch(String search) {
         return search == null || search.isBlank() ? null : search.trim();
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        String normalized = role.trim().toUpperCase();
+        return ("TEAM_LEADER".equals(normalized) || "EMPLOYEE".equals(normalized)) ? normalized : null;
     }
 
     private Map<Long, BigDecimal> loadDebtBalances(List<Long> userIds) {

@@ -34,6 +34,7 @@ public class ManagerProjectMapper {
                 profile != null ? profile.getEmployeeCode() : null,
                 resolveAvatar(profile),
                 profile != null ? profile.getJobTitle() : null,
+                user.getRole() != null ? user.getRole().getName() : null,
                 user.getStatus().name(),
                 pendingRequestsCount,
                 debtBalance

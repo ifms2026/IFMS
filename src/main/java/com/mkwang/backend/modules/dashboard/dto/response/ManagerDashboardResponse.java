@@ -9,10 +9,19 @@ import java.math.BigDecimal;
 @Builder
 public class ManagerDashboardResponse {
 
+    private DepartmentSnapshot department;
     private DepartmentBudget departmentBudget;
     private ProjectStatusSummary projectStatusSummary;
     private long pendingApprovalsCount;
     private TeamDebtSummary teamDebtSummary;
+
+    @Getter
+    @Builder
+    public static class DepartmentSnapshot {
+        private Long id;
+        private String name;
+        private String code;
+    }
 
     @Getter
     @Builder

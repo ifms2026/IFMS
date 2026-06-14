@@ -108,8 +108,8 @@ public class RequestSpecification {
                 .and(matchesSearch(search));
     }
 
-    public static Specification<Request> filterForCfoApprovals(String search) {
-        return Specification.where(hasStatus(RequestStatus.PENDING))
+    public static Specification<Request> filterForCfoApprovals(RequestStatus status, String search) {
+        return Specification.where(hasStatus(status))
                 .and(hasType(RequestType.DEPARTMENT_TOPUP))
                 .and(matchesSearch(search));
     }

@@ -21,7 +21,7 @@ public interface UserService {
 
     User getUserById(Long userId);
 
-    Page<User> getDepartmentMembers(Long departmentId, Long excludedUserId, String search, Pageable pageable);
+    Page<User> getDepartmentMembers(Long departmentId, Long excludedUserId, String roleName, String search, Pageable pageable);
 
     User getDepartmentUserById(Long departmentId, Long userId);
 

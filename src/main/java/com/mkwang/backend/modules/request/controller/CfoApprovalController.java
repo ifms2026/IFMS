@@ -9,6 +9,7 @@ import com.mkwang.backend.modules.request.dto.response.CfoApprovalDetailResponse
 import com.mkwang.backend.modules.request.dto.response.CfoApprovalSummaryResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoApproveResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoRejectResponse;
+import com.mkwang.backend.modules.request.entity.RequestStatus;
 import com.mkwang.backend.modules.request.service.RequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -41,11 +42,12 @@ public class CfoApprovalController {
                       "Keyword search applies to request code and description."
     )
     public ResponseEntity<ApiResponse<PageResponse<CfoApprovalSummaryResponse>>> getApprovals(
+            @RequestParam(defaultValue = "PENDING") RequestStatus status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
-                requestService.getCfoApprovals(search, page, size)
+                requestService.getCfoApprovals(status, search, page, size)
         ));
     }
 

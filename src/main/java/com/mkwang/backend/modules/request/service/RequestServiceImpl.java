@@ -652,11 +652,12 @@ public class RequestServiceImpl implements RequestService {
     @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_DEPT_TOPUP')")
-    public PageResponse<CfoApprovalSummaryResponse> getCfoApprovals(String search, int page, int size) {
+    public PageResponse<CfoApprovalSummaryResponse> getCfoApprovals(RequestStatus status, String search, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(size, 1);
+        RequestStatus safeStatus = status != null ? status : RequestStatus.PENDING;
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Specification<Request> spec = RequestSpecification.filterForCfoApprovals(search);
+        Specification<Request> spec = RequestSpecification.filterForCfoApprovals(safeStatus, search);
 
         Page<CfoApprovalSummaryResponse> result = requestRepository
                 .findAll(spec, pageable)

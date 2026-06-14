@@ -9,6 +9,7 @@ public record DepartmentMemberSummaryResponse(
         String employeeCode,
         String avatar,
         String jobTitle,
+        String role,
         String status,
         int pendingRequestsCount,
         BigDecimal debtBalance

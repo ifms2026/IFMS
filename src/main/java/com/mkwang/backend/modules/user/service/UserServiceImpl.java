@@ -123,8 +123,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<User> getDepartmentMembers(Long departmentId, Long excludedUserId, String search, Pageable pageable) {
-        var specification = UserSpecification.filterDepartmentMembers(departmentId, excludedUserId, search);
+    public Page<User> getDepartmentMembers(Long departmentId, Long excludedUserId, String roleName, String search, Pageable pageable) {
+        var specification = UserSpecification.filterDepartmentMembers(departmentId, excludedUserId, roleName, search);
         return userRepository.findAll(specification, pageable);
     }
 
