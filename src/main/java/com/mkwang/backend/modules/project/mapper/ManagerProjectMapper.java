@@ -73,14 +73,23 @@ public class ManagerProjectMapper {
     }
 
     public ProjectSummaryResponse toProjectSummaryResponse(Project project, int memberCount) {
+        return toProjectSummaryResponse(project, memberCount, project.getAvailableBudget(), project.getTotalSpent());
+    }
+
+    public ProjectSummaryResponse toProjectSummaryResponse(
+            Project project,
+            int memberCount,
+            BigDecimal availableBudget,
+            BigDecimal totalSpent) {
+
         return new ProjectSummaryResponse(
                 project.getId(),
                 project.getProjectCode(),
                 project.getName(),
                 project.getStatus().name(),
                 project.getTotalBudget(),
-                project.getAvailableBudget(),
-                project.getTotalSpent(),
+                availableBudget,
+                totalSpent,
                 memberCount,
                 project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null,
                 project.getCurrentPhase() != null ? project.getCurrentPhase().getName() : null,
@@ -93,6 +102,16 @@ public class ManagerProjectMapper {
             List<PhaseDetailResponse> phases,
             List<ProjectMemberResponse> members) {
 
+        return toProjectDetailResponse(project, phases, members, project.getAvailableBudget(), project.getTotalSpent());
+    }
+
+    public ProjectDetailResponse toProjectDetailResponse(
+            Project project,
+            List<PhaseDetailResponse> phases,
+            List<ProjectMemberResponse> members,
+            BigDecimal availableBudget,
+            BigDecimal totalSpent) {
+
         return new ProjectDetailResponse(
                 project.getId(),
                 project.getProjectCode(),
@@ -100,8 +119,8 @@ public class ManagerProjectMapper {
                 project.getDescription(),
                 project.getStatus().name(),
                 project.getTotalBudget(),
-                project.getAvailableBudget(),
-                project.getTotalSpent(),
+                availableBudget,
+                totalSpent,
                 project.getDepartment() != null ? project.getDepartment().getId() : null,
                 project.getManager() != null ? project.getManager().getId() : null,
                 project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null,
@@ -113,12 +132,16 @@ public class ManagerProjectMapper {
     }
 
     public PhaseDetailResponse toPhaseDetailResponse(ProjectPhase phase) {
+        return toPhaseDetailResponse(phase, phase.getCurrentSpent());
+    }
+
+    public PhaseDetailResponse toPhaseDetailResponse(ProjectPhase phase, BigDecimal currentSpent) {
         return new PhaseDetailResponse(
                 phase.getId(),
                 phase.getPhaseCode(),
                 phase.getName(),
                 phase.getBudgetLimit(),
-                phase.getCurrentSpent(),
+                currentSpent,
                 phase.getStatus().name(),
                 phase.getStartDate(),
                 phase.getEndDate()

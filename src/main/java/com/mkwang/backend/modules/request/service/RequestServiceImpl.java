@@ -581,6 +581,8 @@ public class RequestServiceImpl implements RequestService {
                 "PROJECT_TOPUP approved by manager — request " + request.getRequestCode()
         );
 
+        request.getProject().addBudget(effectiveAmount);
+
         request.setStatus(RequestStatus.PAID);
         request.setPaidAt(LocalDateTime.now());
         request.getHistories().add(RequestHistory.builder()
@@ -868,6 +870,11 @@ public class RequestServiceImpl implements RequestService {
                         .remainingAmount(amount)
                         .build();
                 advanceBalanceRepository.save(advanceBalance);
+            }
+
+            request.getProject().deductBudget(amount);
+            if (request.getPhase() != null) {
+                request.getPhase().addSpent(amount);
             }
         } else if (request.getType() == RequestType.REIMBURSE) {
             AdvanceBalance advanceBalance = request.getAdvanceBalance();

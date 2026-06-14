@@ -22,6 +22,7 @@ import com.mkwang.backend.modules.project.entity.ProjectRole;
 import com.mkwang.backend.modules.project.entity.ProjectStatus;
 import com.mkwang.backend.modules.project.mapper.ManagerProjectMapper;
 import com.mkwang.backend.modules.project.repository.ProjectMemberRepository;
+import com.mkwang.backend.modules.project.repository.PhaseCategoryBudgetRepository;
 import com.mkwang.backend.modules.project.repository.ProjectPhaseRepository;
 import com.mkwang.backend.modules.project.repository.ProjectRepository;
 import com.mkwang.backend.modules.project.repository.ProjectSpecification;
@@ -55,6 +56,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     private final UserService userService;
     private final ProjectRepository projectRepository;
     private final ProjectPhaseRepository projectPhaseRepository;
+    private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final RequestRepository requestRepository;
     private final WalletRepository walletRepository;
@@ -142,10 +144,18 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         Page<Project> projectPage = projectRepository.findAll(spec, pageable);
         Map<Long, Integer> memberCounts = loadMemberCounts(projectPage.getContent().stream().map(Project::getId).toList());
 
-        List<ProjectSummaryResponse> items = projectPage.getContent().stream()
-                .map(project -> managerProjectMapper.toProjectSummaryResponse(
-                        project,
-                        memberCounts.getOrDefault(project.getId(), 0)))
+        List<Project> projects = projectPage.getContent();
+        Map<Long, BigDecimal> spentByProject = loadProjectCategorySpent(projects.stream().map(Project::getId).toList());
+
+        List<ProjectSummaryResponse> items = projects.stream()
+                .map(project -> {
+                    BigDecimal totalSpent = resolveTotalSpent(project, spentByProject.get(project.getId()));
+                    return managerProjectMapper.toProjectSummaryResponse(
+                            project,
+                            memberCounts.getOrDefault(project.getId(), 0),
+                            resolveAvailableBudget(project, totalSpent),
+                            totalSpent);
+                })
                 .toList();
 
         return PageResponse.<ProjectSummaryResponse>builder()
@@ -271,9 +281,14 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     }
 
     private ProjectDetailResponse buildProjectDetail(Project project) {
-        List<PhaseDetailResponse> phases = projectPhaseRepository.findByProject_IdOrderByCreatedAtAsc(project.getId())
+        var projectPhases = projectPhaseRepository.findByProject_IdOrderByCreatedAtAsc(project.getId());
+        Map<Long, BigDecimal> spentByPhase = loadPhaseCategorySpent(projectPhases.stream().map(phase -> phase.getId()).toList());
+
+        List<PhaseDetailResponse> phases = projectPhases
                 .stream()
-                .map(managerProjectMapper::toPhaseDetailResponse)
+                .map(phase -> managerProjectMapper.toPhaseDetailResponse(
+                        phase,
+                        resolvePhaseSpent(phase.getCurrentSpent(), spentByPhase.get(phase.getId()))))
                 .toList();
 
         List<ProjectMemberResponse> members = projectMemberRepository.findMembersWithProfileByProjectId(project.getId())
@@ -281,7 +296,58 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
                 .map(managerProjectMapper::toProjectMemberResponse)
                 .toList();
 
-        return managerProjectMapper.toProjectDetailResponse(project, phases, members);
+        BigDecimal totalSpent = resolveTotalSpent(
+                project,
+                phaseCategoryBudgetRepository.sumCurrentSpentByProjectId(project.getId()));
+
+        return managerProjectMapper.toProjectDetailResponse(
+                project,
+                phases,
+                members,
+                resolveAvailableBudget(project, totalSpent),
+                totalSpent);
+    }
+
+    private Map<Long, BigDecimal> loadProjectCategorySpent(List<Long> projectIds) {
+        if (projectIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, BigDecimal> spentByProject = new HashMap<>();
+        for (Object[] row : phaseCategoryBudgetRepository.sumCurrentSpentByProjectIds(projectIds)) {
+            spentByProject.put(((Number) row[0]).longValue(), coalesce((BigDecimal) row[1]));
+        }
+        return spentByProject;
+    }
+
+    private Map<Long, BigDecimal> loadPhaseCategorySpent(List<Long> phaseIds) {
+        if (phaseIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, BigDecimal> spentByPhase = new HashMap<>();
+        for (Object[] row : phaseCategoryBudgetRepository.sumCurrentSpentByPhaseIds(phaseIds)) {
+            spentByPhase.put(((Number) row[0]).longValue(), coalesce((BigDecimal) row[1]));
+        }
+        return spentByPhase;
+    }
+
+    private BigDecimal resolveTotalSpent(Project project, BigDecimal categorySpent) {
+        return coalesce(project.getTotalSpent()).max(coalesce(categorySpent));
+    }
+
+    private BigDecimal resolvePhaseSpent(BigDecimal phaseSpent, BigDecimal categorySpent) {
+        return coalesce(phaseSpent).max(coalesce(categorySpent));
+    }
+
+    private BigDecimal resolveAvailableBudget(Project project, BigDecimal totalSpent) {
+        BigDecimal fundedBudget = coalesce(project.getAvailableBudget()).add(coalesce(project.getTotalSpent()));
+        BigDecimal availableBudget = fundedBudget.subtract(coalesce(totalSpent));
+        return availableBudget.max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal coalesce(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private User getManagerOrThrow(Long managerId) {

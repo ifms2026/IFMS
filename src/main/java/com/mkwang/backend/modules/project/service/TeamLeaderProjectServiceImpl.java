@@ -29,6 +29,7 @@ import com.mkwang.backend.modules.project.entity.ProjectRole;
 import com.mkwang.backend.modules.project.entity.ProjectStatus;
 import com.mkwang.backend.modules.project.repository.ProjectMemberRepository;
 import com.mkwang.backend.modules.project.repository.ProjectMemberSpecification;
+import com.mkwang.backend.modules.project.repository.PhaseCategoryBudgetRepository;
 import com.mkwang.backend.modules.project.repository.ProjectPhaseRepository;
 import com.mkwang.backend.modules.project.repository.ProjectRepository;
 import com.mkwang.backend.modules.profile.entity.UserProfile;
@@ -47,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +59,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectPhaseRepository projectPhaseRepository;
+    private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
     private final BusinessCodeGenerator businessCodeGenerator;
@@ -81,19 +84,23 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
         int fromIndex = Math.max(0, (page - 1) * limit);
         int toIndex = Math.min(fromIndex + limit, total);
 
-        List<ProjectSummaryResponse> items = allProjects.subList(fromIndex, toIndex).stream()
+        List<Project> pageProjects = allProjects.subList(fromIndex, toIndex);
+        Map<Long, BigDecimal> spentByProject = loadProjectCategorySpent(pageProjects.stream().map(Project::getId).toList());
+
+        List<ProjectSummaryResponse> items = pageProjects.stream()
                 .map(p -> {
                     int memberCount = projectRepository.countMembersByProjectId(p.getId());
                     String currentPhaseName = p.getCurrentPhase() != null ? p.getCurrentPhase().getName() : null;
                     Long currentPhaseId = p.getCurrentPhase() != null ? p.getCurrentPhase().getId() : null;
+                    BigDecimal totalSpent = resolveTotalSpent(p, spentByProject.get(p.getId()));
                     return new ProjectSummaryResponse(
                             p.getId(),
                             p.getProjectCode(),
                             p.getName(),
                             p.getStatus().name(),
                             p.getTotalBudget(),
-                            p.getAvailableBudget(),
-                            p.getTotalSpent(),
+                            resolveAvailableBudget(p, totalSpent),
+                            totalSpent,
                             memberCount,
                             currentPhaseId,
                             currentPhaseName,
@@ -123,14 +130,16 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
         Project project = getProjectOrThrow(projectId);
         assertLeaderOf(currentUser.getId(), projectId);
 
-        List<PhaseDetailResponse> phases = projectPhaseRepository
-                .findByProject_IdOrderByCreatedAtAsc(projectId).stream()
+        List<ProjectPhase> projectPhases = projectPhaseRepository.findByProject_IdOrderByCreatedAtAsc(projectId);
+        Map<Long, BigDecimal> spentByPhase = loadPhaseCategorySpent(projectPhases.stream().map(ProjectPhase::getId).toList());
+
+        List<PhaseDetailResponse> phases = projectPhases.stream()
                 .map(ph -> new PhaseDetailResponse(
                         ph.getId(),
                         ph.getPhaseCode(),
                         ph.getName(),
                         ph.getBudgetLimit(),
-                        ph.getCurrentSpent(),
+                        resolvePhaseSpent(ph.getCurrentSpent(), spentByPhase.get(ph.getId())),
                         ph.getStatus().name(),
                         ph.getStartDate(),
                         ph.getEndDate()
@@ -143,6 +152,9 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 .toList();
 
         Long currentPhaseId = project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null;
+        BigDecimal totalSpent = resolveTotalSpent(
+                project,
+                phaseCategoryBudgetRepository.sumCurrentSpentByProjectId(projectId));
 
         return new ProjectDetailResponse(
                 project.getId(),
@@ -151,8 +163,8 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 project.getDescription(),
                 project.getStatus().name(),
                 project.getTotalBudget(),
-                project.getAvailableBudget(),
-                project.getTotalSpent(),
+                resolveAvailableBudget(project, totalSpent),
+                totalSpent,
                 project.getDepartment() != null ? project.getDepartment().getId() : null,
                 project.getManager() != null ? project.getManager().getId() : null,
                 currentPhaseId,
@@ -565,6 +577,48 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     // ─────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────
+
+    private Map<Long, BigDecimal> loadProjectCategorySpent(List<Long> projectIds) {
+        if (projectIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, BigDecimal> spentByProject = new HashMap<>();
+        for (Object[] row : phaseCategoryBudgetRepository.sumCurrentSpentByProjectIds(projectIds)) {
+            spentByProject.put(((Number) row[0]).longValue(), coalesce((BigDecimal) row[1]));
+        }
+        return spentByProject;
+    }
+
+    private Map<Long, BigDecimal> loadPhaseCategorySpent(List<Long> phaseIds) {
+        if (phaseIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, BigDecimal> spentByPhase = new HashMap<>();
+        for (Object[] row : phaseCategoryBudgetRepository.sumCurrentSpentByPhaseIds(phaseIds)) {
+            spentByPhase.put(((Number) row[0]).longValue(), coalesce((BigDecimal) row[1]));
+        }
+        return spentByPhase;
+    }
+
+    private BigDecimal resolveTotalSpent(Project project, BigDecimal categorySpent) {
+        return coalesce(project.getTotalSpent()).max(coalesce(categorySpent));
+    }
+
+    private BigDecimal resolvePhaseSpent(BigDecimal phaseSpent, BigDecimal categorySpent) {
+        return coalesce(phaseSpent).max(coalesce(categorySpent));
+    }
+
+    private BigDecimal resolveAvailableBudget(Project project, BigDecimal totalSpent) {
+        BigDecimal fundedBudget = coalesce(project.getAvailableBudget()).add(coalesce(project.getTotalSpent()));
+        BigDecimal availableBudget = fundedBudget.subtract(coalesce(totalSpent));
+        return availableBudget.max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal coalesce(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
 
     private Project getProjectOrThrow(Long projectId) {
         return projectRepository.findById(projectId)
