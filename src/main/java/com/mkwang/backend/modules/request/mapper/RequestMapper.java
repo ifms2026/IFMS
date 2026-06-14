@@ -428,7 +428,8 @@ public class RequestMapper {
                 .build();
     }
 
-    public CfoApprovalSummaryResponse toCfoApprovalSummaryResponse(Request request) {
+    public CfoApprovalSummaryResponse toCfoApprovalSummaryResponse(
+            Request request, java.math.BigDecimal departmentAvailableBalance) {
         User user = request.getRequester();
         UserProfile profile = user != null ? user.getProfile() : null;
         Department department = user != null ? user.getDepartment() : null;
@@ -453,7 +454,7 @@ public class RequestMapper {
                         .id(department.getId())
                         .name(department.getName())
                         .code(department.getCode())
-                        .totalAvailableBalance(department.getTotalAvailableBalance())
+                        .totalAvailableBalance(departmentAvailableBalance)
                         .build()
                         : null)
                 .createdAt(request.getCreatedAt())
@@ -461,7 +462,10 @@ public class RequestMapper {
     }
 
     public CfoApprovalDetailResponse toCfoApprovalDetailResponse(
-            Request request, List<RequestHistoryResponse> timeline, java.math.BigDecimal cfBalance) {
+            Request request,
+            List<RequestHistoryResponse> timeline,
+            java.math.BigDecimal cfBalance,
+            java.math.BigDecimal departmentAvailableBalance) {
 
         User user = request.getRequester();
         UserProfile profile = user != null ? user.getProfile() : null;
@@ -491,7 +495,7 @@ public class RequestMapper {
                         .name(department.getName())
                         .code(department.getCode())
                         .totalProjectQuota(department.getTotalProjectQuota())
-                        .totalAvailableBalance(department.getTotalAvailableBalance())
+                        .totalAvailableBalance(departmentAvailableBalance)
                         .build()
                         : null)
                 .companyFund(CfoApprovalDetailResponse.CompanyFundSnapshot.builder()

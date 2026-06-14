@@ -660,7 +660,10 @@ public class RequestServiceImpl implements RequestService {
 
         Page<CfoApprovalSummaryResponse> result = requestRepository
                 .findAll(spec, pageable)
-                .map(requestMapper::toCfoApprovalSummaryResponse);
+                .map(request -> requestMapper.toCfoApprovalSummaryResponse(
+                        request,
+                        getDepartmentWalletAvailableBalance(request)
+                ));
 
         return PageResponse.<CfoApprovalSummaryResponse>builder()
                 .items(result.getContent())
@@ -686,7 +689,9 @@ public class RequestServiceImpl implements RequestService {
         java.math.BigDecimal cfBalance = walletService.getWallet(
                 com.mkwang.backend.modules.wallet.entity.WalletOwnerType.COMPANY_FUND, 1L).getBalance();
 
-        return requestMapper.toCfoApprovalDetailResponse(request, timeline, cfBalance);
+        BigDecimal departmentAvailableBalance = getDepartmentWalletAvailableBalance(request);
+
+        return requestMapper.toCfoApprovalDetailResponse(request, timeline, cfBalance, departmentAvailableBalance);
     }
 
     @Override
@@ -1087,6 +1092,19 @@ public class RequestServiceImpl implements RequestService {
         for (User r : recipients) {
             notify(r, type, title, message, refId);
         }
+    }
+
+    private BigDecimal getDepartmentWalletAvailableBalance(Request request) {
+        if (request.getRequester() == null || request.getRequester().getDepartment() == null) {
+            return BigDecimal.ZERO;
+        }
+
+        Long departmentId = request.getRequester().getDepartment().getId();
+        if (departmentId == null) {
+            return BigDecimal.ZERO;
+        }
+
+        return walletService.getWallet(WalletOwnerType.DEPARTMENT, departmentId).getAvailableBalance();
     }
 
     private static String formatAmount(BigDecimal amount) {

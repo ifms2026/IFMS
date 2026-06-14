@@ -84,7 +84,7 @@ public class DataSeeder implements CommandLineRunner {
     private final BusinessCodeGenerator codeGen;
 
     // ── Amount constants ─────────────────────────────────────────────
-    private static final BigDecimal IT_DEPT_SEED_TOPUP = bd("2080000000");
+    private static final BigDecimal IT_DEPT_SEED_TOPUP = bd("280000000");
     private static final BigDecimal M200   = bd("200000000");
     private static final BigDecimal M100   = bd("100000000");
     private static final BigDecimal M80    = bd("80000000");
@@ -357,7 +357,7 @@ public class DataSeeder implements CommandLineRunner {
                 WalletOwnerType.DEPARTMENT, it.getId(), IT_DEPT_SEED_TOPUP,
                 TransactionType.DEPT_QUOTA_ALLOCATION, ReferenceType.REQUEST, r1.getId(),
                 "DEPT_TOPUP paid — " + r1.getRequestCode());
-        log.info("   ✅ DEPT_TOPUP PAID 2.08B → IT dept");
+        log.info("   ✅ DEPT_TOPUP PAID 280M → IT dept");
 
         // 2. APPROVED_BY_CFO — pending auto-pay
         Request r2 = req(codeGen.generate(BusinessCodeType.REQUEST, "IT"),
