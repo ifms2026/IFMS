@@ -16,6 +16,7 @@ public class CfoApprovalSummaryResponse {
     private RequestType type;
     private RequestStatus status;
     private BigDecimal amount;
+    private BigDecimal approvedAmount;
     private String description;
     private RequesterSnippet requester;
     private DepartmentSnippet department;

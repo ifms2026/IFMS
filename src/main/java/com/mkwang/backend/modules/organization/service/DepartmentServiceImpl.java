@@ -133,7 +133,9 @@ public class DepartmentServiceImpl implements DepartmentService {
             dept.setName(newName);
         }
 
-        if (request.getManagerId() != null) {
+        if (Boolean.TRUE.equals(request.getClearManager())) {
+            dept.setManager(null);
+        } else if (request.getManagerId() != null) {
             User manager = userService.getUserById(request.getManagerId());
             dept.setManager(manager);
         }

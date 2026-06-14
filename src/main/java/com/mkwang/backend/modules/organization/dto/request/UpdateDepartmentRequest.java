@@ -15,5 +15,6 @@ public class UpdateDepartmentRequest {
 
     private String name;
     private Long managerId;
+    private Boolean clearManager;
     private BigDecimal totalProjectQuota;
 }

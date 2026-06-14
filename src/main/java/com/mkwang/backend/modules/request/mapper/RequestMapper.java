@@ -440,6 +440,7 @@ public class RequestMapper {
                 .type(request.getType())
                 .status(request.getStatus())
                 .amount(request.getAmount())
+                .approvedAmount(request.getApprovedAmount())
                 .description(request.getDescription())
                 .requester(CfoApprovalSummaryResponse.RequesterSnippet.builder()
                         .id(user != null ? user.getId() : null)
