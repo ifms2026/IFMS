@@ -14,5 +14,6 @@ public record AccountantLedgerEntryResponse(
         BigDecimal balanceAfter,
         WalletOwnerType walletOwnerType,
         Long walletOwnerId,
+        String walletOwnerName,
         LocalDateTime createdAt
 ) {}

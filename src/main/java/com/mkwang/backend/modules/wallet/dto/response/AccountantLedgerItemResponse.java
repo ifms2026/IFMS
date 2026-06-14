@@ -18,5 +18,6 @@ public record AccountantLedgerItemResponse(
         BigDecimal balanceAfter,
         WalletOwnerType walletOwnerType,
         Long ownerId,
+        String ownerName,
         LocalDateTime timestamp
 ) {}

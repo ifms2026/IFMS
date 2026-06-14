@@ -29,6 +29,7 @@ public record AccountantTransactionDetailResponse(
         Long referenceId,
         WalletOwnerType walletOwnerType,
         Long walletOwnerId,
+        String walletOwnerName,
         String description,
         List<AccountantLedgerEntryResponse> ledgerEntries,
         LocalDateTime createdAt

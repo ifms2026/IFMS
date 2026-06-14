@@ -146,6 +146,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
         WalletOwnerType ownerType = primaryEntry != null ? primaryEntry.getWallet().getOwnerType() : null;
         Long ownerId = primaryEntry != null ? primaryEntry.getWallet().getOwnerId() : null;
+        String ownerName = walletMapper.resolveWalletOwnerName(ownerType, ownerId);
 
         return new AccountantTransactionDetailResponse(
                 txn.getId(),
@@ -160,6 +161,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
                 txn.getReferenceId(),
                 ownerType,
                 ownerId,
+                ownerName,
                 txn.getDescription(),
                 entryResponses,
                 txn.getCreatedAt()
