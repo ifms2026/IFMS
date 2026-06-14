@@ -296,7 +296,7 @@ public class DataInitializer implements CommandLineRunner {
         log.info("── [2/6] Seeding Departments ...");
 
         createDeptIfNotExists("Ban Giám Đốc",          "BGD",  new BigDecimal("5000000000"),  new BigDecimal("5000000000"));
-        createDeptIfNotExists("Phòng Công Nghệ",        "IT",   new BigDecimal("20000000000"), new BigDecimal("20000000000"));
+        createDeptIfNotExists("Phòng Công Nghệ",        "IT",   new BigDecimal("2000000000"),  new BigDecimal("2000000000"));
         createDeptIfNotExists("Phòng Kế Toán – Tài Chính", "FIN", new BigDecimal("10000000000"), new BigDecimal("10000000000"));
         createDeptIfNotExists("Phòng Kinh Doanh",       "SALES", new BigDecimal("15000000000"), new BigDecimal("15000000000"));
     }

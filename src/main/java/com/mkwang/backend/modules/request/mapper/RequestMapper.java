@@ -29,6 +29,7 @@ import com.mkwang.backend.modules.profile.entity.UserProfile;
 import com.mkwang.backend.modules.user.entity.User;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Component
@@ -243,7 +244,8 @@ public class RequestMapper {
 
     public ManagerApprovalDetailResponse toManagerApprovalDetailResponse(
             Request request,
-            List<RequestHistoryResponse> timeline) {
+            List<RequestHistoryResponse> timeline,
+            BigDecimal departmentAvailableBalance) {
 
         User user = request.getRequester();
         UserProfile profile = user != null ? user.getProfile() : null;
@@ -280,7 +282,7 @@ public class RequestMapper {
                         ? ManagerApprovalDetailResponse.DepartmentDetail.builder()
                         .id(department.getId())
                         .name(department.getName())
-                        .totalAvailableBalance(department.getTotalAvailableBalance())
+                        .totalAvailableBalance(departmentAvailableBalance)
                         .build()
                         : null)
                 .timeline(timeline)

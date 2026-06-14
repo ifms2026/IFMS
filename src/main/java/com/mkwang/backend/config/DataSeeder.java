@@ -84,6 +84,7 @@ public class DataSeeder implements CommandLineRunner {
     private final BusinessCodeGenerator codeGen;
 
     // ── Amount constants ─────────────────────────────────────────────
+    private static final BigDecimal IT_DEPT_SEED_TOPUP = bd("2080000000");
     private static final BigDecimal M200   = bd("200000000");
     private static final BigDecimal M100   = bd("100000000");
     private static final BigDecimal M80    = bd("80000000");
@@ -344,7 +345,7 @@ public class DataSeeder implements CommandLineRunner {
         // 1. PAID — CFO approved, funds transferred
         Request r1 = req(codeGen.generate(BusinessCodeType.REQUEST, "IT"),
                 managerIT, null, null, null,
-                RequestType.DEPARTMENT_TOPUP, M200, M200, RequestStatus.PAID,
+                RequestType.DEPARTMENT_TOPUP, IT_DEPT_SEED_TOPUP, IT_DEPT_SEED_TOPUP, RequestStatus.PAID,
                 "Nạp ngân sách quý 2/2026 cho Phòng Công Nghệ");
         addHistory(r1, cfo, RequestAction.APPROVE, RequestStatus.APPROVED_BY_CFO,
                 "Duyệt đúng kế hoạch ngân sách Q2");
@@ -353,10 +354,10 @@ public class DataSeeder implements CommandLineRunner {
         r1.setPaidAt(LocalDateTime.now().minusDays(29));
         requestRepository.save(r1);
         walletService.transfer(WalletOwnerType.COMPANY_FUND, 1L,
-                WalletOwnerType.DEPARTMENT, it.getId(), M200,
+                WalletOwnerType.DEPARTMENT, it.getId(), IT_DEPT_SEED_TOPUP,
                 TransactionType.DEPT_QUOTA_ALLOCATION, ReferenceType.REQUEST, r1.getId(),
                 "DEPT_TOPUP paid — " + r1.getRequestCode());
-        log.info("   ✅ DEPT_TOPUP PAID 200M → IT dept");
+        log.info("   ✅ DEPT_TOPUP PAID 2.08B → IT dept");
 
         // 2. APPROVED_BY_CFO — pending auto-pay
         Request r2 = req(codeGen.generate(BusinessCodeType.REQUEST, "IT"),
@@ -1040,7 +1041,7 @@ public class DataSeeder implements CommandLineRunner {
                 "Team Leader đã gửi yêu cầu nạp quỹ dự án 20.000.000 ₫ chờ bạn phê duyệt.",
                 NotificationType.SYSTEM, false);
         notif(managerIT, "Yêu cầu ngân sách phòng ban đã được CFO duyệt",
-                "Yêu cầu DEPARTMENT_TOPUP 200.000.000 ₫ đã được CFO phê duyệt và chuyển vào quỹ phòng ban.",
+                "Yêu cầu DEPARTMENT_TOPUP 2.080.000.000 ₫ đã được CFO phê duyệt và chuyển vào quỹ phòng ban.",
                 NotificationType.DEPT_TOPUP_APPROVED, true);
         notif(managerIT, "Yêu cầu ngân sách đang chờ CFO xem xét",
                 "Yêu cầu cấp ngân sách 50.000.000 ₫ của bạn đang trong hàng đợi phê duyệt của CFO.",

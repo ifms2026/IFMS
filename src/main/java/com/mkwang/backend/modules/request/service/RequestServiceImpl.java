@@ -535,7 +535,11 @@ public class RequestServiceImpl implements RequestService {
                 .map(requestMapper::toHistoryResponse)
                 .toList();
 
-        return requestMapper.toManagerApprovalDetailResponse(request, timeline);
+        BigDecimal departmentAvailableBalance = walletService
+                .getWallet(WalletOwnerType.DEPARTMENT, departmentId)
+                .getAvailableBalance();
+
+        return requestMapper.toManagerApprovalDetailResponse(request, timeline, departmentAvailableBalance);
     }
 
     @Override
