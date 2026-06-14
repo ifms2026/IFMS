@@ -33,8 +33,8 @@ public interface ManagerProjectService {
     List<AvailableMemberResponse> getDepartmentTeamLeaders(Long managerId);
 
     /**
-     * Returns the sum of totalBudget and availableBudget across all projects in the manager's dept.
-     * Result: [totalProjectQuota, totalAvailableBalance]
+     * Returns the department fund snapshot used by Manager screens.
+     * Result: [totalProjectQuota, departmentWalletAvailableBalance]
      */
     BigDecimal[] getDeptBudgetSnapshot(Long managerId);
 

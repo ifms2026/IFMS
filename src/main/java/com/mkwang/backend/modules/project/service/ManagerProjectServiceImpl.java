@@ -259,8 +259,12 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     public BigDecimal[] getDeptBudgetSnapshot(Long managerId) {
         User manager = getManagerOrThrow(managerId);
         Long deptId = manager.getDepartment().getId();
-        BigDecimal totalQuota = projectRepository.sumTotalBudgetByDeptId(deptId);
-        BigDecimal totalAvailable = projectRepository.sumAvailableBudgetByDeptId(deptId);
+        BigDecimal projectQuota = coalesce(projectRepository.sumTotalBudgetByDeptId(deptId));
+        BigDecimal walletAvailable = walletRepository.findByOwnerTypeAndOwnerId(WalletOwnerType.DEPARTMENT, deptId)
+                .map(wallet -> coalesce(wallet.getAvailableBalance()))
+                .orElse(BigDecimal.ZERO);
+        BigDecimal totalQuota = projectQuota.max(walletAvailable);
+        BigDecimal totalAvailable = walletAvailable;
         return new BigDecimal[]{totalQuota, totalAvailable};
     }
 
