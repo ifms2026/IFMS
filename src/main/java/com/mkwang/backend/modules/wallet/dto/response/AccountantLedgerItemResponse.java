@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 
 public record AccountantLedgerItemResponse(
         Long id,
+        Long transactionId,
         String transactionCode,
         TransactionType type,
         TransactionStatus status,

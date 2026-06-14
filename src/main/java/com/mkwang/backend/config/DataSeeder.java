@@ -169,6 +169,7 @@ public class DataSeeder implements CommandLineRunner {
                              project, phase, catEquip, catTravel);
         seedCategorySpending(phase, catEquip, catMeals, catTravel);
         seedPayroll(accountant, empIT1, empIT2, empSales1, empFin1, tlIT, managerIT, cfo);
+        seedJulyPayrollPeriod();
         seedWithdrawals(empIT1, empIT2, empFin1, tlIT, managerIT);
         seedDeposits(empIT1, empIT2, empSales1, empFin1);
         seedNotifications(empIT1, empIT2, empSales1, empFin1,
@@ -803,6 +804,22 @@ public class DataSeeder implements CommandLineRunner {
     // ════════════════════════════════════════════════════════════════
     //  MODULE 5 — Withdrawal requests
     // ════════════════════════════════════════════════════════════════
+
+    private void seedJulyPayrollPeriod() {
+        if (!payrollPeriodRepository.existsByMonthAndYear(7, 2026)) {
+            payrollPeriodRepository.save(PayrollPeriod.builder()
+                    .periodCode("PR-2026-07")
+                    .name("Ky luong thang 7/2026")
+                    .month(7)
+                    .year(2026)
+                    .startDate(LocalDate.of(2026, 7, 1))
+                    .endDate(LocalDate.of(2026, 7, 31))
+                    .status(PayrollStatus.DRAFT)
+                    .nettingApplied(false)
+                    .build());
+            log.info("   T7/2026 DRAFT created");
+        }
+    }
 
     private void seedWithdrawals(User empIT1, User empIT2, User empFin1,
                                  User tlIT, User managerIT) {

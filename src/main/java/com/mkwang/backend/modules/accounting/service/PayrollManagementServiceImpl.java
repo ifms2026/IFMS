@@ -204,14 +204,27 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
                 sheet.setColumnWidth(i, 5000);
             }
 
-            // Sample row so users understand the format
-            Row sampleRow = sheet.createRow(1);
-            sampleRow.createCell(0).setCellValue("MK001");
-            sampleRow.createCell(1).setCellValue("Nguyen Van A");
-            sampleRow.createCell(2).setCellValue(28000000);
-            sampleRow.createCell(3).setCellValue(2000000);
-            sampleRow.createCell(4).setCellValue(0);
-            sampleRow.createCell(5).setCellValue(2800000);
+            List<PayrollTemplateRow> demoRows = List.of(
+                    new PayrollTemplateRow("MK010", "Nguyen Van Minh", 50000000, 0, 0, 0),
+                    new PayrollTemplateRow("MK001", "Le Van Cuong", 20000000, 0, 0, 0),
+                    new PayrollTemplateRow("MK002", "Tran Thi Bich", 35000000, 0, 0, 0),
+                    new PayrollTemplateRow("MK008", "Hoang Minh Tuan", 28000000, 0, 0, 0),
+                    new PayrollTemplateRow("MK004", "Do Quoc Bao", 18500000, 0, 0, 0),
+                    new PayrollTemplateRow("MK005", "Vu Thi Lan", 16000000, 0, 0, 0),
+                    new PayrollTemplateRow("MK006", "Pham Van Duc", 15000000, 0, 0, 0),
+                    new PayrollTemplateRow("MK007", "Nguyen Thi Minh", 12000000, 0, 0, 0)
+            );
+
+            for (int rowIndex = 0; rowIndex < demoRows.size(); rowIndex++) {
+                PayrollTemplateRow rowData = demoRows.get(rowIndex);
+                Row row = sheet.createRow(rowIndex + 1);
+                row.createCell(0).setCellValue(rowData.employeeCode());
+                row.createCell(1).setCellValue(rowData.employeeName());
+                row.createCell(2).setCellValue(rowData.baseSalary());
+                row.createCell(3).setCellValue(rowData.bonus());
+                row.createCell(4).setCellValue(rowData.allowance());
+                row.createCell(5).setCellValue(rowData.deduction());
+            }
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
@@ -670,5 +683,14 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
             return new AggregateMetrics(0, BigDecimal.ZERO);
         }
     }
+
+    private record PayrollTemplateRow(
+            String employeeCode,
+            String employeeName,
+            double baseSalary,
+            double bonus,
+            double allowance,
+            double deduction
+    ) {}
 }
 

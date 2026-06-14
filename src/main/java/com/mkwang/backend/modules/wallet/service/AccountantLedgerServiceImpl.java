@@ -112,10 +112,12 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public AccountantTransactionDetailResponse getTransactionDetail(Long transactionId) {
         Transaction txn = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", transactionId));
+                .orElseGet(() -> ledgerEntryRepository.findById(transactionId)
+                        .map(LedgerEntry::getTransaction)
+                        .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", transactionId)));
 
         // Fetch all ledger entries with wallet eagerly loaded
-        List<LedgerEntry> entries = ledgerEntryRepository.findByTransactionIdWithWallet(transactionId);
+        List<LedgerEntry> entries = ledgerEntryRepository.findByTransactionIdWithWallet(txn.getId());
 
         List<AccountantLedgerEntryResponse> entryResponses = entries.stream()
                 .map(walletMapper::toAccountantLedgerEntryResponse)
