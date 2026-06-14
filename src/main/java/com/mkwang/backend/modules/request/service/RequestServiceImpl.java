@@ -499,14 +499,16 @@ public class RequestServiceImpl implements RequestService {
     @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_PROJECT_TOPUP')")
-    public PageResponse<ManagerApprovalSummaryResponse> getManagerApprovals(Long managerId, String search, int page, int size) {
+    public PageResponse<ManagerApprovalSummaryResponse> getManagerApprovals(
+            Long managerId, RequestStatus status, String search, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(size, 1);
+        RequestStatus safeStatus = status != null ? status : RequestStatus.PENDING;
 
         Long departmentId = getManagerDepartmentId(managerId);
 
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Specification<Request> spec = RequestSpecification.filterForManagerApprovals(departmentId, search);
+        Specification<Request> spec = RequestSpecification.filterForManagerApprovals(departmentId, safeStatus, search);
 
         Page<ManagerApprovalSummaryResponse> result = requestRepository
                 .findAll(spec, pageable)

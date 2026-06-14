@@ -9,6 +9,7 @@ import com.mkwang.backend.modules.request.dto.response.ManagerApprovalDetailResp
 import com.mkwang.backend.modules.request.dto.response.ManagerApprovalSummaryResponse;
 import com.mkwang.backend.modules.request.dto.response.ManagerApproveResponse;
 import com.mkwang.backend.modules.request.dto.response.ManagerRejectResponse;
+import com.mkwang.backend.modules.request.entity.RequestStatus;
 import com.mkwang.backend.modules.request.service.RequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -41,11 +42,12 @@ public class ManagerApprovalController {
     )
     public ResponseEntity<ApiResponse<PageResponse<ManagerApprovalSummaryResponse>>> getApprovals(
             @AuthenticationPrincipal UserDetailsAdapter principal,
+            @RequestParam(defaultValue = "PENDING") RequestStatus status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
-                requestService.getManagerApprovals(principal.getUser().getId(), search, page, size)
+                requestService.getManagerApprovals(principal.getUser().getId(), status, search, page, size)
         ));
     }
 

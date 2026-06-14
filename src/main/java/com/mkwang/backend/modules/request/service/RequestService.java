@@ -59,7 +59,8 @@ public interface RequestService {
 
     TlRejectResponse rejectTlRequest(Long id, Long leaderId, RejectRequestRequest req);
 
-    PageResponse<ManagerApprovalSummaryResponse> getManagerApprovals(Long managerId, String search, int page, int size);
+    PageResponse<ManagerApprovalSummaryResponse> getManagerApprovals(
+            Long managerId, RequestStatus status, String search, int page, int size);
 
     ManagerApprovalDetailResponse getManagerApprovalDetail(Long id, Long managerId);
 

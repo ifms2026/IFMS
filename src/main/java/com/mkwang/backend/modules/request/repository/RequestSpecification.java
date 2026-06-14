@@ -91,8 +91,8 @@ public class RequestSpecification {
                 .and(matchesSearch(search));
     }
 
-    public static Specification<Request> filterForManagerApprovals(Long departmentId, String search) {
-        return Specification.where(hasStatus(RequestStatus.PENDING))
+    public static Specification<Request> filterForManagerApprovals(Long departmentId, RequestStatus status, String search) {
+        return Specification.where(hasStatus(status))
                 .and(hasType(RequestType.PROJECT_TOPUP))
                 .and(hasProjectDepartment(departmentId))
                 .and(matchesSearch(search));
