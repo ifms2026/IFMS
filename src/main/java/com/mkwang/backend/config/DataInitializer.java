@@ -15,6 +15,8 @@ import com.mkwang.backend.modules.project.repository.*;
 import com.mkwang.backend.modules.organization.entity.Department;
 import com.mkwang.backend.modules.organization.repository.DepartmentRepository;
 import com.mkwang.backend.modules.profile.entity.UserProfile;
+import com.mkwang.backend.modules.profile.entity.UserSecuritySettings;
+import com.mkwang.backend.modules.profile.repository.UserSecuritySettingsRepository;
 import com.mkwang.backend.modules.user.entity.*;
 import com.mkwang.backend.modules.user.repository.RoleRepository;
 import com.mkwang.backend.modules.user.repository.UserRepository;
@@ -68,9 +70,11 @@ public class DataInitializer implements CommandLineRunner {
     private final ProjectPhaseRepository        projectPhaseRepository;
     private final ProjectMemberRepository       projectMemberRepository;
     private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
+    private final UserSecuritySettingsRepository userSecuritySettingsRepository;
     private final PasswordEncoder               passwordEncoder;
 
     private static final String DEFAULT_PASSWORD     = "Ifms@2026";
+    private static final String DEFAULT_TRANSACTION_PIN = "27055";
     private static final BigDecimal INITIAL_FUND     = new BigDecimal("50000000000"); // 50 tỷ VND
     private static final String DEMO_PAYROLL_PERIOD_CODE = "PR-DEMO-2026-06";
     private static final int DEMO_PAYROLL_MONTH = 6;
@@ -640,7 +644,10 @@ public class DataInitializer implements CommandLineRunner {
 
         if (userRepository.findByEmail(email).isPresent()) {
             log.info("   👤 User [{}] already exists.", email);
-            return userRepository.findByEmail(email).orElseThrow();
+            User existingUser = userRepository.findByEmail(email).orElseThrow();
+            createWalletIfNotExists(existingUser);
+            createSecuritySettingsIfMissing(existingUser);
+            return existingUser;
         }
 
         User user = User.builder()
@@ -671,6 +678,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // Wallet
         createWalletIfNotExists(user);
+        createSecuritySettingsIfMissing(user);
 
         log.info("   👤 User created: {} | {} | {} | dept={}", employeeCode, fullName, email,
                 department != null ? department.getCode() : "none");
@@ -686,6 +694,19 @@ public class DataInitializer implements CommandLineRunner {
                     .lockedBalance(BigDecimal.ZERO)
                     .build());
         }
+    }
+
+    private void createSecuritySettingsIfMissing(User user) {
+        if (userSecuritySettingsRepository.existsById(user.getId())) {
+            return;
+        }
+
+        userSecuritySettingsRepository.save(UserSecuritySettings.builder()
+                .user(user)
+                .transactionPin(passwordEncoder.encode(DEFAULT_TRANSACTION_PIN))
+                .retryCount(0)
+                .lockedUntil(null)
+                .build());
     }
 
     private void resetDemoAccountsForFirstLoginIfEnabled() {
@@ -704,8 +725,19 @@ public class DataInitializer implements CommandLineRunner {
             user.setIsFirstLogin(requiresFirstLogin);
             user.setTokenVersion(user.getTokenVersion() + 1);
             userRepository.save(user);
+            resetDemoSecuritySettings(user);
             log.info("   Demo account reset: {} | firstLogin={}", email, requiresFirstLogin);
         });
+    }
+
+    private void resetDemoSecuritySettings(User user) {
+        UserSecuritySettings settings = userSecuritySettingsRepository
+                .findById(user.getId())
+                .orElse(UserSecuritySettings.builder().user(user).build());
+
+        settings.setTransactionPin(passwordEncoder.encode(DEFAULT_TRANSACTION_PIN));
+        settings.resetRetryCount();
+        userSecuritySettingsRepository.save(settings);
     }
 
     private void resetDemoPayrollWalletsIfEnabled() {
