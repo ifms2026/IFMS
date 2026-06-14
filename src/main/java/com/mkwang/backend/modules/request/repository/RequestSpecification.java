@@ -55,6 +55,11 @@ public class RequestSpecification {
                         : root.get("project").get("id").in(projectIds);
     }
 
+    public static Specification<Request> requesterIsNot(Long userId) {
+        return (root, query, cb) ->
+                userId == null ? null : cb.notEqual(root.get("requester").get("id"), userId);
+    }
+
     public static Specification<Request> hasProjectId(Long projectId) {
         return (root, query, cb) ->
                 projectId == null ? null : cb.equal(root.get("project").get("id"), projectId);
@@ -68,6 +73,7 @@ public class RequestSpecification {
     }
 
     public static Specification<Request> filterForTlApprovals(
+            Long leaderId,
             List<Long> leaderProjectIds,
             RequestType type,
             Long projectId,
@@ -80,6 +86,7 @@ public class RequestSpecification {
         return Specification.where(hasStatus(RequestStatus.PENDING))
                 .and(hasTypeIn(allowedTypes))
                 .and(projectIdIn(leaderProjectIds))
+                .and(requesterIsNot(leaderId))
                 .and(hasProjectId(projectId))
                 .and(matchesSearch(search));
     }

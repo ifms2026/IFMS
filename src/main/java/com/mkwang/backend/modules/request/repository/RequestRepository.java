@@ -60,9 +60,11 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             LEFT JOIN FETCH r.attachments att
             LEFT JOIN FETCH att.file
             WHERE r.id = :id AND r.project.id IN :projectIds
+              AND r.requester.id <> :leaderId
             """)
     Optional<Request> findDetailByIdForTl(
             @Param("id") Long id,
+            @Param("leaderId") Long leaderId,
             @Param("projectIds") List<Long> projectIds);
 
     @Query("""

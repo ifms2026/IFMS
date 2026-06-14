@@ -366,7 +366,7 @@ public class RequestServiceImpl implements RequestService {
         }
 
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Specification<Request> spec = RequestSpecification.filterForTlApprovals(leaderProjectIds, type, projectId, search);
+        Specification<Request> spec = RequestSpecification.filterForTlApprovals(leaderId, leaderProjectIds, type, projectId, search);
 
         Page<TlApprovalSummaryResponse> result = requestRepository
                 .findAll(spec, pageable)
@@ -390,7 +390,7 @@ public class RequestServiceImpl implements RequestService {
             throw new ResourceNotFoundException("Request not found");
         }
 
-        Request request = requestRepository.findDetailByIdForTl(id, leaderProjectIds)
+        Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         return requestMapper.toTlApprovalDetailResponse(request);
@@ -405,7 +405,7 @@ public class RequestServiceImpl implements RequestService {
             throw new ResourceNotFoundException("Request not found");
         }
 
-        Request request = requestRepository.findDetailByIdForTl(id, leaderProjectIds)
+        Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         if (request.getStatus() != RequestStatus.PENDING) {
@@ -413,6 +413,9 @@ public class RequestServiceImpl implements RequestService {
         }
         if (!FLOW1_TYPES.contains(request.getType())) {
             throw new BadRequestException("Only ADVANCE/EXPENSE/REIMBURSE requests are handled by Team Leader");
+        }
+        if (request.getRequester().getId().equals(leaderId)) {
+            throw new BadRequestException("Team Leader cannot approve their own request");
         }
 
         BigDecimal effectiveAmount = req.getApprovedAmount() != null ? req.getApprovedAmount() : request.getAmount();
@@ -457,7 +460,7 @@ public class RequestServiceImpl implements RequestService {
             throw new ResourceNotFoundException("Request not found");
         }
 
-        Request request = requestRepository.findDetailByIdForTl(id, leaderProjectIds)
+        Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         if (request.getStatus() != RequestStatus.PENDING) {
@@ -465,6 +468,9 @@ public class RequestServiceImpl implements RequestService {
         }
         if (!FLOW1_TYPES.contains(request.getType())) {
             throw new BadRequestException("Only ADVANCE/EXPENSE/REIMBURSE requests are handled by Team Leader");
+        }
+        if (request.getRequester().getId().equals(leaderId)) {
+            throw new BadRequestException("Team Leader cannot reject their own request");
         }
 
         request.setStatus(RequestStatus.REJECTED);
