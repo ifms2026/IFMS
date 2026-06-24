@@ -106,7 +106,10 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
                         phase.getPhaseCode(),
                         phase.getName(),
                         phase.getBudgetLimit(),
-                        phase.getCurrentSpent()
+                        phase.getCurrentSpent(),
+                        phase.getStatus().name(),
+                        phase.getStartDate(),
+                        phase.getEndDate()
                 ))
                 .toList();
 

@@ -17,14 +17,18 @@ public class TlApprovalDetailResponse {
     private RequestType type;
     private RequestStatus status;
     private BigDecimal amount;
+    private BigDecimal approvedAmount;
     private String description;
+    private String rejectReason;
     private RequesterDetail requester;
     private ProjectDetail project;
     private PhaseDetail phase;
     private Long categoryId;
     private String categoryName;
     private List<AttachmentResponse> attachments;
+    private List<RequestHistoryResponse> timeline;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     @Getter
     @Builder

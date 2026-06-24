@@ -53,7 +53,7 @@ public class ProjectPhase extends BaseEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
   @Builder.Default
-  private PhaseStatus status = PhaseStatus.ACTIVE;
+  private PhaseStatus status = PhaseStatus.PLANNED;
 
   @Column(name = "start_date")
   private LocalDate startDate;

@@ -51,7 +51,7 @@ public interface RequestService {
     List<AdvanceBalanceItem> getMyAdvanceBalances(Long userId);
 
     PageResponse<TlApprovalSummaryResponse> getTlApprovals(
-            Long leaderId, RequestType type, Long projectId, String search, int page, int size);
+            Long leaderId, RequestType type, RequestStatus status, Long projectId, String search, int page, int size);
 
     TlApprovalDetailResponse getTlApprovalDetail(Long id, Long leaderId);
 

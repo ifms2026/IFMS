@@ -149,7 +149,9 @@ public class RequestMapper {
                 .build();
     }
 
-    public TlApprovalDetailResponse toTlApprovalDetailResponse(Request request) {
+    public TlApprovalDetailResponse toTlApprovalDetailResponse(
+            Request request,
+            List<RequestHistoryResponse> timeline) {
         User user = request.getRequester();
         UserProfile profile = user != null ? user.getProfile() : null;
         ProjectPhase phase = request.getPhase();
@@ -160,7 +162,9 @@ public class RequestMapper {
                 .type(request.getType())
                 .status(request.getStatus())
                 .amount(request.getAmount())
+                .approvedAmount(request.getApprovedAmount())
                 .description(request.getDescription())
+                .rejectReason(request.getRejectReason())
                 .requester(TlApprovalDetailResponse.RequesterDetail.builder()
                         .id(user != null ? user.getId() : null)
                         .fullName(user != null ? user.getFullName() : null)
@@ -188,7 +192,9 @@ public class RequestMapper {
                 .categoryId(request.getCategory() != null ? request.getCategory().getId() : null)
                 .categoryName(request.getCategory() != null ? request.getCategory().getName() : null)
                 .attachments(request.getAttachments().stream().map(this::toAttachmentResponse).toList())
+                .timeline(timeline)
                 .createdAt(request.getCreatedAt())
+                .updatedAt(request.getUpdatedAt())
                 .build();
     }
 

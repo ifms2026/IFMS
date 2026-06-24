@@ -25,6 +25,11 @@ public class RequestSpecification {
                 status == null ? null : cb.equal(root.get("status"), status);
     }
 
+    public static Specification<Request> hasStatusIn(List<RequestStatus> statuses) {
+        return (root, query, cb) ->
+                (statuses == null || statuses.isEmpty()) ? null : root.get("status").in(statuses);
+    }
+
     public static Specification<Request> matchesSearch(String search) {
         return (root, query, cb) -> {
             if (search == null || search.isBlank()) return null;
@@ -76,14 +81,19 @@ public class RequestSpecification {
             Long leaderId,
             List<Long> leaderProjectIds,
             RequestType type,
+            RequestStatus status,
             Long projectId,
             String search) {
 
         List<RequestType> allowedTypes = (type != null)
                 ? List.of(type)
                 : List.of(RequestType.ADVANCE, RequestType.EXPENSE, RequestType.REIMBURSE);
+        List<RequestStatus> allowedStatuses =
+                status == RequestStatus.APPROVED_BY_TEAM_LEADER
+                        ? List.of(RequestStatus.APPROVED_BY_TEAM_LEADER, RequestStatus.PAID)
+                        : List.of(status != null ? status : RequestStatus.PENDING);
 
-        return Specification.where(hasStatus(RequestStatus.PENDING))
+        return Specification.where(hasStatusIn(allowedStatuses))
                 .and(hasTypeIn(allowedTypes))
                 .and(projectIdIn(leaderProjectIds))
                 .and(requesterIsNot(leaderId))

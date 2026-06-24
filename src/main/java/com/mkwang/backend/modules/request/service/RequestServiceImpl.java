@@ -345,7 +345,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_TEAM_LEADER')")
     public PageResponse<TlApprovalSummaryResponse> getTlApprovals(
-            Long leaderId, RequestType type, Long projectId, String search, int page, int size) {
+            Long leaderId, RequestType type, RequestStatus status, Long projectId, String search, int page, int size) {
 
         if (type != null && !FLOW1_TYPES.contains(type)) {
             throw new BadRequestException("Team Leader approvals only support ADVANCE/EXPENSE/REIMBURSE");
@@ -366,7 +366,9 @@ public class RequestServiceImpl implements RequestService {
         }
 
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Specification<Request> spec = RequestSpecification.filterForTlApprovals(leaderId, leaderProjectIds, type, projectId, search);
+        Specification<Request> spec =
+                RequestSpecification.filterForTlApprovals(
+                        leaderId, leaderProjectIds, type, status, projectId, search);
 
         Page<TlApprovalSummaryResponse> result = requestRepository
                 .findAll(spec, pageable)
@@ -393,7 +395,12 @@ public class RequestServiceImpl implements RequestService {
         Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
-        return requestMapper.toTlApprovalDetailResponse(request);
+        List<RequestHistoryResponse> timeline = requestRepository.findHistoriesByRequestId(id)
+                .stream()
+                .map(requestMapper::toHistoryResponse)
+                .toList();
+
+        return requestMapper.toTlApprovalDetailResponse(request, timeline);
     }
 
     @Override

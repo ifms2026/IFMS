@@ -10,6 +10,7 @@ import com.mkwang.backend.modules.request.dto.response.TlApprovalSummaryResponse
 import com.mkwang.backend.modules.request.dto.response.TlApproveResponse;
 import com.mkwang.backend.modules.request.dto.response.TlRejectResponse;
 import com.mkwang.backend.modules.request.entity.RequestType;
+import com.mkwang.backend.modules.request.entity.RequestStatus;
 import com.mkwang.backend.modules.request.service.RequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -37,25 +38,26 @@ public class TeamLeaderApprovalController {
 
     @GetMapping
     @Operation(
-        summary = "List requests pending Team Leader approval",
-        description = "Returns a paginated list of ADVANCE/EXPENSE/REIMBURSE requests in PENDING_TL status that belong to projects where the authenticated user is LEADER. Filterable by type and projectId."
+        summary = "List requests for Team Leader approval history",
+        description = "Returns pending or previously approved ADVANCE/EXPENSE/REIMBURSE requests in projects led by the authenticated Team Leader. Filterable by type, status and projectId."
     )
     public ResponseEntity<ApiResponse<PageResponse<TlApprovalSummaryResponse>>> getApprovals(
             @AuthenticationPrincipal UserDetailsAdapter principal,
             @RequestParam(required = false) RequestType type,
+            @RequestParam(required = false) RequestStatus status,
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
-                requestService.getTlApprovals(principal.getUser().getId(), type, projectId, search, page, size)
+                requestService.getTlApprovals(principal.getUser().getId(), type, status, projectId, search, page, size)
         ));
     }
 
     @GetMapping("/{id}")
     @Operation(
         summary = "Get approval detail",
-        description = "Returns full detail of a pending request for review: requester info, amount, project/phase/category context, attached evidence files, and approval history."
+        description = "Returns full detail of a request for review or history: requester info, amount, project/phase/category context, attached evidence files, and processing history."
     )
     public ResponseEntity<ApiResponse<TlApprovalDetailResponse>> getApprovalDetail(
             @PathVariable Long id,

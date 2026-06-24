@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -131,6 +132,7 @@ public class DataInitializer implements CommandLineRunner {
         initSystemConfigs();
         initExpenseCategories();
         initProjects();
+        normalizeProjectPhaseStatuses();
 
         log.info("╔══════════════════════════════════════════╗");
         log.info("║   ✅  DataInitializer completed OK       ║");
@@ -888,6 +890,64 @@ public class DataInitializer implements CommandLineRunner {
                     log.info("   📋 Phase created: {} [{}] budget={}", name, phaseCode, budgetLimit);
                     return ph;
                 });
+    }
+
+    private void normalizeProjectPhaseStatuses() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+
+        for (Project project : projectRepository.findAll()) {
+            List<ProjectPhase> phases =
+                    projectPhaseRepository.findByProject_IdOrderByCreatedAtAsc(project.getId());
+            ProjectPhase currentPhase = project.getCurrentPhase();
+
+            if (currentPhase != null
+                    && currentPhase.getEndDate() != null
+                    && currentPhase.getEndDate().isBefore(today)) {
+                currentPhase.setStatus(PhaseStatus.CLOSED);
+                projectPhaseRepository.save(currentPhase);
+                project.setCurrentPhase(null);
+                projectRepository.save(project);
+                currentPhase = null;
+            }
+
+            if (currentPhase == null) {
+                currentPhase = phases.stream()
+                        .filter(phase -> phase.getStatus() != PhaseStatus.CLOSED)
+                        .filter(phase -> phase.getStartDate() == null || !phase.getStartDate().isAfter(today))
+                        .filter(phase -> phase.getEndDate() == null || !phase.getEndDate().isBefore(today))
+                        .findFirst()
+                        .orElse(null);
+
+                if (currentPhase != null) {
+                    project.setCurrentPhase(currentPhase);
+                    projectRepository.save(project);
+                }
+            }
+
+            Long currentPhaseId = currentPhase != null ? currentPhase.getId() : null;
+            boolean changed = false;
+
+            for (ProjectPhase phase : phases) {
+                PhaseStatus normalizedStatus;
+                if (currentPhaseId != null && currentPhaseId.equals(phase.getId())) {
+                    normalizedStatus = PhaseStatus.ACTIVE;
+                } else if (phase.getStatus() == PhaseStatus.CLOSED
+                        || (phase.getEndDate() != null && phase.getEndDate().isBefore(today))) {
+                    normalizedStatus = PhaseStatus.CLOSED;
+                } else {
+                    normalizedStatus = PhaseStatus.PLANNED;
+                }
+
+                if (phase.getStatus() != normalizedStatus) {
+                    phase.setStatus(normalizedStatus);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                projectPhaseRepository.saveAll(phases);
+            }
+        }
     }
 
     private void addMemberIfAbsent(Project project, User user, ProjectRole role, String position) {

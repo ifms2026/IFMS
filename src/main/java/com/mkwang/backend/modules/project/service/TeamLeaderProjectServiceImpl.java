@@ -47,6 +47,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -330,18 +332,24 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
 
         String phaseCode = businessCodeGenerator.generate(BusinessCodeType.PHASE, request.name());
 
+        boolean shouldBecomeCurrent = project.getCurrentPhase() == null;
+
         ProjectPhase phase = ProjectPhase.builder()
                 .phaseCode(phaseCode)
                 .project(project)
                 .name(request.name())
                 .budgetLimit(request.budgetLimit())
                 .currentSpent(BigDecimal.ZERO)
-                .status(PhaseStatus.ACTIVE)
+                .status(shouldBecomeCurrent ? PhaseStatus.ACTIVE : PhaseStatus.PLANNED)
                 .startDate(request.startDate())
                 .endDate(request.endDate())
                 .build();
 
         ProjectPhase saved = projectPhaseRepository.save(phase);
+        if (shouldBecomeCurrent) {
+            project.setCurrentPhase(saved);
+            projectRepository.save(project);
+        }
         return toPhaseResponse(saved);
     }
 
@@ -395,7 +403,23 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
         }
 
         if (request.status() != null) {
-            phase.setStatus(request.status());
+            PhaseStatus nextStatus = request.status();
+            ProjectPhase currentPhase = project.getCurrentPhase();
+
+            if (nextStatus == PhaseStatus.ACTIVE) {
+                if (currentPhase != null && !currentPhase.getId().equals(phase.getId())) {
+                    currentPhase.setStatus(PhaseStatus.CLOSED);
+                    currentPhase.setEndDate(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+                    projectPhaseRepository.save(currentPhase);
+                }
+                project.setCurrentPhase(phase);
+                projectRepository.save(project);
+            } else if (currentPhase != null && currentPhase.getId().equals(phase.getId())) {
+                project.setCurrentPhase(null);
+                projectRepository.save(project);
+            }
+
+            phase.setStatus(nextStatus);
         }
 
         ProjectPhase saved = projectPhaseRepository.save(phase);
