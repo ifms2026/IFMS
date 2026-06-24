@@ -25,8 +25,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -60,8 +63,29 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
             projects = projectRepository.findMemberProjects(currentUser.getId(), status);
         }
 
+        Map<Long, BigDecimal> spentByProject = loadProjectCategorySpent(
+                projects.stream().map(Project::getId).toList()
+        );
+
         return projects.stream()
-                .map(project -> new ProjectOptionResponse(project.getId(), project.getProjectCode(), project.getName()))
+                .map(project -> {
+                    BigDecimal totalSpent = resolveTotalSpent(
+                            project,
+                            spentByProject.get(project.getId())
+                    );
+                    return new ProjectOptionResponse(
+                            project.getId(),
+                            project.getProjectCode(),
+                            project.getName(),
+                            project.getStatus().name(),
+                            project.getDepartment().getId(),
+                            project.getTotalBudget(),
+                            resolveAvailableBudget(project, totalSpent),
+                            totalSpent,
+                            project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null,
+                            project.getCurrentPhase() != null ? project.getCurrentPhase().getName() : null
+                    );
+                })
                 .toList();
     }
 
@@ -149,6 +173,35 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
                 budget.getCategory().getId(),
                 budget.getCategory().getName()
         );
+    }
+
+    private Map<Long, BigDecimal> loadProjectCategorySpent(List<Long> projectIds) {
+        if (projectIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, BigDecimal> spentByProject = new HashMap<>();
+        for (Object[] row : phaseCategoryBudgetRepository.sumCurrentSpentByProjectIds(projectIds)) {
+            spentByProject.put(
+                    ((Number) row[0]).longValue(),
+                    coalesce((BigDecimal) row[1])
+            );
+        }
+        return spentByProject;
+    }
+
+    private BigDecimal resolveTotalSpent(Project project, BigDecimal categorySpent) {
+        return coalesce(project.getTotalSpent()).max(coalesce(categorySpent));
+    }
+
+    private BigDecimal resolveAvailableBudget(Project project, BigDecimal totalSpent) {
+        BigDecimal fundedBudget = coalesce(project.getAvailableBudget())
+                .add(coalesce(project.getTotalSpent()));
+        return fundedBudget.subtract(coalesce(totalSpent)).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal coalesce(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private void assertProjectAccess(User currentUser, Project project) {
