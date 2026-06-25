@@ -113,7 +113,17 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
                 ))
                 .toList();
 
-        return new ProjectPhasesResponse(project.getId(), project.getName(), phaseResponses);
+        return new ProjectPhasesResponse(
+                project.getId(),
+                project.getName(),
+                project.getStatus(),
+                project.getTotalBudget(),
+                project.getTotalSpent(),
+                project.getAvailableBudget(),
+                project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null,
+                project.getCurrentPhase() != null ? project.getCurrentPhase().getName() : null,
+                phaseResponses
+        );
     }
 
     @Override
