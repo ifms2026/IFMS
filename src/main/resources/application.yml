@@ -2,6 +2,15 @@ spring:
   application:
     name: IFMS-Backend
 
+  # ── HTTP Client (RestClient/RestTemplate auto-config) ───────
+  # Force blocking java.net.HttpURLConnection instead of the JDK
+  # java.net.http.HttpClient (NIO Selector-based). Some Windows/JDK 24
+  # environments fail to open a loopback NIO Pipe for the Selector
+  # ("Unable to establish loopback connection"); "simple" avoids that
+  # code path entirely since it never opens an NIO Selector.
+  http:
+    client:
+      factory: simple
 
   # ── Database + HikariCP Connection Pool ────────────────────
   # Tối ưu cho ~1000 concurrent requests

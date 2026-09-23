@@ -34,6 +34,7 @@ public class BrevoMailServiceImpl implements BrevoMailService {
     private final SpringTemplateEngine templateEngine;
 
     public BrevoMailServiceImpl(
+            RestClient.Builder restClientBuilder,
             @Value("${application.mail.brevo-api-key}") String apiKey,
             @Value("${application.mail.from-email}") String fromEmail,
             @Value("${application.mail.from-name}") String fromName,
@@ -41,7 +42,9 @@ public class BrevoMailServiceImpl implements BrevoMailService {
         this.fromEmail = fromEmail;
         this.fromName = fromName;
         this.templateEngine = templateEngine;
-        this.restClient = RestClient.builder()
+        // Use the Boot-autoconfigured RestClient.Builder (respects spring.http.client.factory)
+        // instead of RestClient.builder(), which picks its own default request factory.
+        this.restClient = restClientBuilder
                 .baseUrl(BREVO_API_URL)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader("api-key", apiKey)
