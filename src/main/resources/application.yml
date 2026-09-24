@@ -2,6 +2,11 @@ spring:
   application:
     name: IFMS-Backend
 
+  # ── Load .env from project root (IntelliJ / mvnw / java -jar đều tự nạp) ──
+  # Biến môi trường thật (OS env) vẫn được ưu tiên hơn giá trị trong .env.
+  config:
+    import: optional:file:.env[.properties]
+
   # ── HTTP Client (RestClient/RestTemplate auto-config) ───────
   # Force blocking java.net.HttpURLConnection instead of the JDK
   # java.net.http.HttpClient (NIO Selector-based). Some Windows/JDK 24
@@ -31,7 +36,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update          # Validate schema khi startup (không tự động tạo/alter)
+      ddl-auto: validate          # Validate schema khi startup (không tự động tạo/alter)
     show-sql: false
     properties:
       hibernate:
@@ -41,7 +46,7 @@ spring:
 
   # ── Flyway Database Migration ──────────────────────────────
   flyway:
-    enabled: false
+    enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
 

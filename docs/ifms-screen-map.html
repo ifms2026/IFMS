@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IFMS Screen Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#F2F5F7; --surface:#FFFFFF; --surface-2:#E8EEF2; --ink:#14202B; --ink-2:#4A5A68; --ink-3:#6F808D;
+  --line:#CAD5DD; --line-2:#DFE6EB;
+  --accent:#0F6E8C; --accent-soft:#D5EAF1; --accent-ink:#0B5068;
+  --credit:#2F7D5B; --credit-soft:#DCEFE5; --debit:#B4413C; --debit-soft:#F6E0DE;
+  --money:#A86A12; --money-soft:#F6EAD3;
+  --font-display:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0E151B; --surface:#15202A; --surface-2:#1C2A35; --ink:#E2E9EF; --ink-2:#A2B3C0; --ink-3:#7C8E9C;
+    --line:#2E404D; --line-2:#233340;
+    --accent:#5BB9D5; --accent-soft:#143746; --accent-ink:#9AD6E8;
+    --credit:#62C293; --credit-soft:#16352A; --debit:#E5827A; --debit-soft:#3C1E1D;
+    --money:#E3AA4E; --money-soft:#3A2C14;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0E151B; --surface:#15202A; --surface-2:#1C2A35; --ink:#E2E9EF; --ink-2:#A2B3C0; --ink-3:#7C8E9C;
+  --line:#2E404D; --line-2:#233340;
+  --accent:#5BB9D5; --accent-soft:#143746; --accent-ink:#9AD6E8;
+  --credit:#62C293; --credit-soft:#16352A; --debit:#E5827A; --debit-soft:#3C1E1D;
+  --money:#E3AA4E; --money-soft:#3A2C14;
+}
+*{box-sizing:border-box}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;scroll-behavior:auto!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+code{font-family:var(--font-mono);font-size:.82em;background:var(--surface-2);color:var(--accent-ink);padding:.06em .36em;border-radius:5px;word-break:break-word}
+h1,h2,h3,h4{font-family:var(--font-display);margin:0;line-height:1.25;text-wrap:balance;letter-spacing:-.01em}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{padding-inline:clamp(16px,3vw,40px);padding-block:28px 64px;max-width:1680px;margin:0 auto}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font:600 .74rem var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+h1{font-size:clamp(1.7rem,3.2vw,2.4rem);font-weight:700;letter-spacing:-.02em}
+.lede{color:var(--ink-2);max-width:78ch;margin:.6rem 0 0}
+.themebtns{display:flex;gap:6px}
+.btn{font:500 .82rem var(--font-body);padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+
+/* role bar */
+.rolebar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);padding-block:14px 12px;margin-top:18px;border-bottom:1px solid var(--line-2)}
+.roles{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.role{flex:none;font:500 .88rem var(--font-body);display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.role:hover{border-color:var(--accent);color:var(--ink)}
+.role[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.role .dot{width:8px;height:8px;border-radius:50%;background:var(--rc)}
+.role.hand{margin-left:8px;border-style:dashed}
+.role.hand[aria-selected="true"]{background:var(--accent);border-color:var(--accent);border-style:solid}
+
+/* summary */
+.summary{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:20px}
+.card{background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:16px 18px}
+.card h3{font-size:1.25rem}
+.card h4{font:600 .74rem var(--font-display);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+.card p{margin:.4rem 0;color:var(--ink-2);font-size:.92rem}
+.card ul{margin:.2rem 0;padding-left:1.1rem;font-size:.9rem;color:var(--ink-2)}
+.card li{margin:.2rem 0}
+.stats{display:flex;gap:18px;margin-top:12px;flex-wrap:wrap}
+.stats div b{display:block;font:700 1.45rem var(--font-display);font-variant-numeric:tabular-nums;color:var(--ink)}
+.stats div span{font-size:.78rem;color:var(--ink-3)}
+.rolechip{display:inline-flex;align-items:center;gap:8px;font:600 .74rem var(--font-mono);padding:2px 9px;border-radius:5px;background:var(--surface-2);color:var(--ink-2)}
+.rolechip i{width:8px;height:8px;border-radius:50%;background:var(--rc)}
+
+/* map */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;margin-top:14px;align-items:start}
+.mapbox{background:var(--surface);border:1px solid var(--line-2);border-radius:10px;overflow:hidden;min-width:0}
+.maphead{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line-2);font-size:.8rem;color:var(--ink-3)}
+.legend{display:flex;flex-wrap:wrap;gap:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:16px;height:11px;border-radius:3px;border:1.4px solid var(--ink-3);background:var(--surface)}
+.legend i.m{border-color:var(--accent);background:var(--accent-soft)}
+.legend i.x{border-style:dashed;border-color:var(--money);background:var(--money-soft)}
+.legend i.h{border-style:dashed}
+.scroll{overflow:auto;max-height:78vh}
+svg.map{display:block;min-width:960px;width:100%;height:auto;color:var(--ink)}
+svg text{font-family:var(--font-body);fill:currentColor}
+.n rect.b{fill:var(--surface);stroke:var(--line);stroke-width:1.3;transition:stroke .15s, fill .15s}
+.n.menu rect.b{stroke:var(--accent);stroke-opacity:.55}
+.n.modal rect.b{fill:var(--money-soft);stroke:var(--money);stroke-dasharray:5 3}
+.n.hid rect.b{stroke-dasharray:4 3;fill:var(--surface-2)}
+.n.hub rect.b{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.8}
+.n .t1{font:600 12.5px var(--font-display)}
+.n .t2{font:400 10.5px var(--font-mono);fill:var(--ink-3)}
+.n .tag{font:600 8.5px var(--font-body);letter-spacing:.08em;fill:var(--ink-3)}
+.n .tagbg{fill:var(--surface-2)}
+.n.menu .tag{fill:var(--accent)} .n.menu .tagbg{fill:var(--accent-soft)}
+.n.modal .tag{fill:var(--money)} .n.modal .tagbg{fill:var(--surface)}
+.n{cursor:pointer;transition:opacity .15s}
+.n:hover rect.b{stroke:var(--accent);stroke-opacity:1}
+.n:focus{outline:none}
+.n:focus-visible rect.b{stroke:var(--accent);stroke-width:2.6}
+.n.sel rect.b{stroke:var(--accent);stroke-width:2.6;stroke-opacity:1;fill:var(--accent-soft)}
+.n.rel rect.b{stroke:var(--accent);stroke-opacity:1;stroke-width:1.8}
+svg.dim .n:not(.sel):not(.rel):not(.hub){opacity:.42}
+.e{fill:none;stroke:var(--line);stroke-width:1.4;transition:stroke .15s, opacity .15s}
+.e.hot{stroke:var(--accent);stroke-width:2.2}
+svg.dim .e:not(.hot){opacity:.35}
+.el{font:500 10.5px var(--font-body);fill:var(--ink-2);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+.el.hot{fill:var(--accent)}
+.ah{fill:var(--line)} .ah.hot{fill:var(--accent)}
+.glabel{font:600 10px var(--font-display);letter-spacing:.1em;fill:var(--ink-3)}
+.gline{stroke:var(--line-2);stroke-width:1}
+
+/* panel */
+.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 76px);background:var(--surface);border:1px solid var(--line-2);border-radius:10px;max-height:calc(100vh - 96px);overflow:auto;padding:18px 20px}
+.panel .route{font:500 .8rem var(--font-mono);color:var(--accent-ink);background:var(--accent-soft);padding:2px 8px;border-radius:5px;display:inline-block;word-break:break-all}
+.panel h2{font-size:1.25rem;margin:10px 0 4px}
+.panel .tags{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.panel .tg{font:600 .68rem var(--font-body);letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--surface-2);color:var(--ink-2)}
+.panel .tg.m{background:var(--accent-soft);color:var(--accent-ink)}
+.panel .tg.x{background:var(--money-soft);color:var(--money)}
+.panel .tg.h{background:var(--debit-soft);color:var(--debit)}
+.panel .k{font:600 .72rem var(--font-display);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 6px}
+.panel ul{margin:0;padding-left:1.05rem;font-size:.9rem;color:var(--ink-2)}
+.panel li{margin:.22rem 0}
+.act{list-style:none;padding:0!important;display:flex;flex-direction:column;gap:6px}
+.act li{margin:0!important;border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.act b{font-weight:600;color:var(--ink);font-size:.9rem}
+.act .api{display:block;margin-top:3px}
+.act .note{display:block;font-size:.83rem;color:var(--ink-3);margin-top:3px}
+.gotos{display:flex;flex-wrap:wrap;gap:6px}
+.goto{font:500 .8rem var(--font-body);padding:4px 10px;border-radius:999px;border:1px solid var(--accent);background:var(--surface);color:var(--accent-ink);cursor:pointer}
+.goto:hover{background:var(--accent-soft)}
+.goto[disabled]{border-color:var(--line);color:var(--ink-3);cursor:default;background:var(--surface-2)}
+.warn{border-left:3px solid var(--money);background:var(--money-soft);padding:8px 10px;border-radius:0 6px 6px 0;font-size:.85rem;color:var(--ink)}
+.vary{border-left:3px solid var(--accent);background:var(--accent-soft);padding:8px 10px;border-radius:0 6px 6px 0;font-size:.86rem;color:var(--ink)}
+.empty{color:var(--ink-3);font-size:.88rem}
+
+/* handoff */
+.flowtabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
+.ft{font:500 .84rem var(--font-body);padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.ft:hover{border-color:var(--accent)}
+.ft[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.lane-l{font:600 11px var(--font-display);letter-spacing:.06em}
+.lane-bg{fill:var(--surface-2);opacity:.55}
+.hs .n rect.b{fill:var(--surface)}
+.hs .num{font:700 11px var(--font-mono);fill:var(--surface)}
+.hs .numbg{fill:var(--accent)}
+.flowdesc{margin-top:12px;color:var(--ink-2);max-width:90ch;font-size:.93rem}
+.global{margin-top:14px}
+.global ul{columns:2;column-gap:28px}
+
+@media (max-width: 1280px){
+  .stage{grid-template-columns:1fr}
+  .panel{position:static;max-height:none}
+}
+@media (max-width: 900px){
+  .summary{grid-template-columns:1fr}
+  .global ul{columns:1}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">IFMS · bản đồ màn hình theo role</div>
+      <h1>Ai thấy gì, làm được gì trên IFMS</h1>
+      <p class="lede">Mỗi role có một sơ đồ riêng: <b>Dashboard</b> ở giữa, các nhóm menu trong sidebar tỏa ra, rồi đi tiếp sang màn hình chi tiết và các modal thao tác. Bấm vào bất kỳ màn hình nào để xem nó hiển thị thông tin gì, có những nút gì, gọi API nào và dẫn đi đâu. Tab <b>Bàn giao giữa role</b> cho thấy một yêu cầu đi qua màn hình của nhiều người như thế nào.</p>
+    </div>
+    <div class="themebtns" role="group" aria-label="Giao diện">
+      <button class="btn" type="button" data-th="light">Sáng</button>
+      <button class="btn" type="button" data-th="dark">Tối</button>
+      <button class="btn" type="button" data-th="">Hệ thống</button>
+    </div>
+  </header>
+
+  <div class="rolebar">
+    <div class="roles" id="roles" role="tablist" aria-label="Chọn role"></div>
+  </div>
+
+  <!-- ROLE VIEW -->
+  <div id="view-role">
+    <div class="summary">
+      <div class="card" id="sum-main"></div>
+      <div class="card" id="sum-see"></div>
+      <div class="card" id="sum-do"></div>
+    </div>
+    <div class="stage">
+      <div class="mapbox">
+        <div class="maphead">
+          <span id="map-title">Sơ đồ màn hình</span>
+          <div class="legend">
+            <span><i class="m"></i>có trên sidebar</span>
+            <span><i></i>màn hình con</span>
+            <span><i class="x"></i>modal / drawer</span>
+            <span><i class="h"></i>không có trên sidebar</span>
+          </div>
+        </div>
+        <div class="scroll"><svg class="map" id="map" role="img" aria-label="Sơ đồ màn hình của role đang chọn"></svg></div>
+      </div>
+      <aside class="panel" id="panel" aria-live="polite"></aside>
+    </div>
+    <div class="card global">
+      <h4>Có trên mọi màn hình sau khi đăng nhập</h4>
+      <ul>
+        <li><b>Header</b>: breadcrumb + tiêu đề trang, chip role, chuông thông báo (badge chưa đọc, tối đa 99+) → <code>/notifications</code>.</li>
+        <li><b>Menu người dùng</b> ở header: họ tên, email, "Hồ sơ cá nhân", "Thông báo", đăng xuất (không hỏi xác nhận).</li>
+        <li><b>Sidebar</b>: menu theo role, thu gọn/mở rộng, nút "Đăng xuất" có hộp xác nhận "Đăng xuất khỏi hệ thống?".</li>
+        <li><b>Realtime</b>: một kết nối SSE <code>GET /users/stream</code> cập nhật số dư ví, giao dịch mới và thông báo mà không cần tải lại.</li>
+        <li><b>Số thông báo chưa đọc</b>: <code>GET /notifications/unread-count</code> mỗi 60 giây và mỗi khi có thông báo mới.</li>
+        <li><b>Lỗi 503</b> ở bất kỳ API nào → chuyển sang trang "Hệ thống đang bảo trì"; <b>401</b> → tự refresh token rồi thử lại.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- HANDOFF VIEW -->
+  <div id="view-hand" hidden>
+    <div class="flowtabs" id="flowtabs" role="group" aria-label="Chọn luồng"></div>
+    <p class="flowdesc" id="flowdesc"></p>
+    <div class="mapbox" style="margin-top:12px">
+      <div class="maphead"><span>Mỗi hàng là một role. Bấm vào một bước để mở đúng màn hình đó trong sơ đồ của role.</span></div>
+      <div class="scroll"><svg class="map hs" id="swim" role="img" aria-label="Sơ đồ bàn giao giữa các role"></svg></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs={}, parent) => { const e = document.createElementNS(NS, tag); for(const k in attrs) e.setAttribute(k, attrs[k]); if(parent) parent.appendChild(e); return e; };
+
+/* theme */
+const root = document.documentElement;
+try{ const t = localStorage.getItem('ifms-map-theme'); if(t) root.setAttribute('data-theme', t); }catch(e){}
+$$('[data-th]').forEach(b => b.onclick = () => { const t = b.dataset.th; if(t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme'); try{ t ? localStorage.setItem('ifms-map-theme', t) : localStorage.removeItem('ifms-map-theme'); }catch(e){} });
+
+/* ═════════════ ROLES ═════════════ */
+const ROLES = {
+  PUBLIC:{label:'Đăng nhập (public)', c:'#6F808D'},
+  EMPLOYEE:{label:'Nhân viên', c:'#2F7D5B'},
+  TEAM_LEADER:{label:'Trưởng nhóm', c:'#0F6E8C'},
+  MANAGER:{label:'Manager', c:'#6B5BB5'},
+  ACCOUNTANT:{label:'Kế toán', c:'#A86A12'},
+  CFO:{label:'CFO', c:'#B4413C'},
+  ADMIN:{label:'Admin', c:'#3E5566'}
+};
+
+/* ═════════════ SCREENS ═════════════ */
+/* see: xem được · do: [tên nút, API, ghi chú] · load: API khi mở · go: màn hình đi tới · warn: lưu ý */
+const S = {
+ /* ── public ── */
+ login:{t:'Đăng nhập', r:'/login', load:[],
+   see:['Thông điệp "Chào mừng trở lại" và 3 điểm nổi bật của hệ thống','"Vai trò của bạn": 6 thẻ role — chỉ đổi màu nút, role thật do backend trả về','Banner "Đặt lại mật khẩu thành công" khi vào từ ?reset=success'],
+   do:[['Đăng nhập','POST /auth/login','Email công việc + mật khẩu bắt buộc. Lần đầu đăng nhập → /change-password; còn lại → /dashboard'],['Quên mật khẩu?','','Mở /forgot-password']],
+   go:['dash-any','changepw','forgot']},
+ changepw:{t:'Thiết lập tài khoản', r:'/change-password', load:[],
+   see:['Chỉ vào được khi có setup_token từ lần đăng nhập đầu; không có thì quay về /login','Hai nhóm: Mật khẩu mới và Mã PIN giao dịch'],
+   do:[['Hoàn tất thiết lập','POST /auth/first-login/complete','Mật khẩu ≥ 8 ký tự và khớp xác nhận; PIN đúng 5 chữ số và khớp xác nhận']],
+   go:['dash-any']},
+ forgot:{t:'Quên mật khẩu', r:'/forgot-password', load:[],
+   see:['Bước 1: Email, Mật khẩu mới, Xác nhận mật khẩu mới','Bước 2: "Nhập mã OTP" được gửi qua email'],
+   do:[['Gửi mã OTP','POST /auth/forgot-password','Mật khẩu mới ≥ 6 ký tự và khớp xác nhận'],['Xác nhận đặt lại mật khẩu','POST /auth/verify-password-reset','Thành công → /login?reset=success']],
+   go:['login']},
+ maint:{t:'Hệ thống đang bảo trì', r:'/maintenance', load:[],
+   see:['"IFMS đang trong quá trình bảo trì và nâng cấp..."','Tự động chuyển tới khi bất kỳ API nào trả về 503'],
+   do:[['Thử lại','','Tải lại trang']], go:[]},
+ 'dash-any':{t:'Dashboard theo role', r:'/dashboard', load:[],
+   see:['Một route, 6 giao diện khác nhau. Thứ tự ưu tiên: ADMIN → CFO → ACCOUNTANT → MANAGER → TEAM_LEADER → còn lại là EMPLOYEE'],
+   do:[], go:[], jump:true},
+
+ /* ── shared ── */
+ wallet:{t:'Ví của tôi', r:'/wallet', load:['GET /wallet','GET /wallet/transactions?size=5'],
+   see:['Số dư khả dụng, Tổng số dư, Đang khóa','Thông tin ví: Loại ví, Trạng thái, Tỷ lệ khả dụng','Giao dịch gần đây (5): Tiền vào/Tiền ra, mã GD, thời gian, ±số tiền, số dư sau'],
+   do:[['Rút tiền','','Mở /wallet/withdraw'],['Nạp tiền','','Mở /wallet/deposit'],['Lịch sử nạp','','Mở /wallet/deposit/my'],['Xem tất cả','','Mở /wallet/transactions']],
+   go:['withdraw','deposit','deposit-my','wallet-tx','wallet-txd']},
+ 'wallet-tx':{t:'Lịch sử giao dịch', r:'/wallet/transactions', load:['GET /wallet/transactions?from&to&page&size=10'],
+   see:['Bảng: Ngày, Loại (Tiền vào/Tiền ra), Mã giao dịch, Số tiền, Số dư sau','Lọc theo khoảng ngày; tự làm mới trang 1 khi có giao dịch mới (SSE)'],
+   do:[['Xóa bộ lọc','',''],['Xem chi tiết','','Mở chi tiết giao dịch']], go:['wallet-txd']},
+ 'wallet-txd':{t:'Chi tiết giao dịch', r:'/wallet/transactions/[id]', load:['GET /wallet/transactions/{id}'],
+   see:['Trạng thái: Thành công / Đang chờ / Thất bại / Đã hủy','Loại giao dịch (Nạp tiền, Rút tiền, Thanh toán yêu cầu, Nhận lương, Cấp quỹ dự án…), Số tiền, Mô tả, Thời gian tạo, Reference ID'],
+   do:[], go:['wallet-tx']},
+ deposit:{t:'Nạp tiền qua VNPay', r:'/wallet/deposit', load:[],
+   see:['Ô "Số tiền nạp", gợi ý tối thiểu 10.000 ₫','Sau khi tạo: Mã nạp tiền, Số tiền, Trạng thái'],
+   do:[['Tạo thanh toán','POST /wallet/deposit','Tối thiểu 10.000 ₫'],['Thanh toán qua VNPay','','Mở trang VNPay ở tab mới; ví được cộng khi VNPay gọi IPN về backend'],['Sao chép mã nạp tiền','','']],
+   go:['deposit-my']},
+ 'deposit-my':{t:'Lịch sử nạp tiền', r:'/wallet/deposit/my', load:['GET /wallet/deposit/my?status&from&to'],
+   see:['Bảng: Mã nạp tiền, Số tiền, Trạng thái, Mã giao dịch VNPay, Thời gian thanh toán, Ngày tạo','Lọc: Thành công / Đang chờ / Thất bại, khoảng ngày'],
+   do:[['Thanh toán','','Chỉ ở dòng Đang chờ — mở lại link VNPay']], go:['deposit']},
+ withdraw:{t:'Rút tiền', r:'/wallet/withdraw', load:['GET /wallet/withdraw/my'],
+   see:['Số dư hiện tại và Khả dụng','Kết quả vừa tạo: Mã yêu cầu, Trạng thái, Ngân hàng, Tài khoản','Lịch sử yêu cầu rút tiền: Đang chờ / Hoàn tất / Từ chối / Đã hủy / Thất bại'],
+   do:[['Gửi yêu cầu rút tiền','POST /wallet/withdraw','≥ 10.000 ₫, ≤ số dư khả dụng, PIN đúng 5 chữ số. Tiền bị khóa tới khi kế toán xử lý'],['Hủy','DELETE /wallet/withdraw/{id}','Chỉ khi còn Đang chờ']],
+   go:['wallet']},
+ profile:{t:'Hồ sơ cá nhân', r:'/profile', load:['GET /users/me/profile','GET /banks'],
+   see:['Mã nhân viên, Phòng ban, Email, Vai trò','Tab "Thông tin cá nhân": họ tên, điện thoại, ngày sinh, CCCD, địa chỉ, avatar','Tab "Ngân hàng & Bảo mật": thẻ ngân hàng, PIN'],
+   do:[['Lưu thông tin','PUT /users/me/profile','Điện thoại dạng 0xxxxxxxxx'],['Lưu ảnh đại diện','PUT /users/me/avatar','Ảnh ≤ 5 MB, upload lên Cloudinary'],['Lưu ngân hàng','PUT /users/me/bank-info','Ngân hàng, Số tài khoản, Chủ tài khoản đều bắt buộc — dùng để nhận giải ngân và rút tiền'],['Cập nhật PIN','PUT /users/me/pin','PIN hiện tại + PIN mới 5 chữ số']],
+   go:[]},
+ notif:{t:'Thông báo', r:'/notifications', load:['GET /notifications?isRead&page&limit=20'],
+   see:['Tổng thông báo, Chưa đọc, Trang hiện tại','Tab Tất cả / Chưa đọc; thông báo mới chèn lên đầu theo thời gian thực'],
+   do:[['Đánh dấu tất cả đã đọc','PATCH /notifications/read-all','Cũng tự chạy mỗi khi mở trang'],['Bấm một thông báo','PATCH /notifications/{id}/read','Rồi mở màn hình liên quan: yêu cầu, phiếu lương hoặc dự án']],
+   go:['req-detail','payroll-detail','projects-detail'], warn:'Mở trang là mọi thông báo bị đánh dấu đã đọc ngay, kể cả khi chưa xem.'},
+
+ /* ── employee ── */
+ 'dash-emp':{t:'Tổng quan · Nhân viên', r:'/dashboard', load:['GET /wallet','GET /requests/summary','GET /requests?status=PENDING','GET /payslips?limit=1','GET /wallet/transactions?size=5','GET /dashboard/analytics/employee'],
+   see:['Số dư khả dụng, Tiền đang khóa, Yêu cầu đang chờ (kèm lương kỳ gần nhất)','Biểu đồ "Chi tiêu theo tháng" — 6 tháng, Chi phí và Tạm ứng đã thanh toán','Hoạt động gần đây (5 giao dịch)','Yêu cầu đang xử lý (3 yêu cầu PENDING)'],
+   do:[['Tạo yêu cầu mới','','Mở /requests/new'],['Rút tiền / Nạp tiền','','Thao tác nhanh']],
+   go:['req-new','requests','req-detail','wallet-tx','withdraw','deposit']},
+ requests:{t:'Yêu cầu của tôi', r:'/requests', load:['GET /requests?status&type&from&to&page&limit=8','GET /requests/summary'],
+   see:['Tổng yêu cầu, Đang chờ, Đã duyệt, Đóng luồng (từ chối / hủy)','Lọc theo trạng thái, loại, khoảng ngày','Bảng: Mã yêu cầu, Loại, Số tiền, Trạng thái, Dự án, Ngày tạo'],
+   do:[['Tạo yêu cầu mới','','Nhân viên → /requests/new'],['Xem chi tiết','','Mở chi tiết yêu cầu']],
+   go:['req-new','req-detail'],
+   vary:{EMPLOYEE:'Thấy các loại Tạm ứng, Chi phí, Hoàn ứng.',TEAM_LEADER:'Chỉ thấy loại "Cấp vốn dự án". Nút đầu trang là "Xin cấp vốn dự án" → /team-leader/projects.',MANAGER:'Chỉ thấy loại "Cấp vốn phòng ban". Nút đầu trang là "Xin cấp vốn phòng ban" → /dashboard.'}},
+ 'req-new':{t:'Tạo yêu cầu mới', r:'/requests/new', load:['GET /projects','GET /projects/{id}/phases?status=ACTIVE','GET /requests/my-advance-balances'],
+   see:['Chọn loại: Tạm ứng · Chi phí · Hoàn ứng','Dự án → Phase → Hạng mục chi phí; với Hoàn ứng: khoản tạm ứng còn nợ ("code — còn X")'],
+   do:[['Gửi yêu cầu','POST /requests','Số tiền ≥ 1.000, tiêu đề 3–200 ký tự, mô tả 10–1000 ký tự, ngày chi tiêu bắt buộc. Chi phí và Hoàn ứng cần ít nhất 1 chứng từ (JPG/PNG/PDF)'],['Đính kèm chứng từ','GET /uploads/signature → Cloudinary','Mỗi file được ký và upload trực tiếp'],['Hủy','','Quay lại']],
+   go:['req-detail'], warn:'Danh sách hạng mục gọi GET /projects/{phaseId} — truyền phaseId vào endpoint của project.',
+   vary:{TEAM_LEADER:'Không có form. Hiện thẻ "Xin cấp vốn dự án" → chọn dự án ở /team-leader/projects.',MANAGER:'Không có form. Hiện thẻ "Xin cấp vốn phòng ban" → về dashboard.'}},
+ 'req-detail':{t:'Chi tiết yêu cầu', r:'/requests/[id]', load:['GET /requests/{id}'],
+   see:['Số tiền, Tiêu đề, Dự án, Phase, Category, Ngày chi tiêu, Mô tả','Tệp đính kèm (xem trước / tải xuống)','Lịch sử xử lý: bước hiện tại, người duyệt, ghi chú, lý do từ chối'],
+   do:[['Chỉnh sửa','PUT /requests/{id}','Chỉ khi PENDING'],['Hủy yêu cầu','DELETE /requests/{id}','Chỉ khi PENDING, có hộp xác nhận']],
+   go:['requests']},
+ payroll:{t:'Phiếu lương', r:'/payroll', load:['GET /payslips?year&status&page&limit=12'],
+   see:['Tổng đã nhận, Số tiền tháng hiện tại','Lọc theo năm và trạng thái (Chờ thanh toán / Đã thanh toán)','Bảng: Kỳ lương, Thực lĩnh, Trạng thái, Ngày chi'],
+   do:[['Chọn kỳ lương','','Mở phiếu lương']], go:['payroll-detail']},
+ 'payroll-detail':{t:'Chi tiết phiếu lương', r:'/payroll/[id]', load:['GET /payslips/{id}'],
+   see:['Thu nhập: Lương cơ bản, Phụ cấp, Thưởng, Tổng thu nhập','Khấu trừ: cố định, Khấu trừ tạm ứng (netting), Tổng khấu trừ','Net Salary và phần bù trừ nợ tạm ứng'],
+   do:[['In phiếu lương','','In từ trình duyệt']], go:['payroll']},
+ projects:{t:'Dự án', r:'/projects', load:['GET /projects?status&search&page&limit=9'],
+   see:['Tab trạng thái: Đang triển khai, Lên kế hoạch, Tạm dừng, Đã đóng','Thẻ dự án: mã, tên, giai đoạn hiện tại, thanh % đã chi, Hạn mức / Đã chi / Khả dụng'],
+   do:[['Tìm','',''],['Chọn dự án','','Mở chi tiết']], go:['projects-detail']},
+ 'projects-detail':{t:'Chi tiết dự án', r:'/projects/[id]', load:['GET /projects/{id}/phases'],
+   see:['Tổng quan ngân sách: Hạn mức giai đoạn, Đã chi, Quỹ khả dụng','Danh sách giai đoạn: thời gian, ngân sách, đã chi, còn lại, trạng thái'],
+   do:[], go:['projects'], note:'Chỉ xem, không có thao tác.'},
+
+ /* ── team leader ── */
+ 'dash-tl':{t:'Tổng quan · Trưởng nhóm', r:'/dashboard', load:['GET /team-leader/approvals?status=PENDING&size=3','GET /team-leader/projects?size=3','GET /wallet'],
+   see:['Số dư ví, Chờ duyệt, Dự án (đang hoạt động / tổng), Thành viên','"Tổng giá trị đang chờ duyệt"','Yêu cầu đang chờ duyệt (Flow 1) — 3 mới nhất','Dự án của tôi — tỷ lệ sử dụng ngân sách'],
+   do:[['Xem tất cả','','Tới danh sách duyệt / dự án'],['Nạp tiền / Rút tiền','','Thao tác nhanh']],
+   go:['tl-appr','tl-appr-d','tl-proj','tl-proj-d','tl-team','wallet'], warn:'"Chờ duyệt", "Dự án", "Thành viên" được tính từ 3 bản ghi tải về, nên không vượt quá 3.'},
+ 'tl-appr':{t:'Duyệt yêu cầu', r:'/team-leader/approvals', load:['GET /team-leader/approvals?type&status&search&page&size=10'],
+   see:['Hàng chờ, Tổng tiền, Nhân sự gửi, Cần kiểm tra (nguy cơ vượt ngân sách giai đoạn)','Tab Chưa duyệt / Đã duyệt; loại Tạm ứng, Chi phí, Hoàn ứng; tìm theo mã, tên','Mỗi thẻ: người gửi, dự án / giai đoạn / danh mục, tình trạng ngân sách giai đoạn (spent + amount / limit)'],
+   do:[['Xem chi tiết','','Mở chi tiết để duyệt'],['Xóa bộ lọc','','']],
+   go:['tl-appr-d'], warn:'Tab "Đã duyệt" chỉ lấy APPROVED_BY_TEAM_LEADER — yêu cầu kế toán đã giải ngân sẽ biến khỏi tab. Yêu cầu của chính TL bị ẩn.'},
+ 'tl-appr-d':{t:'Chi tiết yêu cầu phê duyệt', r:'/team-leader/approvals/[id]', load:['GET /team-leader/approvals/{id}'],
+   see:['Số tiền yêu cầu, Số tiền duyệt, Ngân sách còn lại (sau yêu cầu), Trạng thái','Người gửi, mô tả, dự án, giai đoạn, danh mục','"Tình hình ngân sách giai đoạn": đã dùng + yêu cầu này / hạn mức, cảnh báo vượt','Tệp đính kèm, Lịch sử xử lý'],
+   do:[['Duyệt','POST /team-leader/approvals/{id}/approve','Modal "Xác nhận duyệt": số tiền duyệt > 0 và ≤ số xin, ghi chú tùy chọn. Tiền bị khóa trong ví dự án'],['Từ chối','POST /team-leader/approvals/{id}/reject','Lý do ≥ 10 ký tự; gợi ý nhanh: Thiếu chứng từ, Số tiền không hợp lý, Không đúng danh mục, Vượt ngân sách']],
+   go:['tl-appr'], warn:'Yêu cầu do chính TL tạo hiện hộp "Yêu cầu của chính bạn" và không có nút duyệt (Separation of Duties).'},
+ 'tl-proj':{t:'Dự án của tôi', r:'/team-leader/projects', load:['GET /team-leader/projects?status&search&page&limit=12'],
+   see:['Tổng dự án, Đang chạy, Ngân sách còn lại, Cần chú ý (dùng ≥ 85%)','Lọc trạng thái, tìm mã hoặc tên','Thẻ: giai đoạn hiện tại, tỷ lệ sử dụng ngân sách, khả dụng, số thành viên'],
+   do:[['Chọn dự án','','Mở chi tiết dự án']], go:['tl-proj-d']},
+ 'tl-proj-d':{t:'Chi tiết dự án (TL)', r:'/team-leader/projects/[id]', load:['GET /team-leader/projects/{id}','GET …/available-members','GET /team-leader/expense-categories?projectId','GET …/categories?phaseId'],
+   see:['Hạn mức dự án, Đã chi, Quỹ khả dụng, Thành viên; Tổng quan ngân sách','Tab Giai đoạn: mã, tên, trạng thái, đã chi / hạn mức, thời gian','Tab Ngân sách danh mục: Ngân sách, Đã dùng, Còn lại, Tỷ lệ dùng theo từng giai đoạn','Tab Thành viên: tên, mã, vị trí, LEADER / MEMBER'],
+   do:[['Xin cấp vốn','','Mở drawer "Xin cấp vốn dự án"'],['+ Tạo giai đoạn','POST …/projects/{id}/phases','Tên, ngân sách > 0, ngày bắt đầu và kết thúc'],['Sửa giai đoạn','PUT …/phases/{phaseId}','Chuyển một giai đoạn sang "Đang thực hiện" sẽ hỏi xác nhận kết thúc giai đoạn đang chạy'],['Cập nhật ngân sách danh mục','PUT …/projects/{id}/categories','Sửa trực tiếp trong bảng, lưu từng danh mục'],['+ Thêm danh mục','POST …/projects/{id}/expense-categories','Tên và ngân sách giai đoạn > 0'],['Xóa danh mục','DELETE …/projects/{id}/categories','Bị chặn nếu danh mục đã có chi tiêu'],['Thêm / sửa / xóa thành viên','POST · PUT · DELETE …/members','Vị trí bắt buộc; không xóa được LEADER']],
+   go:['tl-topup','tl-proj']},
+ 'tl-topup':{t:'Xin cấp vốn dự án', r:'drawer trên /team-leader/projects/[id]', modal:true, load:[],
+   see:['Ô "Số tiền cần cấp" và "Lý do (tuỳ chọn)"'],
+   do:[['Gửi yêu cầu','POST /requests  {type: PROJECT_TOPUP}','Số tiền > 0. Yêu cầu chuyển tới Manager của phòng ban']],
+   go:['requests'], warn:'Gửi xong chỉ hiện toast, không chuyển trang.'},
+ 'tl-team':{t:'Thành viên nhóm', r:'/team-leader/team', load:['GET /team-leader/team-members?search&projectId&page&limit=20'],
+   see:['Tổng thành viên, Có dư nợ (cần theo dõi hoàn ứng), Chờ duyệt, Dự án liên quan','Thẻ: chức danh, mã, trạng thái, Dư nợ, số yêu cầu chờ duyệt, dự án','Bấm thẻ → drawer: email, điện thoại, dư nợ, dự án tham gia, yêu cầu gần đây'],
+   do:[['Lọc theo dự án / tìm kiếm','',''],['Xem thành viên','GET /team-leader/team-members/{userId}','Chỉ xem']], go:[]},
+
+ /* ── manager ── */
+ 'dash-mgr':{t:'Tổng quan · Manager', r:'/dashboard', load:['GET /dashboard/manager','GET /manager/approvals?size=3','GET /manager/projects?size=4','GET /wallet'],
+   see:['Số dư ví PB (có thể dùng để cấp vốn), Chờ duyệt, Dự án đang hoạt động, Dư nợ nhóm','"Đề xuất cấp vốn dự án đang chờ" — tổng giá trị','Yêu cầu cấp vốn dự án chờ duyệt','Dự án phòng ban — mức tiêu hao ngân sách (Thấp / Trung bình / Cao)'],
+   do:[['Xin cấp vốn PB','','Mở modal xin quota từ CFO'],['Ví cá nhân','','Mở /wallet']],
+   go:['mgr-topup','mgr-appr','mgr-appr-d','mgr-proj','mgr-proj-d','mgr-dept','wallet']},
+ 'mgr-topup':{t:'Xin cấp vốn phòng ban', r:'modal trên /dashboard', modal:true, load:[],
+   see:['"Yêu cầu này sẽ được gửi đến CFO để phê duyệt ngân sách phòng ban."'],
+   do:[['Gửi yêu cầu','POST /requests  {type: DEPARTMENT_TOPUP}','Số tiền > 0, mô tả nhu cầu ≥ 10 ký tự']],
+   go:['requests'], warn:'Gửi xong chỉ hiện toast, không chuyển trang.'},
+ 'mgr-appr':{t:'Duyệt cấp vốn dự án', r:'/manager/approvals', load:['GET /manager/approvals?status&search&page&size=10'],
+   see:['Chưa duyệt / Đã duyệt, Tổng đề xuất, Người gửi, Vượt ngân sách DA','Thẻ: dự án, người gửi (TL), "Ngân sách DA hiện có", số tiền, cờ vượt ngân sách'],
+   do:[['Xem chi tiết','','Mở chi tiết để duyệt']], go:['mgr-appr-d']},
+ 'mgr-appr-d':{t:'Chi tiết cấp vốn dự án', r:'/manager/approvals/[id]', load:['GET /manager/approvals/{id}'],
+   see:['Số tiền yêu cầu, Có thể duyệt (= min(số xin, quỹ PB)), Quỹ PB sau duyệt, Dự án sau duyệt','Banner: "Phê duyệt sẽ tự động trích X từ Quỹ Phòng ban sang Dự án, không qua Kế toán"','Người gửi, ngân sách dự án trước / sau, số dư ví phòng ban, nội dung, lịch sử'],
+   do:[['Duyệt','POST /manager/approvals/{id}/approve','Số tiền ≤ mức có thể duyệt; cảnh báo chuyển tiền ngay, không hoàn tác'],['Từ chối','POST /manager/approvals/{id}/reject','Lý do ≥ 10 ký tự; gợi ý: Thiếu căn cứ sử dụng vốn, Quỹ PB chưa đủ…']],
+   go:['mgr-appr']},
+ 'mgr-proj':{t:'Dự án phòng ban', r:'/manager/projects', load:['GET /manager/projects?status&search&page&limit=9','GET /manager/department/team-leaders'],
+   see:['Tổng dự án, Đang chạy, Ngân sách còn lại, Cần chú ý','Thẻ: Trưởng nhóm phụ trách, tỷ lệ sử dụng, đã chi / tổng ngân sách'],
+   do:[['Tạo dự án','POST /manager/projects','Tên bắt buộc, tổng ngân sách > 0, chọn Trưởng nhóm'],['Xem chi tiết','','']],
+   go:['mgr-proj-d']},
+ 'mgr-proj-d':{t:'Chi tiết dự án (Manager)', r:'/manager/projects/[id]', load:['GET /manager/projects/{id}'],
+   see:['Hạn mức dự án, Đã chi, Quỹ khả dụng, Thành viên','Thông tin dự án: Trưởng nhóm, phòng ban, ngày tạo','Các giai đoạn và thành viên (chỉ xem)'],
+   do:[['Sửa thông tin','PUT /manager/projects/{id}','Tên, mô tả, tổng ngân sách > 0, trạng thái (Lập kế hoạch / Đang hoạt động / Tạm dừng / Đã đóng), Trưởng nhóm']],
+   go:['mgr-proj'], warn:'Phòng ban hiển thị dạng "Phòng ban #{id}" thay vì tên; tiêu đề danh sách thành viên là "Members".'},
+ 'mgr-dept':{t:'Phòng ban của tôi', r:'/manager/department', load:['GET /dashboard/manager','GET /manager/department/members?search&role&page&limit=12'],
+   see:['Số dư ví PB, Thành viên, Có dư nợ, Chờ xử lý','Tỷ lệ khả dụng ví phòng ban','Thẻ thành viên: vai trò, trạng thái, dư nợ, số dự án, yêu cầu chờ; bấm để xem drawer chi tiết'],
+   do:[['Lọc Trưởng nhóm / Nhân viên, tìm kiếm','',''],['Xem thành viên','GET /manager/department/members/{id}','Chỉ xem']], go:[]},
+
+ /* ── accountant ── */
+ 'dash-acc':{t:'Bảng điều khiển Kế toán', r:'/dashboard', load:['GET /dashboard/accountant','GET /accountant/disbursements?status=APPROVED_BY_TEAM_LEADER&size=3','GET /accountant/payroll?limit=1','GET /dashboard/analytics/cashflow ×3'],
+   see:['System Fund: số dư + sức khỏe HEALTHY / LOW / CRITICAL','Chờ giải ngân, Dòng tiền vào / ra / ròng tháng này','Biểu đồ "Xu hướng dòng tiền": Năm nay / 6 tháng / Năm 2025','Chờ giải ngân (3 yêu cầu), Kỳ lương gần nhất'],
+   do:[['Xem tất cả','','Tới danh sách giải ngân'],['Quản lý lương','','Tới bảng lương'],['Sổ cái / Quỹ hệ thống','','Truy cập nhanh']],
+   go:['acc-disb','acc-disb-d','acc-payroll','acc-ledger','fund']},
+ 'acc-disb':{t:'Giải ngân', r:'/accountant/disbursements', load:['GET /accountant/disbursements?status=APPROVED_BY_TEAM_LEADER&type&search','GET /company-fund'],
+   see:['Đang chờ xử lý, Quỹ hệ thống + trạng thái sức khỏe, Giá trị trang hiện tại','Tab Tất cả / Tạm ứng / Chi phí / Hoàn ứng; tìm theo mã, nhân viên, dự án','Thẻ: người gửi, dự án, "Duyệt bởi", Số tiền yêu cầu vs Số tiền giải ngân'],
+   do:[['Xử lý →','','Mở chi tiết giải ngân']], go:['acc-disb-d']},
+ 'acc-disb-d':{t:'Chi tiết giải ngân', r:'/accountant/disbursements/[id]', load:['GET /accountant/disbursements/{id}'],
+   see:['Luồng phê duyệt 3 bước: Nhân viên tạo → Trưởng nhóm duyệt → Kế toán giải ngân','Thông tin người nhận: ngân hàng, số tài khoản, chủ tài khoản','Thông tin yêu cầu: dự án, giai đoạn, ngân sách phase, mô tả; chứng từ đính kèm'],
+   do:[['Checklist kiểm tra','','5 mục bắt buộc: danh tính, số tiền khớp chứng từ, đã xem chứng từ, ngân sách phase đủ, chuỗi phê duyệt hợp lệ'],['Giải ngân','POST /users/me/pin/verify → POST …/{id}/disburse','PIN 5 chữ số, mở khóa sau khi xong checklist; sai PIN hiện số lần thử còn lại. Thành công → modal có Mã giao dịch'],['Từ chối giải ngân','POST /accountant/disbursements/{id}/reject','Lý do ≥ 10 ký tự; tiền bị khóa được trả lại ví dự án']],
+   go:['acc-disb']},
+ 'acc-payroll':{t:'Quản lý kỳ lương', r:'/accountant/payroll', load:['GET /accountant/payroll?year&status&page&limit=8'],
+   see:['Quy trình 4 bước: Tạo kỳ lương → Nhập Excel → Rà soát & bù trừ → Chi lương','Tổng kỳ lương, Kỳ đã chi xong, Tổng thực lĩnh','Lọc: Đang chuẩn bị / Đang chi lương / Đã hoàn tất; năm'],
+   do:[['Tải file mẫu Excel','GET /accountant/payroll/template',''],['Tạo kỳ lương mới','POST /accountant/payroll','Tên (tự gợi ý "Bảng lương tháng MM/YYYY"), tháng, năm → mở kỳ vừa tạo']],
+   go:['acc-payroll-d']},
+ 'acc-payroll-d':{t:'Quy trình chi lương', r:'/accountant/payroll/[id]', load:['GET /accountant/payroll/{id}'],
+   see:['Tổng tiền sẽ chi, Nhân viên, Trạng thái, Tháng lương','Bước 2 — bảng: Mã NV, Họ tên, Lương cơ bản, Phụ cấp, Khấu trừ, Thực lĩnh','Bước 3 — Dư nợ tạm ứng, Khấu trừ, Thực lĩnh; Tổng tạm ứng đã trừ'],
+   do:[['Bước 1 · Nhập Excel','POST …/{id}/import','.xlsx/.xls; nếu kỳ đã có dữ liệu (409) → hỏi xác nhận rồi POST …/confirm-overwrite. Hiện số dòng thành công / lỗi'],['Bước 2 · Sửa tiền','PUT …/{id}/entries/{entryId}','Tổng lương không được nhỏ hơn tổng khấu trừ'],['Bước 3 · Tính khoản tạm ứng cần trừ','POST …/{id}/auto-netting','Trừ tối đa 50% gross vào nợ tạm ứng'],['Bước 4 · Xác nhận chi lương','POST …/{id}/run','Chuyển lương vào ví của N nhân viên, không hoàn tác']],
+   go:['acc-payslip','acc-payroll']},
+ 'acc-payslip':{t:'Phiếu lương nhân viên', r:'/accountant/payslips/[id]', load:['GET /accountant/payslips/{id}'],
+   see:['Tổng thu nhập, Tổng khấu trừ (% thu nhập), Thực lĩnh','Nhân viên: họ tên, mã, phòng ban, chức danh, ngân hàng, số tài khoản','Chi tiết: lương cơ bản, thưởng, phụ cấp, khấu trừ, khấu trừ tạm ứng'],
+   do:[], go:['acc-payroll-d'], note:'Chỉ xem.'},
+ 'acc-ledger':{t:'Sổ cái', r:'/accountant/ledger', load:['GET /accountant/ledger/summary','GET /accountant/ledger?type&status&referenceType&from&to'],
+   see:['Nhãn "Immutable · Chỉ đọc"','Số dư quỹ, Tổng nạp vào, Tổng chi ra, Số giao dịch','Lọc: Loại (Giải ngân yêu cầu, Chi trả lương, Cấp vốn dự án…), Trạng thái, Nguồn, ngày','Bảng: Mã GD, Loại, Hướng tiền, Số tiền, Số dư sau, Ví liên quan, Thời gian'],
+   do:[['Chọn giao dịch','','Mở chi tiết']], go:['acc-ledger-d']},
+ 'acc-ledger-d':{t:'Chi tiết giao dịch (sổ cái)', r:'/accountant/ledger/[id]', load:['GET /accountant/ledger/{id}'],
+   see:['Mã giao dịch, loại, trạng thái, số tiền, số dư sau, ví liên quan, mô tả, mã thanh toán','Nguồn gốc giao dịch: nghiệp vụ và ID tham chiếu','"Bút toán kép": từng dòng DEBIT / CREDIT theo ví'],
+   do:[], go:['acc-ledger'], warn:'Link nguồn gốc trỏ tới route của nhân viên (/requests, /payroll, /projects) — có thể không mở được với tài khoản kế toán.'},
+ 'acc-wd':{t:'Yêu cầu rút tiền', r:'/accountant/withdrawals', load:['GET /wallet/withdraw?status&size=20'],
+   see:['Đang chờ, Hoàn tất, Tổng giá trị','Tab Tất cả / Đang chờ / Hoàn tất / Từ chối','Bảng: người yêu cầu, số tiền, tài khoản, ngân hàng, ghi chú, thời gian, trạng thái'],
+   do:[['Thực hiện','PUT /wallet/withdraw/{id}/execute','Chuyển khoản qua MockBank'],['Từ chối','PUT /wallet/withdraw/{id}/reject','Lý do ≥ 3 ký tự; tiền được mở khóa lại cho nhân viên']],
+   go:[], warn:'"Thực hiện" không hỏi xác nhận và không cần PIN. Đây là trang duy nhất tự kiểm tra role (chỉ ACCOUNTANT).'},
+ fund:{t:'Quỹ hệ thống', r:'/accountant/system-fund · /cfo/system-fund', load:['GET /company-fund','GET /company-fund/reconciliation'],
+   see:['Số dư hệ thống, Số dư ngân hàng, Chênh lệch đối soát (xanh khi bằng 0)','Báo cáo đối soát: số dư ví hệ thống, số dư ngân hàng, thời điểm đối soát, chi tiết'],
+   do:[['Nạp tiền từ ngân hàng','POST /company-fund/topup','Số tiền > 0, ghi chú, mã tham chiếu ngân hàng (VD: VCB-2026-001)'],['Cập nhật sao kê','PUT /company-fund/bank-statement','Số dư ngân hàng thực tế ≥ 0'],['Tải lại','','']],
+   go:['acc-ledger','cfo-appr'], warn:'Nạp quỹ không cần PIN.',
+   vary:{ADMIN:'Route /admin/system-fund không có trên sidebar và bị chặn trong trang: Admin thấy "Không có quyền truy cập quỹ hệ thống".'}},
+
+ /* ── cfo ── */
+ 'dash-cfo':{t:'Quản lý tài chính · CFO', r:'/dashboard', load:['GET /dashboard/cfo'],
+   see:['Số dư quỹ hệ thống, Chờ duyệt cap quota, Đã duyệt tháng này, Từ chối tháng này','Yêu cầu chờ duyệt (5 mới nhất): phòng ban, số tiền','Sức khỏe quỹ: HEALTHY ≥ 500 triệu · LOW 100–500 triệu · CRITICAL < 100 triệu'],
+   do:[['Duyệt cap quota / Quỹ hệ thống','','Truy cập nhanh']], go:['cfo-appr','cfo-appr-d','fund']},
+ 'cfo-appr':{t:'Duyệt ngân sách phòng ban', r:'/cfo/approvals', load:['GET /cfo/approvals?status&search&page&size=10','GET /company-fund'],
+   see:['Quỹ hệ thống khả dụng, Tổng đề xuất trang này, Số yêu cầu chờ duyệt','Tab Chưa duyệt / Đã duyệt; tìm theo mã, phòng ban, Manager','Thẻ: phòng ban, người gửi, "Đủ quỹ" / "Vượt quỹ khả dụng", quỹ PB hiện tại → sau phê duyệt'],
+   do:[['Xem chi tiết','','']], go:['cfo-appr-d']},
+ 'cfo-appr-d':{t:'Chi tiết duyệt ngân sách', r:'/cfo/approvals/[id]', load:['GET /cfo/approvals/{id}'],
+   see:['"Tác động nếu phê duyệt": quỹ hệ thống trước / sau, quỹ phòng ban sau','Người gửi (Manager), phòng ban, số dư ví phòng ban','Nội dung yêu cầu, tiến trình xử lý, tóm tắt quyết định'],
+   do:[['Duyệt','POST /cfo/approvals/{id}/approve','Số tiền > 0, ≤ số xin, ≤ quỹ hệ thống; chuyển tiền ngay, không hoàn tác, không cần PIN'],['Từ chối','POST /cfo/approvals/{id}/reject','Lý do ≥ 10 ký tự; có 4 lý do gợi ý']],
+   go:['cfo-appr']},
+
+ /* ── admin ── */
+ 'dash-admin':{t:'Quản trị hệ thống', r:'/dashboard', load:['GET /dashboard/admin','GET /dashboard/analytics/cashflow ×3','GET /dashboard/admin/analytics'],
+   see:['Tổng người dùng, Tổng phòng ban, Quỹ hệ thống, Hoạt động gần đây','Phân tích dòng tiền: Tổng dòng vào / ra / Thặng dư, biểu đồ xu hướng, donut "Chi tiêu theo phòng ban"','Tạm ứng tồn đọng (top 6, đánh dấu quá hạn > 30 ngày)','Sức khỏe hệ thống, Audit gần đây (5 sự kiện)'],
+   do:[['Truy cập nhanh','','Nhân sự, Phòng ban, Nhật ký, Cấu hình']], go:['adm-users','adm-dept','audit','settings']},
+ 'adm-users':{t:'Quản lý nhân sự', r:'/admin/users', load:['GET /admin/users?role&status&search&page&limit=10','GET /admin/departments'],
+   see:['Tổng người dùng, Đang hoạt động, Đã khóa','Lọc vai trò, trạng thái (Đang hoạt động / Đã khóa / Chờ kích hoạt), tìm tên / email / mã','Bảng: Nhân sự, Mã NV, Vai trò, Phòng ban, Trạng thái'],
+   do:[['Tạo người dùng','POST /admin/users','Họ tên, email công ty, vai trò, phòng ban (có thể để trống). Hệ thống gửi email onboarding'],['Khóa / Mở khóa','POST /admin/users/{id}/lock · /unlock','Có hộp xác nhận'],['Reset mật khẩu','POST /admin/users/{id}/reset-password','Có hộp xác nhận']],
+   go:['adm-user-d']},
+ 'adm-user-d':{t:'User profile', r:'/admin/users/[id]', load:['GET /admin/users/{id}'],
+   see:['Thông tin cơ bản: mã NV, phòng ban, chức danh, điện thoại, ngày sinh, CCCD, địa chỉ','Thông tin ví: Tổng số dư, Đang xử lý, Tạm ứng còn nợ','Bảo mật: Đã có PIN, PIN khóa đến, Số lần nhập sai, Đăng nhập lần đầu'],
+   do:[['Sửa thông tin','PUT /admin/users/{id}','Họ tên, vai trò, phòng ban'],['Khóa / Mở khóa, Reset mật khẩu','POST …/lock · /unlock · /reset-password','']],
+   go:['adm-users']},
+ 'adm-dept':{t:'Quản lý phòng ban', r:'/admin/departments', load:['GET /admin/departments?search&page&limit=10','GET /admin/users?role=MANAGER'],
+   see:['Tổng phòng ban, Tổng quota, Khả dụng (% đã dùng), Nhân sự (số phòng có trưởng phòng)','Bảng: phòng ban, trưởng phòng, nhân sự, quota sử dụng'],
+   do:[['+ Tạo phòng ban','POST /admin/departments','Tên bắt buộc, mã (viết hoa), trưởng phòng, tổng quota ≥ 0'],['Chỉnh sửa','PUT /admin/departments/{id}','Mã phòng ban bị khóa khi sửa']],
+   go:['adm-dept-d']},
+ 'adm-dept-d':{t:'Chi tiết phòng ban', r:'/admin/departments/[id]', load:['GET /admin/departments/{id}'],
+   see:['Tổng quota, Đã sử dụng, Khả dụng, Thành viên','Tình trạng quota, thông tin quản trị','Danh sách thành viên: email, chức danh, trạng thái'],
+   do:[['Sửa phòng ban','PUT /admin/departments/{id}','Tên, trưởng phòng, tổng quota']], go:['adm-dept']},
+ 'adm-roles':{t:'Vai trò hệ thống', r:'/admin/roles', load:[],
+   see:['6 thẻ role: mô tả, số quyền, độ phủ permission','Ma trận quyền theo 5 nhóm: IAM & Bảo mật, Ví & giao dịch, Yêu cầu & phê duyệt, Dự án & phòng ban, Kế toán & hệ thống'],
+   do:[], go:[], note:'Chỉ xem.', warn:'Ma trận quyền viết cứng trong frontend, không đọc từ backend — có thể lệch với phân quyền thật.'},
+ settings:{t:'Cấu hình hệ thống', r:'/admin/settings · /cfo/settings', load:['GET /admin/settings'],
+   see:['Tổng cấu hình, Bảo mật, Vận hành, Hạn mức rút','Nhóm Bảo mật: số lần sai PIN tối đa (1–10), thời gian khóa PIN, thời hạn phiên','Nhóm Vận hành: chế độ bảo trì, dung lượng / số tệp đính kèm, thời gian lưu thông báo, hạn mức rút tự động theo từng role'],
+   do:[['Lưu (từng mục)','PUT /admin/settings','Kiểm tra khoảng giá trị ngay trên form'],['Làm mới cache','DELETE /system-configs/cache',''],['Tải lại','','']],
+   go:[], vary:{CFO:'Route /cfo/settings dùng lại trang của Admin nhưng không có trên sidebar CFO; backend yêu cầu SYSTEM_CONFIG_MANAGE mà CFO không có.'}},
+ audit:{t:'Nhật ký kiểm toán', r:'/admin/audit-logs · /cfo/audit-logs', load:['GET /admin/audit?actor&action&startDate&endDate&page&limit=20'],
+   see:['Tổng bản ghi, Trang hiện tại','Lọc: người thực hiện, hành động (Thêm mới / Cập nhật / Xóa), khoảng ngày','Bảng: thời gian, người thực hiện, hành động, đối tượng, tóm tắt thay đổi','Modal chi tiết: các trường thay đổi trước / sau'],
+   do:[['Xuất CSV','','Xuất trang hiện tại, làm ở trình duyệt'],['Xem bản ghi','','Mở modal so sánh trước / sau']],
+   go:[], vary:{CFO:'Route /cfo/audit-logs dùng lại trang của Admin nhưng không có trên sidebar CFO; backend yêu cầu AUDIT_LOG_VIEW mà CFO không có.'}}
+};
+
+/* ═════════════ ROLE MAPS ═════════════ */
+/* row item: [id, col, from, edgeLabel, flag]  flag: m = sidebar, h = ẩn, x = modal */
+const walletRows = [
+  [['wallet',0,'hub','','m'],['wallet-tx',1,'wallet','Xem tất cả'],['wallet-txd',2,'wallet-tx','Chọn dòng']],
+  [['deposit',1,'wallet','Nạp tiền'],['deposit-my',2,'deposit','Lịch sử']],
+  [['withdraw',1,'wallet','Rút tiền']],
+  [['profile',0,'hub','','m']]
+];
+const MAPS = {
+  PUBLIC:{hub:'login', groups:[
+    {g:'Đăng nhập thành công', rows:[[['dash-any',1,'hub','Thành công']]]},
+    {g:'Lần đầu đăng nhập', rows:[[['changepw',0,'hub','']]]},
+    {g:'Quên mật khẩu', rows:[[['forgot',0,'hub','']]]},
+    {g:'Mọi API trả 503', rows:[[['maint',0,null,'','h']]]}
+  ], extra:[['changepw','dash-any','Hoàn tất']],
+   see:['Chỉ trang đăng nhập, thiết lập lần đầu, quên mật khẩu và bảo trì'],
+   can:['Đăng nhập; lần đầu phải đặt mật khẩu mới và PIN giao dịch 5 số','Đặt lại mật khẩu bằng OTP qua email'],
+   intro:'Người chưa đăng nhập chỉ vào được 4 màn hình. Middleware chuyển mọi route khác về /login?callbackUrl=… và đưa người đã đăng nhập ra khỏi các trang public.'},
+  EMPLOYEE:{hub:'dash-emp', groups:[
+    {g:'Menu chính', rows:[...walletRows,
+      [['requests',0,'hub','','m'],['req-new',1,'requests','Tạo mới'],['req-detail',2,'req-new','Gửi xong']],
+      [['payroll',0,'hub','','m'],['payroll-detail',1,'payroll','Chọn kỳ']],
+      [['projects',0,'hub','','m'],['projects-detail',1,'projects','Chọn dự án']],
+      [['notif',0,'hub','','m']]]}
+  ],
+   see:['Ví cá nhân: số dư khả dụng, tiền đang khóa, lịch sử giao dịch','Yêu cầu của mình và lịch sử duyệt từng bước','Phiếu lương theo kỳ, kể cả phần trừ nợ tạm ứng','Dự án mình tham gia (chỉ xem ngân sách, giai đoạn)'],
+   can:['Tạo Tạm ứng, Chi phí, Hoàn ứng (kèm chứng từ)','Sửa hoặc hủy yêu cầu khi còn chờ duyệt','Nạp tiền qua VNPay, rút tiền về ngân hàng (PIN)','Cập nhật hồ sơ, tài khoản ngân hàng, PIN'],
+   intro:'Nhân viên là role duy nhất tạo được yêu cầu chi tiêu cá nhân. Mọi yêu cầu đi tiếp sang Trưởng nhóm của dự án.'},
+  TEAM_LEADER:{hub:'dash-tl', groups:[
+    {g:'Menu chính', rows:[...walletRows,[['notif',0,'hub','','m']]]},
+    {g:'Trưởng nhóm', rows:[
+      [['tl-appr',0,'hub','','m'],['tl-appr-d',1,'tl-appr','Chọn YC']],
+      [['tl-proj',0,'hub','','m'],['tl-proj-d',1,'tl-proj','Chọn DA'],['tl-topup',2,'tl-proj-d','Xin cấp vốn','x']],
+      [['tl-team',0,'hub','','m']]]},
+    {g:'Cá nhân', rows:[
+      [['requests',0,'hub','','m'],['req-detail',1,'requests','Chọn dòng']],
+      [['payroll',0,'hub','','m'],['payroll-detail',1,'payroll','Chọn kỳ']]]}
+  ],
+   see:['Hàng chờ duyệt Flow 1 của các dự án mình phụ trách, kèm tình trạng ngân sách giai đoạn','Ngân sách dự án: hạn mức, đã chi, quỹ khả dụng, theo giai đoạn và danh mục','Thành viên nhóm và dư nợ tạm ứng của từng người'],
+   can:['Duyệt (có thể giảm số tiền) hoặc từ chối Tạm ứng / Chi phí / Hoàn ứng — không tự duyệt yêu cầu của mình','Tạo, sửa giai đoạn; chia ngân sách danh mục; thêm, xóa thành viên','Xin cấp vốn dự án từ Manager (PROJECT_TOPUP)'],
+   intro:'Trưởng nhóm là cấp duyệt đầu tiên của Flow 1. Khi duyệt, tiền bị khóa trong ví dự án, chờ kế toán giải ngân.'},
+  MANAGER:{hub:'dash-mgr', groups:[
+    {g:'Menu chính', rows:[...walletRows,[['notif',0,'hub','','m']]]},
+    {g:'Từ dashboard', rows:[[['mgr-topup',1,'hub','Xin cấp vốn PB','x']]]},
+    {g:'Manager', rows:[
+      [['mgr-appr',0,'hub','','m'],['mgr-appr-d',1,'mgr-appr','Chọn YC']],
+      [['mgr-proj',0,'hub','','m'],['mgr-proj-d',1,'mgr-proj','Xem chi tiết']],
+      [['mgr-dept',0,'hub','','m']]]},
+    {g:'Cá nhân', rows:[
+      [['requests',0,'hub','','m'],['req-detail',1,'requests','Chọn dòng']],
+      [['payroll',0,'hub','','m'],['payroll-detail',1,'payroll','Chọn kỳ']]]}
+  ],
+   see:['Số dư ví phòng ban và tỷ lệ khả dụng','Đề xuất cấp vốn từ các Trưởng nhóm, ngân sách dự án trước / sau','Toàn bộ dự án và thành viên phòng ban, dư nợ nhóm'],
+   can:['Duyệt cấp vốn dự án — tiền chuyển ngay từ ví phòng ban sang ví dự án','Tạo dự án, gán Trưởng nhóm, sửa ngân sách và trạng thái dự án','Xin quota phòng ban từ CFO (DEPARTMENT_TOPUP)'],
+   intro:'Manager cấp vốn cho dự án từ ví phòng ban (Flow 2) và xin quota cho phòng ban từ CFO (Flow 3).'},
+  ACCOUNTANT:{hub:'dash-acc', groups:[
+    {g:'Menu chính', rows:[...walletRows,[['notif',0,'hub','','m']]]},
+    {g:'Kế toán', rows:[
+      [['acc-disb',0,'hub','','m'],['acc-disb-d',1,'acc-disb','Xử lý']],
+      [['acc-payroll',0,'hub','','m'],['acc-payroll-d',1,'acc-payroll','Mở kỳ'],['acc-payslip',2,'acc-payroll-d','Phiếu lương']],
+      [['acc-ledger',0,'hub','','m'],['acc-ledger-d',1,'acc-ledger','Chọn GD']],
+      [['acc-wd',0,'hub','','m']],
+      [['fund',0,'hub','','m']]]},
+    {g:'Cá nhân', rows:[[['payroll',0,'hub','','m'],['payroll-detail',1,'payroll','Chọn kỳ']]]}
+  ],
+   see:['Hàng chờ giải ngân đã được Trưởng nhóm duyệt, thông tin ngân hàng người nhận','Quỹ hệ thống, sức khỏe quỹ, dòng tiền vào / ra theo tháng','Sổ cái toàn hệ thống và bút toán kép của từng giao dịch','Yêu cầu rút tiền của mọi nhân viên'],
+   can:['Giải ngân Flow 1 sau checklist 5 mục và PIN; hoặc từ chối','Chạy lương 4 bước: tạo kỳ, import Excel, trừ tạm ứng, chi lương','Thực hiện hoặc từ chối yêu cầu rút tiền','Nạp tiền vào quỹ công ty, cập nhật sao kê để đối soát'],
+   intro:'Kế toán là người duy nhất thật sự chi tiền cho nhân viên: giải ngân yêu cầu, chi lương và xử lý rút tiền.'},
+  CFO:{hub:'dash-cfo', groups:[
+    {g:'Menu chính', rows:[...walletRows,[['notif',0,'hub','','m']]]},
+    {g:'CFO', rows:[
+      [['cfo-appr',0,'hub','','m'],['cfo-appr-d',1,'cfo-appr','Chọn YC']],
+      [['fund',0,'hub','','m']]]},
+    {g:'Không có trên sidebar', rows:[[['settings',0,null,'','h']],[['audit',0,null,'','h']]]}
+  ],
+   see:['Quỹ hệ thống, sức khỏe quỹ theo ngưỡng 500 / 100 triệu','Đề xuất quota từ các phòng ban và tác động lên quỹ trước / sau','Báo cáo đối soát quỹ với ngân hàng'],
+   can:['Duyệt quota phòng ban — tiền chuyển ngay từ quỹ công ty sang ví phòng ban','Từ chối kèm lý do','Nạp tiền vào quỹ, cập nhật sao kê'],
+   intro:'CFO là cấp duyệt của Flow 3. CFO không có nhóm "Cá nhân" trên sidebar.'},
+  ADMIN:{hub:'dash-admin', groups:[
+    {g:'Menu chính', rows:[...walletRows,[['notif',0,'hub','','m']]]},
+    {g:'Quản trị', rows:[
+      [['adm-users',0,'hub','','m'],['adm-user-d',1,'adm-users','Xem chi tiết']],
+      [['adm-dept',0,'hub','','m'],['adm-dept-d',1,'adm-dept','Xem chi tiết']],
+      [['adm-roles',0,'hub','','m']],
+      [['settings',0,'hub','','m']],
+      [['audit',0,'hub','','m']]]},
+    {g:'Không có trên sidebar', rows:[[['fund',0,null,'','h']]]}
+  ],
+   see:['Người dùng, phòng ban, quota; ví và trạng thái bảo mật của từng user','Phân tích dòng tiền, tạm ứng tồn đọng, audit gần đây','Ma trận quyền của 6 role, cấu hình hệ thống, nhật ký kiểm toán'],
+   can:['Tạo người dùng (gửi email onboarding), sửa, khóa / mở khóa, reset mật khẩu','Tạo, sửa phòng ban và trưởng phòng','Sửa cấu hình: PIN, bảo trì, đính kèm, hạn mức rút tự động','Xuất nhật ký kiểm toán ra CSV'],
+   intro:'Admin quản trị tài khoản và hệ thống, không tham gia duyệt tiền. Route /admin/approvals chuyển về dashboard; quỹ hệ thống bị chặn.'}
+};
+
+/* ═════════════ HANDOFF FLOWS ═════════════ */
+const HAND = [
+  {n:'Flow 1 · Tạm ứng → hoàn ứng', lanes:['EMPLOYEE','TEAM_LEADER','ACCOUNTANT'],
+   d:'Nhân viên xin tạm ứng, Trưởng nhóm duyệt và khóa tiền trong ví dự án, Kế toán giải ngân sang ví nhân viên. Sau khi chi, nhân viên nộp Hoàn ứng kèm chứng từ; khi kế toán quyết toán, khoản tạm ứng được đóng lại mà không có dòng tiền mới.',
+   s:[['EMPLOYEE','req-new','Tạo Tạm ứng: dự án, phase, hạng mục'],['TEAM_LEADER','tl-appr-d','Duyệt · khóa tiền ví dự án'],['ACCOUNTANT','acc-disb-d','Checklist + PIN · giải ngân'],['EMPLOYEE','wallet','Nhận tiền vào ví (realtime)'],['EMPLOYEE','req-new','Tạo Hoàn ứng + chứng từ'],['TEAM_LEADER','tl-appr-d','Duyệt hoàn ứng'],['ACCOUNTANT','acc-disb-d','Quyết toán khoản tạm ứng']]},
+  {n:'Flow 2 · Cấp vốn dự án', lanes:['TEAM_LEADER','MANAGER','EMPLOYEE'],
+   d:'Trưởng nhóm xin vốn trong trang chi tiết dự án. Manager duyệt và tiền chuyển ngay từ ví phòng ban sang ví dự án, không qua kế toán. Quỹ khả dụng tăng lên để Trưởng nhóm chia cho giai đoạn, danh mục và để nhân viên tạo yêu cầu.',
+   s:[['TEAM_LEADER','tl-topup','Xin cấp vốn dự án'],['MANAGER','mgr-appr-d','Duyệt · ví PB → ví dự án'],['TEAM_LEADER','tl-proj-d','Quỹ khả dụng tăng · chia ngân sách'],['EMPLOYEE','req-new','Tạo yêu cầu trên phase']]},
+  {n:'Flow 3 · Quota phòng ban', lanes:['MANAGER','CFO'],
+   d:'Manager xin quota từ dashboard. CFO xem tác động lên quỹ hệ thống, duyệt và tiền chuyển ngay từ quỹ công ty sang ví phòng ban. Số dư này là nguồn để Manager duyệt Flow 2.',
+   s:[['MANAGER','mgr-topup','Xin cấp vốn phòng ban'],['CFO','cfo-appr-d','Duyệt · quỹ công ty → ví PB'],['MANAGER','mgr-dept','Số dư ví PB tăng'],['MANAGER','mgr-appr-d','Dùng để duyệt Flow 2']]},
+  {n:'Chi lương', lanes:['ACCOUNTANT','EMPLOYEE'],
+   d:'Kế toán tạo kỳ lương, import Excel, rà soát, tự động trừ tối đa 50% lương vào nợ tạm ứng, rồi chi. Nhân viên nhận thông báo SALARY_PAID và xem phiếu lương có phần bù trừ.',
+   s:[['ACCOUNTANT','acc-payroll','Tạo kỳ lương'],['ACCOUNTANT','acc-payroll-d','Import · rà soát · trừ tạm ứng · chi'],['EMPLOYEE','notif','Nhận thông báo lương'],['EMPLOYEE','payroll-detail','Xem phiếu lương']]},
+  {n:'Rút tiền', lanes:['EMPLOYEE','ACCOUNTANT'],
+   d:'Nhân viên tạo lệnh rút bằng PIN; tiền bị khóa trong ví. Nếu số tiền nhỏ hơn hạn mức rút tự động của role, lệnh được thực hiện ngay; nếu không, kế toán thực hiện hoặc từ chối.',
+   s:[['EMPLOYEE','withdraw','Tạo lệnh rút + PIN'],['ACCOUNTANT','acc-wd','Thực hiện / Từ chối'],['EMPLOYEE','withdraw','Lịch sử: Hoàn tất']]},
+  {n:'Nạp quỹ & đối soát', lanes:['CFO','ACCOUNTANT'],
+   d:'CFO hoặc Kế toán nạp tiền từ ngân hàng vào quỹ công ty, cập nhật số dư sao kê để đối soát chênh lệch, và kiểm tra bút toán trong sổ cái.',
+   s:[['CFO','fund','Nạp tiền từ ngân hàng'],['ACCOUNTANT','fund','Cập nhật sao kê · đối soát'],['ACCOUNTANT','acc-ledger','Kiểm tra sổ cái']]},
+  {n:'Onboarding nhân viên mới', lanes:['ADMIN','PUBLIC','EMPLOYEE'],
+   d:'Admin tạo người dùng; hệ thống gửi email onboarding kèm mật khẩu tạm. Lần đăng nhập đầu, người dùng phải đặt mật khẩu mới và PIN rồi mới vào được dashboard của role mình.',
+   s:[['ADMIN','adm-users','Tạo người dùng'],['PUBLIC','login','Đăng nhập bằng mật khẩu tạm'],['PUBLIC','changepw','Đặt mật khẩu + PIN'],['EMPLOYEE','dash-emp','Vào dashboard']]}
+];
+
+/* ═════════════ BUILD ROLE BAR ═════════════ */
+let curRole = 'EMPLOYEE', curSel = null, curView = 'role', curHand = 0;
+const roleBar = $('#roles');
+Object.entries(ROLES).forEach(([k,r]) => {
+  const b = document.createElement('button');
+  b.type='button'; b.className='role'; b.dataset.r=k; b.setAttribute('role','tab'); b.style.setProperty('--rc', r.c);
+  b.innerHTML = `<span class="dot"></span>${esc(r.label)}`;
+  b.onclick = () => showRole(k);
+  roleBar.appendChild(b);
+});
+const hb = document.createElement('button');
+hb.type='button'; hb.className='role hand'; hb.dataset.r='HAND'; hb.setAttribute('role','tab'); hb.textContent='Bàn giao giữa role';
+hb.onclick = () => showHand(curHand);
+roleBar.appendChild(hb);
+function markTabs(k){ $$('.role', roleBar).forEach(b => b.setAttribute('aria-selected', b.dataset.r === k)); }
+
+/* ═════════════ ROLE VIEW ═════════════ */
+const W = 196, H = 54, X0 = 212, GAP = 70, HUBX = 16, HUBW = 172;
+const colX = c => X0 + c*(W+GAP);
+let POS = {}, EDGES = [];
+
+function showRole(k, sel){
+  curView='role'; curRole=k; markTabs(k);
+  $('#view-role').hidden=false; $('#view-hand').hidden=true;
+  try{ history.replaceState(null,'','#'+k.toLowerCase()); }catch(e){}
+  renderSummary(k); buildMap(k);
+  select(sel || MAPS[k].hub);
+}
+
+function renderSummary(k){
+  const M = MAPS[k], R = ROLES[k];
+  const ids = mapIds(k);
+  const acts = ids.reduce((n,id) => n + (S[id].do||[]).filter(d => d[1]).length, 0);
+  const menu = ids.filter(id => flagOf(k,id)==='m').length;
+  $('#sum-main').innerHTML = `<span class="rolechip" style="--rc:${R.c}"><i></i>${esc(k)}</span><h3 style="margin-top:8px">${esc(R.label)}</h3><p>${esc(M.intro)}</p>
+    <div class="stats"><div><b>${ids.length + 1}</b><span>màn hình</span></div><div><b>${menu}</b><span>mục sidebar</span></div><div><b>${acts}</b><span>thao tác gọi API</span></div></div>`;
+  $('#sum-see').innerHTML = `<h4>Xem được</h4><ul>${M.see.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  $('#sum-do').innerHTML = `<h4>Làm được</h4><ul>${M.can.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  $('#map-title').textContent = `Sơ đồ màn hình · ${R.label}`;
+}
+function mapIds(k){ const out=[]; MAPS[k].groups.forEach(g => g.rows.forEach(r => r.forEach(it => out.push(it[0])))); return out; }
+function flagOf(k,id){ for(const g of MAPS[k].groups) for(const r of g.rows) for(const it of r) if(it[0]===id) return it[4]||''; return ''; }
+
+function wrapText(s, max){
+  const words = s.split(' '); const lines=[]; let cur='';
+  for(const w of words){ if((cur+' '+w).trim().length > max && cur){ lines.push(cur); cur=w; } else cur=(cur+' '+w).trim(); }
+  if(cur) lines.push(cur); return lines;
+}
+function clip(s, n){ return s.length > n ? s.slice(0, n-1)+'…' : s; }
+
+function drawNode(svg, id, x, y, w, h, opts){
+  const s = S[id];
+  const g = el('g', {class:'n'+(opts.hub?' hub':'')+(opts.flag==='m'?' menu':'')+(opts.flag==='h'?' hid':'')+(opts.flag==='x'||s.modal?' modal':''), 'data-id':id, tabindex:'0', role:'button', 'aria-label': s.t}, svg);
+  el('rect', {class:'b', x, y, width:w, height:h, rx: s.modal ? 12 : 8}, g);
+  const title = opts.title || s.t;
+  if(opts.hub){
+    const lines = wrapText(title, 20);
+    lines.forEach((ln,i) => { const t = el('text', {class:'t1', x:x+14, y:y+26+i*17}, g); t.textContent = ln; });
+    const r = el('text', {class:'t2', x:x+14, y:y+h-14}, g); r.textContent = clip(s.r, 24);
+  } else {
+    const t = el('text', {class:'t1', x:x+12, y:y+23}, g); t.textContent = clip(title, 25);
+    const r = el('text', {class:'t2', x:x+12, y:y+41}, g); r.textContent = clip(s.r, 27);
+  }
+  const tag = opts.flag==='m' ? 'MENU' : opts.flag==='h' ? 'ẨN' : (opts.flag==='x'||s.modal) ? 'MODAL' : '';
+  if(tag){
+    const tw = tag.length*6.2+10;
+    el('rect', {class:'tagbg', x:x+w-tw-6, y:y-7, width:tw, height:14, rx:4}, g);
+    const tt = el('text', {class:'tag', x:x+w-6-tw/2, y:y+3, 'text-anchor':'middle'}, g); tt.textContent = tag;
+  }
+  g.addEventListener('click', () => onNode(id));
+  g.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onNode(id); } });
+  return g;
+}
+function onNode(id){
+  if(curView === 'hand') return;
+  if(S[id].jump){ select(id); return; }
+  select(id);
+}
+
+function buildMap(k){
+  const M = MAPS[k]; const svg = $('#map'); svg.innerHTML=''; svg.classList.remove('dim');
+  POS = {}; EDGES = [];
+  let y = 30, maxCol = 0; const labels = [];
+  M.groups.forEach(g => {
+    labels.push({t:g.g.toUpperCase(), y}); y += 20;
+    g.rows.forEach(row => { row.forEach(it => { POS[it[0]] = {x:colX(it[1]), y, w:W, h:H, col:it[1]}; maxCol=Math.max(maxCol,it[1]); }); y += H + 20; });
+    y += 8;
+  });
+  const total = y + 4;
+  const hubH = 92, hubY = Math.max(30, Math.min(total/2 - hubH/2, 260));
+  POS.hub = {x:HUBX, y:hubY, w:HUBW, h:hubH, col:-1};
+  const width = colX(maxCol) + W + 24;
+  svg.setAttribute('viewBox', `0 0 ${Math.max(width, 960)} ${total}`);
+  const defs = el('defs', {}, svg);
+  [['a','ah'],['ah','ah hot']].forEach(([id,cls]) => { const m = el('marker', {id:'m-'+id, viewBox:'0 0 10 10', refX:'9', refY:'5', markerWidth:'6', markerHeight:'6', orient:'auto-start-reverse'}, defs); el('path', {d:'M0 0L10 5L0 10z', class:cls}, m); });
+  labels.forEach(l => { const t = el('text', {class:'glabel', x:X0, y:l.y+6}, svg); t.textContent = l.t; el('line', {class:'gline', x1:X0 + l.t.length*7.2 + 10, y1:l.y+2, x2:Math.max(width,960)-16, y2:l.y+2}, svg); });
+  const edgeG = el('g', {}, svg);
+  const addEdge = (from, to, label) => {
+    const A = POS[from], B = POS[to]; if(!A || !B) return;
+    const sx = A.x + A.w, sy = A.y + A.h/2, ex = B.x - 3, ey = B.y + B.h/2;
+    const d = Math.abs(sy-ey) < 1 ? `M${sx} ${sy} L${ex} ${ey}` : `M${sx} ${sy} C ${sx+(ex-sx)*.55} ${sy}, ${ex-(ex-sx)*.45} ${ey}, ${ex} ${ey}`;
+    const p = el('path', {class:'e', d, 'marker-end':'url(#m-a)'}, edgeG);
+    let t = null;
+    if(label){ t = el('text', {class:'el', x:ex-6, y:ey-7, 'text-anchor':'end'}, edgeG); t.textContent = label; }
+    EDGES.push({from:from==='hub'?M.hub:from, to, p, t});
+  };
+  M.groups.forEach(g => g.rows.forEach(row => row.forEach(it => { if(it[2]) addEdge(it[2], it[0], it[3]); })));
+  (M.extra||[]).forEach(e => addEdge(e[0], e[1], e[2]));
+  drawNode(svg, M.hub, HUBX, hubY, HUBW, hubH, {hub:true});
+  M.groups.forEach(g => g.rows.forEach(row => row.forEach(it => { const P = POS[it[0]]; drawNode(svg, it[0], P.x, P.y, W, H, {flag:it[4]}); })));
+}
+
+function select(id){
+  curSel = id; const k = curRole; const s = S[id];
+  const svg = $('#map');
+  const inMap = new Set([MAPS[k].hub, ...mapIds(k)]);
+  const rel = new Set((s.go||[]).filter(x => inMap.has(x)));
+  EDGES.forEach(e => { if(e.to === id) rel.add(e.from); });
+  $$('.n', svg).forEach(n => { n.classList.toggle('sel', n.dataset.id === id); n.classList.toggle('rel', rel.has(n.dataset.id) && n.dataset.id !== id); });
+  EDGES.forEach(e => { const hot = e.from === id || e.to === id; e.p.classList.toggle('hot', hot); e.p.setAttribute('marker-end', hot ? 'url(#m-ah)' : 'url(#m-a)'); if(e.t) e.t.classList.toggle('hot', hot); });
+  svg.classList.toggle('dim', id !== MAPS[k].hub);
+  renderPanel(id, inMap);
+}
+
+function renderPanel(id, inMap){
+  const s = S[id], k = curRole, f = flagOf(k, id);
+  let h = `<span class="route">${esc(s.r)}</span><h2>${esc(s.t)}</h2><div class="tags">`;
+  if(id === MAPS[k].hub) h += `<span class="tg m">${k==='PUBLIC'?'điểm vào':'trang chủ sau đăng nhập'}</span>`;
+  if(f==='m') h += '<span class="tg m">có trên sidebar</span>';
+  if(f==='h') h += '<span class="tg h">không có trên sidebar</span>';
+  if(s.modal || f==='x') h += '<span class="tg x">modal / drawer</span>';
+  h += '</div>';
+  if(s.vary && s.vary[k]) h += `<div class="vary">${esc(s.vary[k])}</div>`;
+  if(s.jump){
+    h += `<p class="empty" style="margin-top:10px">${esc(s.see[0])}</p><div class="k">Mở dashboard của</div><div class="gotos">` +
+      Object.keys(ROLES).filter(r => r!=='PUBLIC').map(r => `<button class="goto" type="button" data-role="${r}">${esc(ROLES[r].label)}</button>`).join('') + '</div>';
+  } else {
+    if(s.load && s.load.length) h += `<div class="k">Tải dữ liệu khi mở</div><div>${s.load.map(a => `<code>${esc(a)}</code>`).join(' ')}</div>`;
+    h += `<div class="k">Xem được</div><ul>${s.see.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    h += `<div class="k">Làm được</div>`;
+    h += (s.do && s.do.length) ? `<ul class="act">${s.do.map(d => `<li><b>${esc(d[0])}</b>${d[1] ? `<code class="api">${esc(d[1])}</code>` : ''}${d[2] ? `<span class="note">${esc(d[2])}</span>` : ''}</li>`).join('')}</ul>` : `<p class="empty">${esc(s.note || 'Chỉ xem, không có thao tác.')}</p>`;
+    const go = (s.go||[]);
+    if(go.length){
+      h += `<div class="k">Đi tới</div><div class="gotos">` + go.map(g => `<button class="goto" type="button" data-go="${g}" ${inMap.has(g)?'':'disabled title="Role này không có màn hình này trên sơ đồ"'}>${esc(S[g].t)}</button>`).join('') + '</div>';
+    }
+    if(s.warn) h += `<div class="k">Lưu ý</div><div class="warn">${esc(s.warn)}</div>`;
+  }
+  const p = $('#panel'); p.innerHTML = h; p.scrollTop = 0;
+  $$('[data-go]', p).forEach(b => b.onclick = () => select(b.dataset.go));
+  $$('[data-role]', p).forEach(b => b.onclick = () => showRole(b.dataset.role));
+}
+
+/* ═════════════ HANDOFF VIEW ═════════════ */
+const ft = $('#flowtabs');
+HAND.forEach((f,i) => { const b = document.createElement('button'); b.type='button'; b.className='ft'; b.textContent=f.n; b.onclick = () => showHand(i); ft.appendChild(b); });
+function showHand(i){
+  curView='hand'; curHand=i; markTabs('HAND');
+  $('#view-role').hidden=true; $('#view-hand').hidden=false;
+  try{ history.replaceState(null,'','#flows'); }catch(e){}
+  $$('.ft', ft).forEach((b,j) => b.setAttribute('aria-pressed', j===i));
+  const F = HAND[i]; $('#flowdesc').textContent = F.d;
+  const svg = $('#swim'); svg.innerHTML='';
+  const LW = 150, CW = 190, NW = 164, NH = 70, LH = 96, TOP = 14;
+  const width = LW + F.s.length*CW + 20, height = TOP + F.lanes.length*LH + 10;
+  svg.setAttribute('viewBox', `0 0 ${Math.max(width,960)} ${height}`);
+  const defs = el('defs', {}, svg);
+  const m = el('marker', {id:'hm', viewBox:'0 0 10 10', refX:'9', refY:'5', markerWidth:'6', markerHeight:'6', orient:'auto-start-reverse'}, defs); el('path', {d:'M0 0L10 5L0 10z', class:'ah hot'}, m);
+  F.lanes.forEach((ln,li) => {
+    const y = TOP + li*LH;
+    if(li % 2 === 0) el('rect', {class:'lane-bg', x:0, y, width:Math.max(width,960), height:LH}, svg);
+    const dot = el('circle', {cx:18, cy:y+LH/2, r:5, fill:ROLES[ln].c}, svg);
+    const t = el('text', {class:'lane-l', x:30, y:y+LH/2+4}, svg); t.textContent = ROLES[ln].label.toUpperCase();
+  });
+  const pos = F.s.map((st,i) => ({x: LW + i*CW, y: TOP + F.lanes.indexOf(st[0])*LH + (LH-NH)/2}));
+  for(let i=0;i<F.s.length-1;i++){
+    const A=pos[i], B=pos[i+1]; const sx=A.x+NW, sy=A.y+NH/2, ex=B.x-3, ey=B.y+NH/2;
+    const d = Math.abs(sy-ey)<1 ? `M${sx} ${sy} L${ex} ${ey}` : `M${sx} ${sy} C ${sx+14} ${sy}, ${ex-14} ${ey}, ${ex} ${ey}`;
+    el('path', {class:'e hot', d, 'marker-end':'url(#hm)'}, svg);
+  }
+  F.s.forEach((st,i) => {
+    const P = pos[i], s = S[st[1]];
+    const g = el('g', {class:'n', tabindex:'0', role:'button', 'aria-label':`Bước ${i+1}: ${st[2]} — mở ${s.t}`}, svg);
+    el('rect', {class:'b', x:P.x, y:P.y, width:NW, height:NH, rx:8}, g);
+    el('circle', {class:'numbg', cx:P.x+16, cy:P.y+16, r:9}, g);
+    const n = el('text', {class:'num', x:P.x+16, y:P.y+20, 'text-anchor':'middle'}, g); n.textContent = i+1;
+    wrapText(st[2], 17).slice(0,2).forEach((ln,j) => { const t = el('text', {class:'t1', x:P.x+32, y:P.y+20+j*16, style:'font-size:12px'}, g); t.textContent = ln; });
+    const r = el('text', {class:'t2', x:P.x+12, y:P.y+NH-10}, g); r.textContent = clip(s.t, 23);
+    const go = () => { showRole(st[0], st[1]); $('#map').scrollIntoView({block:'start'}); };
+    g.addEventListener('click', go);
+    g.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
+  });
+}
+
+/* ═════════════ INIT ═════════════ */
+const hash = (location.hash||'').slice(1).toUpperCase();
+if(hash === 'FLOWS') showHand(0);
+else if(ROLES[hash]) showRole(hash);
+else showRole('EMPLOYEE');
+})();
+</script>
+</body>
+</html>

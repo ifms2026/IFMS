@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IFMS Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#F2F5F7; --surface:#FFFFFF; --surface-2:#E8EEF2; --ink:#14202B; --ink-2:#4A5A68; --ink-3:#6F808D;
+  --line:#CAD5DD; --line-2:#DFE6EB;
+  --accent:#0F6E8C; --accent-soft:#D5EAF1; --accent-ink:#0B5068;
+  --credit:#2F7D5B; --credit-soft:#DCEFE5; --debit:#B4413C; --debit-soft:#F6E0DE;
+  --money:#A86A12; --money-soft:#F6EAD3;
+  --font-display:"Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0E151B; --surface:#15202A; --surface-2:#1C2A35; --ink:#E2E9EF; --ink-2:#A2B3C0; --ink-3:#7C8E9C;
+    --line:#2E404D; --line-2:#233340;
+    --accent:#5BB9D5; --accent-soft:#143746; --accent-ink:#9AD6E8;
+    --credit:#62C293; --credit-soft:#16352A; --debit:#E5827A; --debit-soft:#3C1E1D;
+    --money:#E3AA4E; --money-soft:#3A2C14;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0E151B; --surface:#15202A; --surface-2:#1C2A35; --ink:#E2E9EF; --ink-2:#A2B3C0; --ink-3:#7C8E9C;
+  --line:#2E404D; --line-2:#233340;
+  --accent:#5BB9D5; --accent-soft:#143746; --accent-ink:#9AD6E8;
+  --credit:#62C293; --credit-soft:#16352A; --debit:#E5827A; --debit-soft:#3C1E1D;
+  --money:#E3AA4E; --money-soft:#3A2C14;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto} *{transition:none!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.62 var(--font-body);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+a{color:var(--accent)}
+code,.mono{font-family:var(--font-mono);font-size:.86em}
+code{background:var(--surface-2);padding:.08em .38em;border-radius:5px;color:var(--accent-ink);word-break:break-word}
+h1,h2,h3,h4{font-family:var(--font-display);text-wrap:balance;margin:0;line-height:1.25;letter-spacing:-.01em}
+h2{font-size:1.65rem;font-weight:700}
+h3{font-size:1.15rem;font-weight:600;margin-top:2rem}
+h4{font-size:.98rem;font-weight:600}
+p{margin:.6rem 0;max-width:70ch}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── layout ─────────────────────────────────────── */
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);gap:0;min-height:100vh}
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 18px 28px 24px;border-right:1px solid var(--line-2);background:var(--surface)}
+.toc .brand{font-family:var(--font-display);font-weight:700;font-size:1.05rem;display:flex;gap:10px;align-items:center}
+.toc .brand svg{flex:none}
+.toc .sub{color:var(--ink-3);font-size:.8rem;margin:4px 0 22px}
+.toc nav{display:flex;flex-direction:column;gap:2px}
+.toc .grp{font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 6px;font-weight:600}
+.toc a{text-decoration:none;color:var(--ink-2);padding:5px 10px;border-radius:7px;font-size:.9rem}
+.toc a:hover{background:var(--surface-2);color:var(--ink)}
+.toc a.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:500}
+.toc .theme{margin-top:24px;display:flex;gap:6px}
+main{padding-inline:clamp(16px,4vw,56px);padding-block:40px 80px;max-width:1120px;width:100%}
+section{padding-block:38px 10px;border-top:1px solid var(--line-2)}
+section:first-of-type{border-top:0;padding-top:0}
+.eyebrow{font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:6px;font-family:var(--font-display)}
+.lede{font-size:1.05rem;color:var(--ink-2)}
+.audience{display:inline-flex;gap:6px;align-items:center;font-size:.76rem;border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--ink-2);margin-left:8px;vertical-align:middle;font-family:var(--font-body);font-weight:500;letter-spacing:0}
+.audience.biz{border-color:var(--credit);color:var(--credit)}
+.audience.dev{border-color:var(--accent);color:var(--accent)}
+
+/* ── hero ───────────────────────────────────────── */
+.hero h1{font-size:clamp(2rem,4.2vw,2.9rem);font-weight:700;letter-spacing:-.025em}
+.hero .meta{display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--ink-3);font-size:.85rem;margin-top:12px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:var(--radius);overflow:hidden;margin-top:26px}
+.stat{background:var(--surface);padding:14px 16px}
+.stat b{display:block;font-family:var(--font-display);font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.stat span{font-size:.8rem;color:var(--ink-3)}
+
+/* ── generic blocks ─────────────────────────────── */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:18px}
+.panel{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);padding:16px 18px}
+.panel h4{margin-bottom:6px}
+.panel p{font-size:.92rem;color:var(--ink-2);margin:.3rem 0}
+.tbl{overflow-x:auto;margin-top:14px;border:1px solid var(--line-2);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+th{font-family:var(--font-display);font-weight:600;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;text-align:right}
+.chip{display:inline-block;font-family:var(--font-mono);font-size:.74rem;padding:1px 7px;border-radius:5px;background:var(--surface-2);color:var(--ink-2);margin:2px 3px 2px 0;white-space:nowrap}
+.chip.a{background:var(--accent-soft);color:var(--accent-ink)}
+.chip.cr{background:var(--credit-soft);color:var(--credit)}
+.chip.db{background:var(--debit-soft);color:var(--debit)}
+.chip.m{background:var(--money-soft);color:var(--money)}
+ul.tight{padding-left:1.1rem;margin:.4rem 0}
+ul.tight li{margin:.2rem 0}
+ol.steps{padding-left:1.3rem}
+ol.steps li{margin:.45rem 0;max-width:72ch}
+
+/* ── figures / svg ──────────────────────────────── */
+figure{margin:18px 0 0}
+.fig{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);overflow:hidden}
+.fig-scroll{overflow-x:auto;padding:14px}
+.fig svg{display:block;width:100%;height:auto;min-width:720px;color:var(--ink)}
+figcaption{font-size:.84rem;color:var(--ink-3);margin-top:8px;max-width:80ch}
+svg text{font-family:var(--font-body);fill:currentColor}
+svg .t-title{font-family:var(--font-display);font-weight:600;font-size:14px}
+svg .t-sub{font-size:11.5px;fill:var(--ink-3)}
+svg .t-mono{font-family:var(--font-mono);font-size:11px}
+svg .t-edge{font-size:11px;fill:var(--ink-2)}
+svg .box{fill:var(--surface);stroke:var(--line);stroke-width:1.3}
+svg .box.ext{fill:var(--surface-2);stroke-dasharray:4 3}
+svg .box.core{fill:var(--accent-soft);stroke:var(--accent)}
+svg .edge{stroke:var(--ink-3);stroke-width:1.4;fill:none}
+svg .edge.dash{stroke-dasharray:5 4}
+svg .node{cursor:pointer}
+svg .node:hover .box{stroke:var(--accent)}
+svg .node.sel .box{stroke:var(--accent);stroke-width:2.4}
+svg .node:focus{outline:none}
+svg .node:focus-visible .box{stroke:var(--accent);stroke-width:2.4}
+svg .ah{fill:var(--ink-3)}
+.split{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:0}
+.split > .detail{border-left:1px solid var(--line-2);padding:18px 20px;background:var(--surface);min-width:0}
+.split.stack{grid-template-columns:1fr}
+.split.stack > .detail{border-left:0;border-top:1px solid var(--line-2);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:4px 28px;align-items:start}
+.split.stack > .detail > .body{grid-column:2;grid-row:1 / span 6}
+@media (max-width: 900px){.split.stack > .detail{grid-template-columns:1fr}.split.stack > .detail > .body{grid-column:auto;grid-row:auto}}
+.detail h4{font-size:1.05rem}
+.detail .kicker{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-top:14px;margin-bottom:4px}
+.detail p{font-size:.9rem;color:var(--ink-2);margin:.35rem 0}
+.detail ul{padding-left:1.05rem;margin:.3rem 0;font-size:.88rem;color:var(--ink-2)}
+.detail li{margin:.18rem 0}
+.hint{font-size:.8rem;color:var(--ink-3);padding:8px 14px;border-top:1px solid var(--line-2);background:var(--surface-2)}
+
+/* ── buttons / tabs ─────────────────────────────── */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.tab{font:500 .84rem var(--font-body);padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.tab:hover{border-color:var(--accent);color:var(--ink)}
+.tab[aria-pressed="true"],.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn{font:500 .84rem var(--font-body);padding:6px 12px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* ── modules ────────────────────────────────────── */
+.mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:14px}
+.mod{text-align:left;font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;color:var(--ink);display:flex;flex-direction:column;gap:2px;transition:border-color .15s, background .15s}
+.mod b{font-family:var(--font-mono);font-weight:500;font-size:.86rem}
+.mod span{font-size:.76rem;color:var(--ink-3)}
+.mod .ep{font-variant-numeric:tabular-nums}
+.mod:hover{border-color:var(--accent)}
+.mod.sel{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.mod.sel span{color:var(--surface);opacity:.85}
+.mod.out{background:var(--accent-soft);border-color:var(--accent)}
+.mod.in{background:var(--money-soft);border-color:var(--money)}
+.mod.dim{opacity:.4}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--ink-2);padding:0 14px 12px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px;border:1px solid}
+.layers{display:grid;gap:6px;margin-top:14px}
+.layer{display:grid;grid-template-columns:200px minmax(0,1fr);gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;padding:10px 14px}
+.layer b{font-family:var(--font-display);font-weight:600;font-size:.92rem}
+.layer div{font-size:.88rem;color:var(--ink-2)}
+.layer .down{grid-column:1/-1}
+
+/* ── wallet flows ───────────────────────────────── */
+svg .w .box{fill:var(--surface)}
+svg .w.hot .box{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.2}
+svg .w.lock .box{stroke:var(--money);stroke-width:2.2;stroke-dasharray:6 3;fill:var(--money-soft)}
+svg .w .wstate{font-family:var(--font-mono);font-size:10.5px;fill:var(--money)}
+svg .flow{stroke:var(--line);stroke-width:1.6;fill:none}
+svg .flow-l{font-size:11px;fill:var(--ink-3)}
+svg .flow.hot{stroke:var(--accent);stroke-width:3}
+svg .flow-l.hot{fill:var(--accent);font-weight:600}
+svg .fah{fill:var(--line)}
+svg .fah.hot{fill:var(--accent)}
+.flowbox{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);border-top:1px solid var(--line-2)}
+.steplist{list-style:none;margin:0;padding:10px;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--line-2)}
+.steplist button{width:100%;text-align:left;font:inherit;font-size:.88rem;background:transparent;border:1px solid transparent;border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--ink-2);display:grid;grid-template-columns:26px 1fr;gap:6px}
+.steplist button .n{font-family:var(--font-mono);font-size:.8rem;color:var(--ink-3)}
+.steplist button:hover{background:var(--surface-2)}
+.steplist button[aria-current="step"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.stepdetail{padding:16px 18px}
+.stepdetail .who{font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.stepdetail h4{margin:4px 0 8px;font-size:1.05rem}
+.stepdetail p{font-size:.9rem;color:var(--ink-2)}
+.ledger{margin-top:10px;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;font-size:.84rem}
+.ledger div{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:6px 10px;border-top:1px solid var(--line-2)}
+.ledger div:first-child{border-top:0}
+.ledger .dir{font-family:var(--font-mono);font-weight:500}
+.ledger .DEBIT .dir{color:var(--debit)} .ledger .CREDIT .dir{color:var(--credit)} .ledger .LOCK .dir,.ledger .NONE .dir{color:var(--money)}
+.stepnav{display:flex;gap:8px;margin-top:14px}
+.statusline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+
+/* ── state machine ──────────────────────────────── */
+svg .st .box{fill:var(--surface)}
+svg .st.term .box{fill:var(--surface-2)}
+svg .sm{stroke:var(--ink-3);stroke-width:1.5;fill:none;transition:opacity .2s}
+svg .sm-l{font-size:11px;fill:var(--ink-2);transition:opacity .2s}
+svg .faded{opacity:.14}
+svg .smhot{stroke:var(--accent);stroke-width:2.4}
+
+/* ── ER ─────────────────────────────────────────── */
+.er{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}
+.er-groups{padding:14px;display:flex;flex-direction:column;gap:12px}
+.er-groups h5{margin:0 0 6px;font-family:var(--font-display);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.er-groups .row{display:flex;flex-wrap:wrap;gap:6px}
+.tblbtn{font:500 .8rem var(--font-mono);padding:5px 9px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.tblbtn:hover{border-color:var(--accent)}
+.tblbtn.sel{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+.tblbtn.rel{background:var(--accent-soft);border-color:var(--accent)}
+.cols-list{font-family:var(--font-mono);font-size:.78rem;list-style:none;padding:0;margin:6px 0}
+.cols-list li{padding:3px 0;border-bottom:1px dashed var(--line-2);display:flex;gap:8px;flex-wrap:wrap}
+.cols-list .k{color:var(--money);min-width:26px}
+
+/* ── notes ──────────────────────────────────────── */
+.notes{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.note{background:var(--surface);border:1px solid var(--line-2);border-radius:8px;padding:12px 14px;display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px}
+.note .sev{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:5px;height:fit-content;text-align:center}
+.sev.bug{background:var(--debit-soft);color:var(--debit)}
+.sev.sec{background:var(--money-soft);color:var(--money)}
+.sev.conv{background:var(--accent-soft);color:var(--accent-ink)}
+.sev.doc{background:var(--surface-2);color:var(--ink-2)}
+.note h4{font-size:.94rem}
+.note p{font-size:.87rem;color:var(--ink-2);margin:.25rem 0 0}
+
+/* ── responsive ─────────────────────────────────── */
+@media (max-width: 900px){
+  .shell{grid-template-columns:1fr}
+  .toc{position:sticky;top:env(safe-area-inset-top,0px);height:auto;z-index:5;padding:10px 16px;border-right:0;border-bottom:1px solid var(--line-2)}
+  .toc .sub,.toc .grp,.toc .theme{display:none}
+  .toc nav{flex-direction:row;overflow-x:auto;gap:4px;margin-top:6px}
+  .toc a{white-space:nowrap}
+  .split,.flowbox,.er{grid-template-columns:1fr}
+  .split > .detail{border-left:0;border-top:1px solid var(--line-2)}
+  .steplist{border-right:0;border-bottom:1px solid var(--line-2)}
+  .layer{grid-template-columns:1fr;gap:4px}
+  .note{grid-template-columns:1fr;gap:6px}
+  .note .sev{width:fit-content}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="toc">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="6" fill="var(--accent)"/><path d="M7 9h12M7 13h12M7 17h7" stroke="var(--surface)" stroke-width="2" stroke-linecap="round"/></svg>
+      IFMS Architecture
+    </div>
+    <div class="sub">Internal Financial Management System · Internal wallet model</div>
+    <nav id="toc">
+      <div class="grp">Tổng quan</div>
+      <a href="#overview">Hệ thống làm gì</a>
+      <a href="#context">System context</a>
+      <a href="#stack">Tech stack</a>
+      <div class="grp">Kỹ thuật</div>
+      <a href="#backend">Backend modules &amp; layers</a>
+      <a href="#frontend">Frontend</a>
+      <a href="#finance">Luồng tài chính</a>
+      <a href="#security">Security &amp; RBAC</a>
+      <a href="#async">Async &amp; realtime</a>
+      <a href="#database">Database</a>
+      <div class="grp">Phụ lục</div>
+      <a href="#notes">Ghi chú kỹ thuật</a>
+    </nav>
+    <div class="theme" role="group" aria-label="Giao diện">
+      <button class="btn" type="button" id="th-light">Sáng</button>
+      <button class="btn" type="button" id="th-dark">Tối</button>
+      <button class="btn" type="button" id="th-sys">Hệ thống</button>
+    </div>
+  </aside>
+
+<main>
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero" id="overview">
+  <div class="eyebrow">Tài liệu kiến trúc · mô tả theo source code hiện tại</div>
+  <h1>IFMS — dòng tiền nội bộ chạy trên ví điện tử</h1>
+  <div class="meta">
+    <span>Backend <code>D:\IFMS</code> · Spring Boot 3.4.1 · Java 21</span>
+    <span>Frontend <code>D:\IFMS_FE\…\FRONTEND</code> · Next.js 16.1.6</span>
+    <span>Cập nhật 24/09/2026</span>
+  </div>
+  <p class="lede" style="margin-top:18px">IFMS quản lý toàn bộ tiền của công ty như một chuỗi <b>wallet</b> nội bộ: quỹ công ty cấp quota cho phòng ban, phòng ban cấp budget cho dự án, dự án giải ngân cho nhân viên. Mỗi lần tiền di chuyển đều được ghi thành <b>Transaction</b> với các <b>LedgerEntry</b> theo nguyên tắc double-entry (ghi sổ kép), nên số dư luôn đối soát được.</p>
+
+  <div class="stats" aria-label="Số liệu chính">
+    <div class="stat"><b>16</b><span>backend modules</span></div>
+    <div class="stat"><b>137</b><span>REST endpoints</span></div>
+    <div class="stat"><b>6</b><span>roles · 45 permissions</span></div>
+    <div class="stat"><b>5</b><span>wallet owner types</span></div>
+    <div class="stat"><b>V16</b><span>Flyway migrations</span></div>
+    <div class="stat"><b>~60</b><span>frontend routes</span></div>
+  </div>
+
+  <h3>Cách đọc tài liệu <span class="audience biz">cho mọi người</span></h3>
+  <p>Hai phần đầu (<a href="#overview">Tổng quan</a>, <a href="#context">System context</a>) và phần mở đầu của <a href="#finance">Luồng tài chính</a> không cần biết code. Các phần còn lại đi sâu vào class, endpoint và bảng dữ liệu — tên file được ghi rõ để dev tìm ngay. Sơ đồ nào có con trỏ tay đều bấm được; nội dung chi tiết hiện ở khung bên cạnh.</p>
+
+  <div class="cols">
+    <div class="panel">
+      <h4>Ai dùng hệ thống</h4>
+      <p><span class="chip">EMPLOYEE</span> tạo yêu cầu tạm ứng, thanh toán, hoàn ứng.</p>
+      <p><span class="chip">TEAM_LEADER</span> duyệt chi tiêu dự án, chia budget theo phase/category.</p>
+      <p><span class="chip">MANAGER</span> tạo dự án, cấp vốn cho dự án từ ví phòng ban.</p>
+      <p><span class="chip">ACCOUNTANT</span> giải ngân (có PIN), chạy lương, duyệt rút tiền.</p>
+      <p><span class="chip">CFO</span> cấp quota từ quỹ công ty cho phòng ban.</p>
+      <p><span class="chip">ADMIN</span> quản lý tài khoản, phòng ban, cấu hình, audit log.</p>
+    </div>
+    <div class="panel">
+      <h4>Ý tưởng cốt lõi</h4>
+      <p>Tiền chỉ “chảy xuống” theo cấp: <b>Company fund → Department → Project → User</b>. Mỗi cấp chỉ tiêu được phần đã được cấp trên duyệt.</p>
+      <p>Khi Team Leader duyệt, tiền bị <b>lock</b> (giữ chỗ) trong ví dự án; chỉ khi kế toán giải ngân mới thật sự chuyển.</p>
+      <p>Tiền vào/ra khỏi hệ thống (nạp qua VNPay, rút qua ngân hàng, nạp quỹ) được đối ứng với ví kiểm soát <code>FLOAT_MAIN</code>.</p>
+    </div>
+    <div class="panel">
+      <h4>Nguyên tắc thiết kế</h4>
+      <p><b>Separation of Duties</b>: người tạo yêu cầu, người duyệt và người chi tiền là các role khác nhau.</p>
+      <p><b>Mọi thay đổi đều có dấu vết</b>: audit log ghi tự động sau mỗi commit, request history ghi từng bước duyệt.</p>
+      <p><b>Realtime</b>: số dư ví và thông báo được đẩy về trình duyệt qua Server-Sent Events.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CONTEXT ═══════════════ -->
+<section id="context">
+  <div class="eyebrow">Bức tranh tổng thể</div>
+  <h2>System context <span class="audience biz">cho mọi người</span></h2>
+  <p>Trình duyệt chỉ nói chuyện với Next.js; Next.js proxy mọi <code>/api/*</code> sang Spring Boot, nên không có CORS phía trình duyệt. Spring Boot là nơi duy nhất chạm vào database, cache, message queue và các dịch vụ bên ngoài — trừ Cloudinary, nơi trình duyệt upload file trực tiếp bằng chữ ký do backend cấp.</p>
+  <figure>
+    <div class="fig">
+      <div class="split stack">
+        <div class="fig-scroll">
+          <svg id="ctx" viewBox="0 0 980 470" role="img" aria-label="Trình duyệt gọi Next.js, Next.js proxy sang Spring Boot; Spring Boot dùng PostgreSQL, Redis, RabbitMQ và gọi MockBank, Brevo; VNPay gọi IPN về Spring Boot; trình duyệt upload trực tiếp lên Cloudinary.">
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+            </defs>
+            <!-- edges -->
+            <line class="edge" x1="170" y1="195" x2="238" y2="195" marker-end="url(#ah)"/>
+            <text class="t-edge" x="204" y="187" text-anchor="middle">HTTP</text>
+            <line class="edge dash" x1="240" y1="228" x2="172" y2="228" marker-end="url(#ah)"/>
+            <text class="t-edge" x="204" y="246" text-anchor="middle">SSE</text>
+            <line class="edge" x1="400" y1="195" x2="468" y2="195" marker-end="url(#ah)"/>
+            <text class="t-edge" x="434" y="187" text-anchor="middle">proxy</text>
+            <line class="edge dash" x1="470" y1="228" x2="402" y2="228" marker-end="url(#ah)"/>
+            <text class="t-edge" x="434" y="246" text-anchor="middle">SSE</text>
+            <line class="edge" x1="690" y1="150" x2="778" y2="80" marker-end="url(#ah)"/>
+            <text class="t-edge" x="742" y="128">JPA · Flyway</text>
+            <line class="edge" x1="690" y1="185" x2="778" y2="178" marker-end="url(#ah)"/>
+            <text class="t-edge" x="734" y="172" text-anchor="middle">cache</text>
+            <line class="edge" x1="690" y1="250" x2="778" y2="278" marker-end="url(#ah)"/>
+            <text class="t-edge" x="728" y="255" text-anchor="middle">AMQP</text>
+            <line class="edge" x1="80" y1="251" x2="80" y2="378" marker-end="url(#ah)"/>
+            <text class="t-edge" x="88" y="320">upload (signed)</text>
+            <line class="edge" x1="150" y1="251" x2="288" y2="378" marker-end="url(#ah)"/>
+            <text class="t-edge" x="232" y="300">redirect</text>
+            <line class="edge" x1="400" y1="398" x2="488" y2="298" marker-end="url(#ah)"/>
+            <text class="t-edge" x="452" y="340" text-anchor="end">IPN</text>
+            <line class="edge" x1="545" y1="296" x2="545" y2="378" marker-end="url(#ah)"/>
+            <text class="t-edge" x="552" y="345">transfer</text>
+            <line class="edge" x1="640" y1="296" x2="640" y2="378" marker-end="url(#ah)"/>
+            <text class="t-edge" x="648" y="345">mail</text>
+            <!-- nodes -->
+            <g class="node" data-id="browser" tabindex="0" role="button" aria-label="Browser"><rect class="box" x="20" y="165" width="150" height="86" rx="9"/><text class="t-title" x="95" y="200" text-anchor="middle">Browser</text><text class="t-sub" x="95" y="220" text-anchor="middle">người dùng · 6 roles</text></g>
+            <g class="node" data-id="next" tabindex="0" role="button" aria-label="Next.js"><rect class="box" x="240" y="165" width="160" height="86" rx="9"/><text class="t-title" x="320" y="200" text-anchor="middle">Next.js 16</text><text class="t-sub" x="320" y="220" text-anchor="middle">:3000 · App Router</text></g>
+            <g class="node sel" data-id="spring" tabindex="0" role="button" aria-label="Spring Boot"><rect class="box core" x="470" y="120" width="220" height="176" rx="10"/><text class="t-title" x="580" y="152" text-anchor="middle">Spring Boot 3.4.1</text><text class="t-sub" x="580" y="171" text-anchor="middle">:8080 · context /api/v1</text><text class="t-mono" x="490" y="204">16 modules · 137 endpoints</text><text class="t-mono" x="490" y="224">JWT filter → @PreAuthorize</text><text class="t-mono" x="490" y="244">WalletService (ledger)</text><text class="t-mono" x="490" y="264">SseService (in-memory)</text></g>
+            <g class="node" data-id="pg" tabindex="0" role="button" aria-label="PostgreSQL"><rect class="box" x="780" y="40" width="180" height="60" rx="9"/><text class="t-title" x="870" y="66" text-anchor="middle">PostgreSQL 16</text><text class="t-sub" x="870" y="85" text-anchor="middle">IFMSdb · :5433</text></g>
+            <g class="node" data-id="redis" tabindex="0" role="button" aria-label="Redis"><rect class="box" x="780" y="148" width="180" height="60" rx="9"/><text class="t-title" x="870" y="174" text-anchor="middle">Redis 7</text><text class="t-sub" x="870" y="193" text-anchor="middle">:6379 · token &amp; cache</text></g>
+            <g class="node" data-id="rabbit" tabindex="0" role="button" aria-label="RabbitMQ"><rect class="box" x="780" y="252" width="180" height="60" rx="9"/><text class="t-title" x="870" y="278" text-anchor="middle">RabbitMQ 3</text><text class="t-sub" x="870" y="297" text-anchor="middle">:5672 · 5 queues + DLQ</text></g>
+            <g class="node" data-id="cloud" tabindex="0" role="button" aria-label="Cloudinary"><rect class="box ext" x="20" y="380" width="150" height="60" rx="9"/><text class="t-title" x="95" y="406" text-anchor="middle">Cloudinary</text><text class="t-sub" x="95" y="425" text-anchor="middle">file storage</text></g>
+            <g class="node" data-id="vnpay" tabindex="0" role="button" aria-label="VNPay"><rect class="box ext" x="240" y="380" width="160" height="60" rx="9"/><text class="t-title" x="320" y="406" text-anchor="middle">VNPay sandbox</text><text class="t-sub" x="320" y="425" text-anchor="middle">nạp tiền vào ví</text></g>
+            <g class="node" data-id="mockbank" tabindex="0" role="button" aria-label="MockBank"><rect class="box ext" x="470" y="380" width="105" height="60" rx="9"/><text class="t-title" x="522" y="406" text-anchor="middle">MockBank</text><text class="t-sub" x="522" y="425" text-anchor="middle">:8081</text></g>
+            <g class="node" data-id="brevo" tabindex="0" role="button" aria-label="Brevo"><rect class="box ext" x="590" y="380" width="100" height="60" rx="9"/><text class="t-title" x="640" y="406" text-anchor="middle">Brevo</text><text class="t-sub" x="640" y="425" text-anchor="middle">email API</text></g>
+          </svg>
+        </div>
+        <div class="detail" id="ctx-detail" aria-live="polite"></div>
+      </div>
+      <div class="hint">Bấm vào một khối để xem vai trò, class chính và cấu hình liên quan. Viền đứt = dịch vụ bên ngoài; mũi tên đứt = luồng Server-Sent Events.</div>
+    </div>
+    <figcaption>Hình 1. Mọi request nghiệp vụ đi Browser → Next.js (rewrite <code>/api/:path*</code>) → Spring Boot. Hai luồng đi ngược chiều: SSE đẩy dữ liệu về trình duyệt, và VNPay gọi IPN vào backend.</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════════ STACK ═══════════════ -->
+<section id="stack">
+  <div class="eyebrow">Công nghệ</div>
+  <h2>Tech stack</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>Công nghệ</th><th>Dùng để làm gì trong IFMS</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>Next.js 16.1.6 · React 19.2 · Tailwind 4 · TypeScript 5</td><td>App Router, hầu hết page là <code>"use client"</code>, fetch dữ liệu trong <code>useEffect</code></td></tr>
+      <tr><td>FE libraries</td><td>recharts · zod 4 · react-toastify · @microsoft/fetch-event-source</td><td>Biểu đồ dashboard, validate form, toast, SSE có header <code>Authorization</code></td></tr>
+      <tr><td>Backend framework</td><td>Spring Boot 3.4.1 · Java 21 · Lombok</td><td>Web MVC, Validation, Thymeleaf (template email)</td></tr>
+      <tr><td>Security</td><td>Spring Security · JJWT 0.12.6 (HMAC) · BCrypt</td><td>Stateless JWT, <code>@EnableMethodSecurity</code>, transaction PIN</td></tr>
+      <tr><td>Persistence</td><td>Spring Data JPA · Hibernate 6 · PostgreSQL 16 · Flyway (V1–V16)</td><td><code>ddl-auto: validate</code>; Flyway quản lý toàn bộ schema; Specification cho filter động</td></tr>
+      <tr><td>Cache / session</td><td>Redis 7 (Lettuce) · Spring Cache</td><td>Token version, setup token, OTP quên mật khẩu, cache <code>system_configs</code></td></tr>
+      <tr><td>Messaging</td><td>RabbitMQ 3 (AMQP) · Jackson converter</td><td>Queue mail, audit, notification; retry 3 lần rồi vào DLQ</td></tr>
+      <tr><td>Realtime</td><td>Server-Sent Events (<code>SseEmitter</code>)</td><td>Đẩy thông báo, số dư ví, giao dịch mới</td></tr>
+      <tr><td>Tích hợp ngoài</td><td>VNPay (HMAC-SHA512) · MockBank REST · Brevo · Cloudinary 1.39</td><td>Nạp tiền, rút tiền, gửi email, lưu file</td></tr>
+      <tr><td>Khác</td><td>Apache POI 5.3 · SpringDoc OpenAPI 2.8.6</td><td>Import/xuất Excel bảng lương; Swagger UI tại <code>/api/v1/swagger-ui.html</code></td></tr>
+      <tr><td>Hạ tầng dev</td><td>Docker Compose</td><td><code>ifms-postgres</code> (5433), <code>ifms-redis</code> (6379), <code>ifms-rabbitmq</code> (5672, UI 15672)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════════ BACKEND ═══════════════ -->
+<section id="backend">
+  <div class="eyebrow">Backend · <code>com.mkwang.backend</code></div>
+  <h2>Modules &amp; layers <span class="audience dev">cho dev</span></h2>
+  <p>Backend là một <b>modular monolith</b>: mỗi domain nằm trong <code>modules/{module}/</code> với đủ controller, service, repository, entity, dto, mapper. Phần dùng chung nằm ở <code>common/</code> (BaseEntity, ApiResponse, exception, SSE, sinh mã nghiệp vụ) và <code>config/</code> (Security, Redis, RabbitMQ, seed dữ liệu).</p>
+
+  <h3>Đường đi của một request trong backend</h3>
+  <div class="layers">
+    <div class="layer"><b>Filter chain</b><div><code>JwtAuthenticationFilter</code> → <code>AuditContextFilter</code> (gắn <code>traceId</code>, <code>actorId</code> vào ThreadLocal). Lỗi xác thực trả JSON qua <code>JwtAuthenticationEntryPoint</code>.</div></div>
+    <div class="layer"><b>Controller</b><div>Không chứa logic; lấy user qua <code>@AuthenticationPrincipal UserDetailsAdapter</code>; luôn trả <code>ResponseEntity&lt;ApiResponse&lt;T&gt;&gt;</code>, phân trang bằng <code>PageResponse&lt;T&gt;</code> (<code>items, total, page, size, totalPages</code>).</div></div>
+    <div class="layer"><b>ServiceImpl</b><div>Phân quyền bằng <code>@PreAuthorize("hasAuthority('…')")</code> — 108 chỗ. Gọi domain khác qua <b>Service interface</b> của domain đó. <code>@Transactional</code> bao quanh nghiệp vụ tiền.</div></div>
+    <div class="layer"><b>Repository</b><div>Spring Data JPA; filter ≥ 2 điều kiện dùng <code>JpaSpecificationExecutor</code> + <code>XxxSpecification.filter(...)</code>. Ví dùng <code>PESSIMISTIC_WRITE</code>.</div></div>
+    <div class="layer"><b>Entity</b><div>Kế thừa <code>BaseEntity</code> (<code>created_at/updated_at/created_by/updated_by</code>); tiền là <code>BigDecimal(19,2)</code>; <code>Transaction</code>, <code>LedgerEntry</code>, <code>AuditLog</code> là append-only.</div></div>
+    <div class="layer"><b>Mapper &amp; lỗi</b><div>Mỗi domain một <code>@Component</code> mapper. Mọi lỗi kế thừa <code>BaseException</code> (400/401/404/409/422/423/500 và các lỗi domain như <code>InsufficientWalletBalanceException</code>), xử lý tập trung ở <code>GlobalExceptionHandler</code>.</div></div>
+  </div>
+
+  <h3>Bản đồ module và phụ thuộc</h3>
+  <p>Bấm vào một module để xem nó <b>gọi</b> module nào (xanh) và <b>được gọi bởi</b> module nào (vàng). Cạnh phụ thuộc lấy theo lời gọi Service interface thật trong code.</p>
+  <figure>
+    <div class="fig">
+      <div class="split">
+        <div>
+          <div class="mods" id="mods" role="listbox" aria-label="Backend modules"></div>
+          <div class="legend"><span><i style="background:var(--accent);border-color:var(--accent)"></i>đang chọn</span><span><i style="background:var(--accent-soft);border-color:var(--accent)"></i>module này gọi tới</span><span><i style="background:var(--money-soft);border-color:var(--money)"></i>gọi vào module này</span></div>
+        </div>
+        <div class="detail" id="mod-detail" aria-live="polite"></div>
+      </div>
+    </div>
+    <figcaption>Hình 2. 16 module, 137 endpoint. <code>request</code> và <code>dashboard</code> là hai module phụ thuộc nhiều nhất; <code>wallet</code> là module được gọi nhiều nhất vì mọi dòng tiền đi qua <code>WalletService</code>.</figcaption>
+  </figure>
+
+  <h3>config/ và common/</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Class</th><th>Vai trò</th></tr></thead>
+    <tbody>
+      <tr><td><code>SecurityConfig</code> · <code>ApplicationConfig</code></td><td>Filter chain stateless, whitelist, CORS; <code>UserDetailsService</code> theo email, <code>BCryptPasswordEncoder</code></td></tr>
+      <tr><td><code>RedisConfig</code></td><td><code>RedisTemplate</code> JSON, <code>RedisCacheManager</code> (TTL mặc định 1h, <code>system_configs</code> 24h)</td></tr>
+      <tr><td><code>RabbitMQBaseConfig</code></td><td>JSON converter, listener factory: AUTO ack, 3 attempts (backoff 3s → 9s), sau đó reject → DLQ</td></tr>
+      <tr><td><code>JpaAuditingConfig</code></td><td>Tự điền <code>created_by/updated_by</code> từ principal</td></tr>
+      <tr><td><code>SchedulerConfig</code> · <code>AsyncConfig</code></td><td>5 scheduler thread; <code>@EnableAsync</code>. Job duy nhất: <code>NotificationScheduler</code> xoá thông báo đã đọc lúc 00:00</td></tr>
+      <tr><td><code>WebMvcConfig</code> · <code>MaintenanceInterceptor</code></td><td>Trả 503 khi <code>SYSTEM_MAINTENANCE_MODE=true</code></td></tr>
+      <tr><td><code>DataInitializer</code> · <code>DataSeeder</code></td><td>Seed roles/permissions, phòng ban, 9 user demo, ví, quỹ công ty; seed dữ liệu mẫu cho 3 flow và payroll</td></tr>
+      <tr><td><code>common/sse/SseService</code></td><td>Giữ <code>SseEmitter</code> theo userId và theo wallet key (<code>PROJECT:{id}</code>, <code>DEPARTMENT:{id}</code>, <code>COMPANY_FUND:1</code>)</td></tr>
+      <tr><td><code>common/utils/businesscodegenerator</code></td><td><code>BusinessCodeGenerator</code> + <code>BusinessCodeType</code> + <code>SequenceService</code> (PostgreSQL <code>nextval</code>)</td></tr>
+      <tr><td><code>common/utils/PinValidator</code></td><td>Độ dài PIN (5), danh sách PIN yếu, số lần sai tối đa, thời gian khoá</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Business codes</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Loại</th><th>Định dạng</th><th>Ví dụ</th><th>Nguồn số</th></tr></thead>
+    <tbody>
+      <tr><td>EMPLOYEE</td><td><code>MK{seq:03}</code></td><td><code>MK004</code></td><td><code>seq_employee_code</code></td></tr>
+      <tr><td>PROJECT</td><td><code>PRJ-{slug}-{YYYY}-{seq:03}</code></td><td><code>PRJ-ERP-2026-001</code></td><td><code>seq_project_code</code></td></tr>
+      <tr><td>PHASE</td><td><code>PH-{slug}-{seq:02}</code></td><td><code>PH-ERP-01</code></td><td><code>seq_phase_code</code></td></tr>
+      <tr><td>REQUEST</td><td><code>REQ-{dept}-{MMYY}-{seq:03}</code></td><td><code>REQ-IT-0926-012</code></td><td><code>seq_request_code</code></td></tr>
+      <tr><td>TRANSACTION</td><td><code>TXN-{8 hex}</code></td><td><code>TXN-3FA9C01B</code></td><td>random</td></tr>
+      <tr><td>PERIOD · PAYSLIP</td><td><code>PR-{YYYY}-{MM}</code> · <code>PSL-{emp}-{MMYY}</code></td><td><code>PR-2026-07</code></td><td>tính từ dữ liệu</td></tr>
+      <tr><td>WITHDRAWAL · DEPOSIT</td><td><code>WD-{YYYY}-{seq:06}</code> · <code>DEP-{YYYY}-{seq:06}</code></td><td><code>DEP-2026-000031</code></td><td><code>seq_withdraw_code</code>, <code>seq_deposit_code</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════════ FRONTEND ═══════════════ -->
+<section id="frontend">
+  <div class="eyebrow">Frontend · Next.js App Router</div>
+  <h2>Frontend <span class="audience dev">cho dev</span></h2>
+  <p>Frontend là một SPA viết trên App Router: chỉ <code>app/layout.tsx</code> là server component thật, còn gần như mọi page là client component, tự fetch dữ liệu. Không dùng SWR/React Query hay form library; state toàn cục nằm trong 3 React context.</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 920 360" role="img" aria-label="Luồng request trong frontend: middleware kiểm tra cookie, layout cung cấp context, page gọi api-client, api-client gắn Bearer và xử lý 401/503, next.config rewrite sang backend. Hook useUserStream nhận SSE và cập nhật context.">
+        <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+        <g><rect class="box" x="20" y="16" width="590" height="50" rx="8"/><text class="t-mono" x="36" y="38">middleware.ts</text><text class="t-sub" x="36" y="55">Không có cookie access_token → /login?callbackUrl=… · có cookie mà vào trang public → /dashboard</text></g>
+        <line class="edge" x1="315" y1="66" x2="315" y2="84" marker-end="url(#ah2)"/>
+        <g><rect class="box" x="20" y="86" width="590" height="50" rx="8"/><text class="t-mono" x="36" y="108">app/(auth) · app/(dashboard)/layout.tsx</text><text class="t-sub" x="36" y="125">AuthProvider → WalletProvider → ToastProvider · Sidebar theo role · ErrorBoundary</text></g>
+        <line class="edge" x1="315" y1="136" x2="315" y2="154" marker-end="url(#ah2)"/>
+        <g><rect class="box" x="20" y="156" width="590" height="50" rx="8"/><text class="t-mono" x="36" y="178">app/(dashboard)/**/page.tsx  ("use client")</text><text class="t-sub" x="36" y="195">useEffect → api.get/post… · dashboard/page.tsx chọn dashboard theo role</text></g>
+        <line class="edge" x1="315" y1="206" x2="315" y2="224" marker-end="url(#ah2)"/>
+        <g><rect class="box core" x="20" y="226" width="590" height="50" rx="8"/><text class="t-mono" x="36" y="248">lib/api-client.ts</text><text class="t-sub" x="36" y="265">Gắn Bearer · 401 → refresh-token → retry 1 lần · 503 → /maintenance · lỗi → ApiError</text></g>
+        <line class="edge" x1="315" y1="276" x2="315" y2="294" marker-end="url(#ah2)"/>
+        <g><rect class="box ext" x="20" y="296" width="590" height="50" rx="8"/><text class="t-mono" x="36" y="318">next.config.ts  rewrites()</text><text class="t-sub" x="36" y="335">/api/:path* → ${NEXT_PUBLIC_API_URL}/api/:path*  (localhost:8080)</text></g>
+        <g><rect class="box" x="660" y="156" width="240" height="190" rx="8"/><text class="t-mono" x="676" y="180">lib/hooks/use-user-stream.ts</text><text class="t-sub" x="676" y="198">fetchEventSource /api/v1/users/stream</text>
+          <text class="t-mono" x="676" y="228">wallet.updated</text><text class="t-sub" x="676" y="244">→ WalletContext.updateFromSse</text>
+          <text class="t-mono" x="676" y="270">notification</text><text class="t-sub" x="676" y="286">→ event notifications:new</text>
+          <text class="t-mono" x="676" y="312">transaction.created</text><text class="t-sub" x="676" y="328">→ event wallet:transaction-created</text></g>
+        <path class="edge dash" d="M660 250 C 630 250, 640 111, 612 111" marker-end="url(#ah2)"/>
+        <text class="t-edge" x="628" y="150" text-anchor="end">cập nhật state</text>
+        <path class="edge dash" d="M612 321 C 640 321, 780 380, 780 348" marker-end="url(#ah2)"/>
+      </svg>
+    </div></div>
+    <figcaption>Hình 3. Đường đi của một thao tác trên frontend. Mũi tên đứt là luồng SSE: cùng đi qua rewrite, rồi được hook <code>useUserStream</code> phân phối vào context và các <code>window</code> CustomEvent.</figcaption>
+  </figure>
+
+  <div class="cols">
+    <div class="panel"><h4>Auth phía client</h4>
+      <p><code>lib/auth.ts</code> gọi <code>/auth/login</code>. Nếu <code>requiresSetup</code> → lưu <code>setup_token</code> vào sessionStorage và chuyển <code>/change-password</code> (đặt mật khẩu + PIN 5 số).</p>
+      <p>Token lưu ở localStorage (<code>access_token</code>, <code>refresh_token</code>) và copy access token ra cookie để middleware đọc được.</p>
+    </div>
+    <div class="panel"><h4>API layer</h4>
+      <p>6 module typed trong <code>lib/api/</code> (analytics, company-fund, notification, payment, system-config, withdrawal); phần lớn endpoint khác được gọi trực tiếp bằng <code>api.*</code> trong page.</p>
+      <p><code>toFriendlyApiMessage</code> dịch lỗi backend sang tiếng Việt.</p>
+    </div>
+    <div class="panel"><h4>State</h4>
+      <p><code>AuthContext</code> (user, <code>hasRole</code>) · <code>WalletContext</code> (ví hiện tại, <code>optimisticUpdate</code>, <code>updateFromSse</code>) · <code>ToastContext</code>.</p>
+      <p>Components giao tiếp qua <code>window</code> CustomEvent: <code>notifications:changed</code>, <code>notifications:new</code>, <code>wallet:transaction-created</code>.</p>
+    </div>
+  </div>
+
+  <h3>Routes theo role</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Nhóm</th><th>Routes</th><th>Backend chính</th></tr></thead>
+    <tbody>
+      <tr><td>Public</td><td><code>/login</code> <code>/change-password</code> <code>/forgot-password</code> <code>/maintenance</code></td><td><code>/auth/*</code></td></tr>
+      <tr><td>Mọi role</td><td><code>/dashboard</code> <code>/wallet/**</code> (deposit, withdraw, transactions) <code>/profile</code> <code>/notifications</code></td><td><code>/wallet</code>, <code>/users/me/*</code>, <code>/notifications</code></td></tr>
+      <tr><td>EMPLOYEE</td><td><code>/requests</code> <code>/requests/new</code> <code>/requests/[id]</code> <code>/payroll</code> <code>/projects</code></td><td><code>/requests</code>, <code>/payslips</code>, <code>/projects</code></td></tr>
+      <tr><td>TEAM_LEADER</td><td><code>/team-leader/approvals</code> <code>/team-leader/projects/[id]</code> <code>/team-leader/team</code></td><td><code>/team-leader/*</code> (Flow 1, phase, member, category)</td></tr>
+      <tr><td>MANAGER</td><td><code>/manager/approvals</code> <code>/manager/projects</code> <code>/manager/department</code></td><td><code>/manager/*</code> (Flow 2)</td></tr>
+      <tr><td>ACCOUNTANT</td><td><code>/accountant/disbursements</code> <code>/accountant/payroll</code> <code>/accountant/ledger</code> <code>/accountant/withdrawals</code> <code>/accountant/system-fund</code></td><td><code>/accountant/*</code>, <code>/wallet/withdraw</code>, <code>/company-fund</code></td></tr>
+      <tr><td>CFO</td><td><code>/cfo/approvals</code> <code>/cfo/system-fund</code></td><td><code>/cfo/approvals</code> (Flow 3), <code>/company-fund</code></td></tr>
+      <tr><td>ADMIN</td><td><code>/admin/users</code> <code>/admin/departments</code> <code>/admin/roles</code> <code>/admin/settings</code> <code>/admin/audit-logs</code></td><td><code>/admin/*</code>, <code>/system-configs</code></td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:.88rem;color:var(--ink-3)">Menu sidebar lọc theo role (<code>getNavGroups(role)</code>), nhưng middleware không chặn route theo role — quyền thật do backend <code>@PreAuthorize</code> quyết định.</p>
+</section>
+
+<!-- ═══════════════ FINANCE ═══════════════ -->
+<section id="finance">
+  <div class="eyebrow">Domain tài chính · wallet, request, accounting</div>
+  <h2>Luồng tài chính</h2>
+  <p><span class="audience biz">cho mọi người</span> Mọi số dư nằm trong bảng <code>wallets</code>, mỗi ví thuộc một chủ sở hữu (<code>owner_type</code>, <code>owner_id</code>). Tiền không bao giờ “sinh ra” giữa chừng: mỗi lần chuyển, ví nguồn bị <span class="chip db">DEBIT</span> và ví đích được <span class="chip cr">CREDIT</span> đúng cùng một số tiền, trong cùng một database transaction.</p>
+
+  <div class="cols">
+    <div class="panel"><h4>balance · lockedBalance</h4><p><code>availableBalance = balance − lockedBalance</code>. <code>lock()</code> giữ chỗ tiền khi Team Leader duyệt; <code>settle()</code> vừa mở lock vừa trừ balance khi giải ngân.</p></div>
+    <div class="panel"><h4>Transaction + LedgerEntry</h4><p>1 <code>Transaction</code> (code, type, amount, reference) + 2 <code>LedgerEntry</code> (DEBIT/CREDIT, <code>balance_after</code>). Giao dịch biên (deposit, withdraw, system top-up) chỉ có 1 entry, đối ứng bằng <code>FLOAT_MAIN</code>.</p></div>
+    <div class="panel"><h4>Concurrency</h4><p><code>getWalletForUpdate</code> khoá <code>PESSIMISTIC_WRITE</code>; chuyển giữa hai ví dùng <code>lockPairDeterministically()</code> (sắp theo <code>WalletKey</code>) để tránh deadlock; thêm <code>@Version</code> trên <code>Wallet</code>.</p></div>
+  </div>
+
+  <h3>Mô phỏng từng luồng tiền</h3>
+  <p>Chọn một luồng, rồi đi từng bước. Sơ đồ sáng lên ví và mũi tên đang tham gia; khung bên phải cho biết ai làm, gọi endpoint nào, status đổi ra sao và bút toán nào được ghi.</p>
+  <div class="tabs" id="flow-tabs" role="tablist" aria-label="Chọn luồng"></div>
+  <figure>
+    <div class="fig">
+      <div class="fig-scroll">
+        <svg id="wallets" viewBox="0 0 952 390" role="img" aria-label="Năm ví theo cấp: ngân hàng ngoài, COMPANY_FUND, DEPARTMENT, PROJECT, USER, cùng ví kiểm soát FLOAT_MAIN. Các mũi tên là những đường tiền có thể đi.">
+          <defs>
+            <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="fah"/></marker>
+            <marker id="fah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="fah hot"/></marker>
+          </defs>
+          <!-- float main -->
+          <g class="w" id="w-float"><rect class="box" x="16" y="22" width="330" height="62" rx="9" style="stroke-dasharray:5 3"/><text class="t-title" x="32" y="48">FLOAT_MAIN <tspan class="t-sub" dx="4">ownerId = 0</tspan></text><text class="t-sub" x="32" y="68">control total: tổng tiền đã vào hệ thống = Σ mọi ví khác</text><text class="wstate" x="330" y="48" text-anchor="end" id="ws-float"></text></g>
+          <line class="flow" x1="84" y1="84" x2="84" y2="150" style="stroke-dasharray:3 3"/>
+          <!-- horizontal edges -->
+          <line class="flow" id="e-topup" x1="152" y1="192" x2="210" y2="192"/><text class="flow-l" id="l-topup" x="181" y="182" text-anchor="middle">top-up</text>
+          <line class="flow" id="e-quota" x1="348" y1="192" x2="406" y2="192"/><text class="flow-l" id="l-quota" x="377" y="182" text-anchor="middle">Flow 3</text>
+          <line class="flow" id="e-proj" x1="544" y1="192" x2="602" y2="192"/><text class="flow-l" id="l-proj" x="573" y="182" text-anchor="middle">Flow 2</text>
+          <line class="flow" id="e-pay" x1="740" y1="192" x2="798" y2="192"/><text class="flow-l" id="l-pay" x="769" y="182" text-anchor="middle">Flow 1</text>
+          <!-- curves -->
+          <path class="flow" id="e-salary" d="M280 228 C 280 282, 848 282, 848 230"/><text class="flow-l" id="l-salary" x="564" y="278" text-anchor="middle">PAYSLIP_PAYMENT · payroll</text>
+          <path class="flow" id="e-deposit" d="M112 228 C 112 330, 878 330, 878 230"/><text class="flow-l" id="l-deposit" x="495" y="319" text-anchor="middle">DEPOSIT · VNPay</text>
+          <path class="flow" id="e-withdraw" d="M908 228 C 908 378, 56 378, 56 230"/><text class="flow-l" id="l-withdraw" x="482" y="366" text-anchor="middle">WITHDRAW · MockBank</text>
+          <!-- wallet nodes -->
+          <g class="w" id="w-bank"><rect class="box ext" x="16" y="152" width="136" height="76" rx="9"/><text class="t-title" x="84" y="182" text-anchor="middle">Ngân hàng</text><text class="t-sub" x="84" y="200" text-anchor="middle">ngoài hệ thống</text><text class="wstate" x="84" y="218" text-anchor="middle" id="ws-bank"></text></g>
+          <g class="w" id="w-company"><rect class="box" x="212" y="152" width="136" height="76" rx="9"/><text class="t-title" x="280" y="182" text-anchor="middle">COMPANY_FUND</text><text class="t-sub" x="280" y="200" text-anchor="middle">ownerId = 1</text><text class="wstate" x="280" y="218" text-anchor="middle" id="ws-company"></text></g>
+          <g class="w" id="w-dept"><rect class="box" x="408" y="152" width="136" height="76" rx="9"/><text class="t-title" x="476" y="182" text-anchor="middle">DEPARTMENT</text><text class="t-sub" x="476" y="200" text-anchor="middle">1 ví / phòng ban</text><text class="wstate" x="476" y="218" text-anchor="middle" id="ws-dept"></text></g>
+          <g class="w" id="w-project"><rect class="box" x="604" y="152" width="136" height="76" rx="9"/><text class="t-title" x="672" y="182" text-anchor="middle">PROJECT</text><text class="t-sub" x="672" y="200" text-anchor="middle">1 ví / dự án</text><text class="wstate" x="672" y="218" text-anchor="middle" id="ws-project"></text></g>
+          <g class="w" id="w-user"><rect class="box" x="800" y="152" width="136" height="76" rx="9"/><text class="t-title" x="868" y="182" text-anchor="middle">USER</text><text class="t-sub" x="868" y="200" text-anchor="middle">1 ví / nhân viên</text><text class="wstate" x="868" y="218" text-anchor="middle" id="ws-user"></text></g>
+        </svg>
+      </div>
+      <div class="flowbox">
+        <ol class="steplist" id="steplist"></ol>
+        <div class="stepdetail" id="stepdetail" aria-live="polite"></div>
+      </div>
+    </div>
+    <figcaption>Hình 4. Năm loại owner của <code>WalletOwnerType</code>. Mũi tên ngang là các cấp phân bổ; ba đường cong là lương (COMPANY_FUND → USER) và hai giao dịch biên với ngân hàng. Viền vàng đứt = ví đang có <code>lockedBalance</code>.</figcaption>
+  </figure>
+
+  <h3>Request state machine</h3>
+  <p>Bảng <code>requests</code> dùng chung cho 5 <code>RequestType</code>. Mỗi flow đi một nhánh khác nhau của cùng một state machine; mọi chuyển trạng thái được ghi vào <code>request_histories</code>.</p>
+  <div class="tabs" id="sm-tabs" role="group" aria-label="Lọc theo flow">
+    <button class="tab" type="button" data-f="all" aria-pressed="true">Tất cả</button>
+    <button class="tab" type="button" data-f="f1" aria-pressed="false">Flow 1 · ADVANCE / EXPENSE / REIMBURSE</button>
+    <button class="tab" type="button" data-f="f2" aria-pressed="false">Flow 2 · PROJECT_TOPUP</button>
+    <button class="tab" type="button" data-f="f3" aria-pressed="false">Flow 3 · DEPARTMENT_TOPUP</button>
+  </div>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg id="sm" viewBox="0 0 860 370" role="img" aria-label="Request bắt đầu ở PENDING. Flow 1: Team Leader duyệt sang APPROVED_BY_TEAM_LEADER, kế toán giải ngân sang PAID. Flow 2: Manager duyệt sang APPROVED_BY_MANAGER rồi tự PAID. Flow 3: CFO duyệt sang APPROVED_BY_CFO rồi tự PAID. PENDING có thể bị REJECTED hoặc CANCELLED.">
+        <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+        <line class="sm" data-f="f1" x1="180" y1="180" x2="298" y2="82" marker-end="url(#ah3)"/><text class="sm-l" data-f="f1" x="206" y="128" text-anchor="end">TL approve</text>
+        <line class="sm" data-f="f2" x1="180" y1="190" x2="298" y2="190" marker-end="url(#ah3)"/><text class="sm-l" data-f="f2" x="240" y="181" text-anchor="middle">Manager approve</text>
+        <line class="sm" data-f="f3" x1="180" y1="200" x2="298" y2="298" marker-end="url(#ah3)"/><text class="sm-l" data-f="f3" x="226" y="286" text-anchor="end">CFO approve</text>
+        <line class="sm" data-f="f1" x1="540" y1="80" x2="678" y2="176" marker-end="url(#ah3)"/><text class="sm-l" data-f="f1" x="618" y="106">disburse + PIN</text>
+        <line class="sm" data-f="f2" x1="540" y1="190" x2="678" y2="190" marker-end="url(#ah3)"/><text class="sm-l" data-f="f2" x="609" y="181" text-anchor="middle">auto-paid</text>
+        <line class="sm" data-f="f3" x1="540" y1="300" x2="678" y2="204" marker-end="url(#ah3)"/><text class="sm-l" data-f="f3" x="618" y="284">auto-paid</text>
+        <line class="sm" data-f="all f1 f2 f3" x1="100" y1="165" x2="100" y2="82" marker-end="url(#ah3)"/><text class="sm-l" data-f="all f1 f2 f3" x="108" y="128">reject</text>
+        <line class="sm" data-f="all f1 f2 f3" x1="100" y1="215" x2="100" y2="298" marker-end="url(#ah3)"/><text class="sm-l" data-f="all f1 f2 f3" x="108" y="262">cancel</text>
+        <line class="sm" data-f="f1" x1="300" y1="68" x2="182" y2="58" marker-end="url(#ah3)"/><text class="sm-l" data-f="f1" x="242" y="48" text-anchor="middle">accountant reject</text>
+        <g class="st"><rect class="box" x="20" y="165" width="160" height="50" rx="8"/><text class="t-mono" x="100" y="194" text-anchor="middle">PENDING</text></g>
+        <g class="st term"><rect class="box" x="20" y="32" width="160" height="50" rx="8"/><text class="t-mono" x="100" y="61" text-anchor="middle">REJECTED</text></g>
+        <g class="st term"><rect class="box" x="20" y="300" width="160" height="50" rx="8"/><text class="t-mono" x="100" y="329" text-anchor="middle">CANCELLED</text></g>
+        <g class="st"><rect class="box" x="300" y="50" width="240" height="50" rx="8"/><text class="t-mono" x="420" y="79" text-anchor="middle">APPROVED_BY_TEAM_LEADER</text></g>
+        <g class="st"><rect class="box" x="300" y="165" width="240" height="50" rx="8"/><text class="t-mono" x="420" y="194" text-anchor="middle">APPROVED_BY_MANAGER</text></g>
+        <g class="st"><rect class="box" x="300" y="275" width="240" height="50" rx="8"/><text class="t-mono" x="420" y="304" text-anchor="middle">APPROVED_BY_CFO</text></g>
+        <g class="st term"><rect class="box core" x="680" y="165" width="160" height="50" rx="8"/><text class="t-mono" x="760" y="194" text-anchor="middle">PAID</text></g>
+      </svg>
+    </div></div>
+    <figcaption>Hình 5. <code>RequestStatus</code> trong <code>RequestServiceImpl</code>. Flow 2 và Flow 3 chuyển tiền và sang <code>PAID</code> ngay trong cùng transaction lúc duyệt; chỉ Flow 1 có bước giải ngân riêng của kế toán. Cancel chỉ được làm khi còn <code>PENDING</code> và bởi chính người tạo.</figcaption>
+  </figure>
+
+  <h3>AdvanceBalance — theo dõi khoản tạm ứng</h3>
+  <p>Khi một yêu cầu <code>ADVANCE</code> được giải ngân, hệ thống tạo <code>AdvanceBalance</code> (<code>original = remaining = amount</code>, status <code>OUTSTANDING</code>). Khoản này giảm dần theo hai cách:</p>
+  <ul class="tight">
+    <li><b>REIMBURSE</b> — nhân viên nộp chứng từ; khi kế toán giải ngân request REIMBURSE, <code>advanceBalance.reimburse(amount)</code> được gọi, <b>không có dòng tiền</b>.</li>
+    <li><b>Payroll netting</b> — khi chạy lương, <code>applyPayrollDeduction</code> khấu trừ tối đa 50% lương gross vào nợ tạm ứng.</li>
+  </ul>
+  <p>Status đi <span class="chip m">OUTSTANDING</span> → <span class="chip m">PARTIALLY_SETTLED</span> → <span class="chip cr">SETTLED</span>, với ràng buộc CHECK <code>remaining_amount ≥ 0</code>.</p>
+</section>
+
+<!-- ═══════════════ SECURITY ═══════════════ -->
+<section id="security">
+  <div class="eyebrow">Auth · JWT · RBAC · PIN</div>
+  <h2>Security &amp; RBAC <span class="audience dev">cho dev</span></h2>
+  <p>Backend stateless: không có HTTP session, mỗi request mang <code>Authorization: Bearer &lt;JWT&gt;</code>. Đăng xuất hay đăng nhập lại không cần blacklist — hệ thống tăng <code>users.token_version</code>, mọi token có <code>ver</code> cũ tự mất hiệu lực (single-session).</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 1000 150" role="img" aria-label="Mỗi request đi qua sáu bước kiểm tra: đọc Bearer token, JWT filter, tải user từ database, kiểm tra trạng thái tài khoản, kiểm tra chữ ký và hạn, kiểm tra token version so với Redis, rồi @PreAuthorize ở service.">
+        <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+        <g><rect class="box" x="20" y="30" width="140" height="70" rx="8"/><text class="t-title" x="90" y="60" text-anchor="middle">Bearer token</text><text class="t-sub" x="90" y="80" text-anchor="middle">header Authorization</text></g>
+        <line class="edge" x1="160" y1="65" x2="182" y2="65" marker-end="url(#ah4)"/>
+        <g><rect class="box" x="184" y="30" width="140" height="70" rx="8"/><text class="t-title" x="254" y="60" text-anchor="middle">Load user</text><text class="t-sub" x="254" y="80" text-anchor="middle">DB · role + permissions</text></g>
+        <line class="edge" x1="324" y1="65" x2="346" y2="65" marker-end="url(#ah4)"/>
+        <g><rect class="box" x="348" y="30" width="140" height="70" rx="8"/><text class="t-title" x="418" y="60" text-anchor="middle">Status</text><text class="t-sub" x="418" y="80" text-anchor="middle">ACTIVE, không LOCKED</text></g>
+        <line class="edge" x1="488" y1="65" x2="510" y2="65" marker-end="url(#ah4)"/>
+        <g><rect class="box" x="512" y="30" width="140" height="70" rx="8"/><text class="t-title" x="582" y="60" text-anchor="middle">Signature + exp</text><text class="t-sub" x="582" y="80" text-anchor="middle">HMAC · subject = email</text></g>
+        <line class="edge" x1="652" y1="65" x2="674" y2="65" marker-end="url(#ah4)"/>
+        <g><rect class="box core" x="676" y="30" width="140" height="70" rx="8"/><text class="t-title" x="746" y="60" text-anchor="middle">Token version</text><text class="t-sub" x="746" y="80" text-anchor="middle">ver ≥ token_ver:{id}</text></g>
+        <line class="edge" x1="816" y1="65" x2="838" y2="65" marker-end="url(#ah4)"/>
+        <g><rect class="box" x="840" y="30" width="140" height="70" rx="8"/><text class="t-title" x="910" y="60" text-anchor="middle">@PreAuthorize</text><text class="t-sub" x="910" y="80" text-anchor="middle">ở ServiceImpl</text></g>
+        <text class="t-sub" x="500" y="132" text-anchor="middle">JwtAuthenticationFilter (5 bước đầu) → SecurityContext → method security</text>
+      </svg>
+    </div></div>
+    <figcaption>Hình 6. Chuỗi kiểm tra trong <code>JwtAuthenticationFilter</code> và <code>JwtService</code>. Token version lấy từ Redis <code>token_ver:{userId}</code>, cache miss thì đọc DB và cache lại.</figcaption>
+  </figure>
+
+  <h3>Đăng nhập và lần đăng nhập đầu tiên</h3>
+  <ol class="steps">
+    <li>FE gửi <code>POST /auth/login</code>; <code>AuthServiceImpl.login</code> xác thực bằng <code>AuthenticationManager</code> (BCrypt).</li>
+    <li>Nếu <code>isFirstLogin = true</code> và role khác ADMIN: trả <code>requiresSetup</code> + <code>setupToken</code> (UUID lưu Redis <code>first_login_setup:{uuid}</code>, TTL <code>app.auth.setup-token-ttl-minutes</code> = 15 phút).</li>
+    <li>Người dùng đặt mật khẩu mới và PIN 5 số → <code>POST /auth/first-login/complete</code>; PIN được <code>PinValidator</code> kiểm tra và lưu BCrypt ở <code>user_security_settings</code>.</li>
+    <li>Tăng <code>token_version</code>, cache vào Redis, phát <b>access token</b> (30 phút) và <b>refresh token</b> (7 ngày). Claims: <code>jti, sub, iat, exp, ver, roles, permissions</code>.</li>
+    <li>Access token hết hạn → FE nhận 401 → <code>POST /auth/refresh-token</code> → thử lại request một lần.</li>
+    <li>Logout → tăng <code>token_version</code>: mọi token cũ trên mọi thiết bị hết hiệu lực.</li>
+  </ol>
+  <div class="cols">
+    <div class="panel"><h4>Quên mật khẩu (OTP)</h4><p><code>/auth/forgot-password</code> sinh OTP 6 số (<code>SecureRandom</code>, TTL 5 phút), lưu Redis và gửi mail qua queue <code>FORGET_PASSWORD</code>; <code>/auth/verify-password-reset</code> xác nhận và đổi mật khẩu.</p></div>
+    <div class="panel"><h4>Transaction PIN</h4><p>Bắt buộc khi kế toán giải ngân và khi rút tiền. <code>ProfileServiceImpl.verifyMyPin</code> tăng <code>retry_count</code>, khoá tới <code>locked_until</code> sau 5 lần sai (<code>noRollbackFor</code> để giữ bộ đếm).</p></div>
+    <div class="panel"><h4>Permission model</h4><p>Tên permission là Java enum <code>Permission</code> (45 giá trị); gán role → permission lưu ở <code>role_permissions</code>. <code>UserDetailsAdapter</code> trả <code>ROLE_&lt;name&gt;</code> + tất cả permission.</p></div>
+  </div>
+
+  <h3>Role → permission riêng</h3>
+  <p>Cả 6 role đều có 13 quyền cá nhân (<code>USER_PROFILE_*</code>, <code>WALLET_VIEW_SELF</code>, <code>WALLET_DEPOSIT</code>, <code>WALLET_WITHDRAW</code>, <code>REQUEST_CREATE</code>, <code>PAYROLL_VIEW_SELF</code>…). Bảng dưới chỉ liệt kê phần riêng của từng role, theo <code>DataInitializer</code>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Role</th><th>Permission riêng</th><th>Trong flow</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip">EMPLOYEE</span></td><td>— (chỉ 13 quyền cá nhân)</td><td>Tạo ADVANCE / EXPENSE / REIMBURSE</td></tr>
+      <tr><td><span class="chip">TEAM_LEADER</span></td><td><span class="chip a">REQUEST_APPROVE_TEAM_LEADER</span><span class="chip">PROJECT_CATEGORY_MANAGE</span><span class="chip">PROJECT_BUDGET_ALLOCATE</span><span class="chip">PROJECT_PHASE_MANAGE</span><span class="chip">PROJECT_MEMBER_MANAGE</span></td><td>Duyệt Flow 1, tạo PROJECT_TOPUP</td></tr>
+      <tr><td><span class="chip">MANAGER</span></td><td><span class="chip">PROJECT_CREATE</span><span class="chip">PROJECT_UPDATE</span><span class="chip">PROJECT_STATUS_MANAGE</span><span class="chip">PROJECT_ASSIGN_LEADER</span><span class="chip">REQUEST_VIEW_DEPT</span><span class="chip a">REQUEST_APPROVE_PROJECT_TOPUP</span><span class="chip">REQUEST_REJECT</span><span class="chip">DEPT_VIEW_DASHBOARD</span></td><td>Duyệt Flow 2, tạo DEPARTMENT_TOPUP</td></tr>
+      <tr><td><span class="chip">ACCOUNTANT</span></td><td><span class="chip">PROJECT_VIEW_ALL</span><span class="chip">REQUEST_VIEW_APPROVED</span><span class="chip a">REQUEST_PAYOUT</span><span class="chip">TRANSACTION_APPROVE_WITHDRAW</span><span class="chip">WALLET_VIEW_ALL</span><span class="chip a">PAYROLL_MANAGE</span><span class="chip">PAYROLL_EXECUTE</span><span class="chip">COMPANY_FUND_VIEW</span><span class="chip">COMPANY_FUND_TOPUP</span></td><td>Giải ngân Flow 1, payroll, rút tiền, nạp quỹ</td></tr>
+      <tr><td><span class="chip">CFO</span></td><td><span class="chip">PROJECT_VIEW_ALL</span><span class="chip">REQUEST_VIEW_ALL</span><span class="chip a">REQUEST_APPROVE_DEPT_TOPUP</span><span class="chip">REQUEST_REJECT</span><span class="chip">TRANSACTION_APPROVE_WITHDRAW</span><span class="chip">WALLET_VIEW_ALL</span><span class="chip">COMPANY_FUND_VIEW</span><span class="chip">COMPANY_FUND_TOPUP</span><span class="chip">DEPT_BUDGET_ALLOCATE</span><span class="chip">DASHBOARD_VIEW_GLOBAL</span></td><td>Duyệt Flow 3</td></tr>
+      <tr><td><span class="chip">ADMIN</span></td><td><span class="chip">USER_VIEW_LIST</span><span class="chip">USER_CREATE</span><span class="chip">USER_UPDATE</span><span class="chip">USER_LOCK</span><span class="chip">ROLE_MANAGE</span><span class="chip">DEPT_MANAGE</span><span class="chip">SYSTEM_CONFIG_MANAGE</span><span class="chip">AUDIT_LOG_VIEW</span></td><td>Không tham gia duyệt tiền</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════════ ASYNC ═══════════════ -->
+<section id="async">
+  <div class="eyebrow">RabbitMQ · audit · mail · SSE</div>
+  <h2>Async &amp; realtime <span class="audience dev">cho dev</span></h2>
+  <p>Ba việc phụ — gửi email, ghi audit log, tạo thông báo — được tách khỏi request chính qua RabbitMQ, để lỗi ở Brevo hay tải cao không làm chậm hoặc hỏng giao dịch tài chính.</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 960 390" role="img" aria-label="Ba luồng RabbitMQ: MailPublisher qua mailExchange tới ba queue mail rồi MailConsumer gọi Brevo; FinancialAuditListener qua AuditPublisher tới auditExchange, auditQueue, AuditLogConsumer ghi audit_logs; NotificationPublisher qua notificationExchange tới notificationQueue, NotificationConsumer lưu notifications rồi đẩy SSE.">
+        <defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+        <text class="t-sub" x="115" y="20" text-anchor="middle">PRODUCER</text><text class="t-sub" x="345" y="20" text-anchor="middle">EXCHANGE (topic)</text><text class="t-sub" x="580" y="20" text-anchor="middle">QUEUE</text><text class="t-sub" x="835" y="20" text-anchor="middle">CONSUMER</text>
+        <!-- row mail -->
+        <g><rect class="box" x="20" y="34" width="190" height="66" rx="8"/><text class="t-mono" x="34" y="60">MailPublisher</text><text class="t-sub" x="34" y="80">ONBOARD · FORGET_PASSWORD</text></g>
+        <line class="edge" x1="210" y1="67" x2="258" y2="67" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="260" y="34" width="170" height="66" rx="8"/><text class="t-mono" x="274" y="60">mailExchange</text><text class="t-sub" x="274" y="80">DLX: mailDLX</text></g>
+        <line class="edge" x1="430" y1="67" x2="478" y2="67" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="480" y="34" width="200" height="66" rx="8"/><text class="t-mono" x="494" y="60">3 mail queues</text><text class="t-sub" x="494" y="80">onboard · forget · warning</text></g>
+        <line class="edge" x1="680" y1="67" x2="728" y2="67" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="730" y="34" width="210" height="66" rx="8"/><text class="t-mono" x="744" y="60">MailConsumer</text><text class="t-sub" x="744" y="80">→ Brevo API (Thymeleaf)</text></g>
+        <!-- row audit -->
+        <g><rect class="box" x="20" y="160" width="190" height="66" rx="8"/><text class="t-mono" x="34" y="186">FinancialAuditListener</text><text class="t-sub" x="34" y="206">POST_COMMIT → @Async</text></g>
+        <line class="edge" x1="210" y1="193" x2="258" y2="193" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="260" y="160" width="170" height="66" rx="8"/><text class="t-mono" x="274" y="186">auditExchange</text><text class="t-sub" x="274" y="206">DLX: auditDLX</text></g>
+        <line class="edge" x1="430" y1="193" x2="478" y2="193" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="480" y="160" width="200" height="66" rx="8"/><text class="t-mono" x="494" y="186">auditQueue</text><text class="t-sub" x="494" y="206">routing key: audit</text></g>
+        <line class="edge" x1="680" y1="193" x2="728" y2="193" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="730" y="160" width="210" height="66" rx="8"/><text class="t-mono" x="744" y="186">AuditLogConsumer</text><text class="t-sub" x="744" y="206">→ bảng audit_logs</text></g>
+        <!-- row notification -->
+        <g><rect class="box" x="20" y="286" width="190" height="66" rx="8"/><text class="t-mono" x="34" y="312">NotificationPublisher</text><text class="t-sub" x="34" y="332">RequestService · Payroll</text></g>
+        <line class="edge" x1="210" y1="319" x2="258" y2="319" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="260" y="286" width="170" height="66" rx="8"/><text class="t-mono" x="274" y="312">notificationExchange</text><text class="t-sub" x="274" y="332">DLX: notificationDLX</text></g>
+        <line class="edge" x1="430" y1="319" x2="478" y2="319" marker-end="url(#ah5)"/>
+        <g><rect class="box" x="480" y="286" width="200" height="66" rx="8"/><text class="t-mono" x="494" y="312">notificationQueue</text><text class="t-sub" x="494" y="332">notification.send</text></g>
+        <line class="edge" x1="680" y1="319" x2="728" y2="319" marker-end="url(#ah5)"/>
+        <g><rect class="box core" x="730" y="286" width="210" height="66" rx="8"/><text class="t-mono" x="744" y="312">NotificationConsumer</text><text class="t-sub" x="744" y="332">lưu DB trước → SSE sau</text></g>
+      </svg>
+    </div></div>
+    <figcaption>Hình 7. Topology RabbitMQ. Mỗi queue có DLX (direct) → DLQ riêng; listener retry 3 lần (backoff 3s → 9s) rồi đẩy message vào DLQ, nơi listener DLQ chỉ ghi log.</figcaption>
+  </figure>
+
+  <div class="cols">
+    <div class="panel"><h4>Audit tự động</h4><p><code>HibernateListenerRegistryConfig</code> gắn <code>FinancialAuditListener</code> vào POST_COMMIT insert/update/delete của <b>mọi entity</b>. Strategy Insert/Update/Delete chỉ ghi field thay đổi, che <code>password</code>/<code>pin</code>… bằng <code>***</code>. Xem tại <code>GET /admin/audit</code>.</p></div>
+    <div class="panel"><h4>Notification → SSE</h4><p><code>NotificationConsumer</code> lưu bảng <code>notifications</code> trước, rồi <code>sseService.sendToUser(...)</code> trong try/catch. User offline vẫn thấy thông báo khi mở lại.</p></div>
+    <div class="panel"><h4>SSE endpoints</h4><p><code>GET /users/stream</code> (mỗi user) và 3 stream theo ví: <code>/users/project/{id}/stream</code>, <code>/users/department/{id}/stream</code>, <code>/users/company-fund/stream</code>. Events: <code>connected</code>, <code>notification</code>, <code>wallet.updated</code>, <code>transaction.created</code>.</p></div>
+  </div>
+
+  <h3>Redis đang lưu gì</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Key</th><th>Ghi bởi</th><th>Giá trị</th><th>TTL</th></tr></thead>
+    <tbody>
+      <tr><td><code>token_ver:{userId}</code></td><td><code>JwtService</code></td><td>token version hiện tại</td><td>bằng refresh TTL (7 ngày)</td></tr>
+      <tr><td><code>first_login_setup:{uuid}</code></td><td><code>AuthServiceImpl</code></td><td>userId</td><td>15 phút</td></tr>
+      <tr><td><code>password_reset_email: {email}</code></td><td><code>AuthServiceImpl</code></td><td><code>ForgotPasswordOtpData</code> (JSON)</td><td>5 phút</td></tr>
+      <tr><td><code>system_configs::{key}</code></td><td>Spring Cache</td><td>giá trị config</td><td>24 giờ</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════════ DATABASE ═══════════════ -->
+<section id="database">
+  <div class="eyebrow">PostgreSQL · Flyway V1 → V16</div>
+  <h2>Database <span class="audience dev">cho dev</span></h2>
+  <p>Schema do Flyway quản lý hoàn toàn (<code>ddl-auto: validate</code>). Bấm vào một bảng để xem cột chính và quan hệ; các bảng liên quan sẽ được đánh dấu.</p>
+  <figure>
+    <div class="fig">
+      <div class="er">
+        <div class="er-groups" id="er-groups"></div>
+        <div class="detail" id="er-detail" aria-live="polite" style="border-left:1px solid var(--line-2)"></div>
+      </div>
+    </div>
+    <figcaption>Hình 8. Các bảng chính theo domain. <code>wallets.owner_id</code> và <code>transactions.reference_id</code> là tham chiếu đa hình (polymorphic) — không có foreign key thật tới <code>users</code>/<code>departments</code>/<code>projects</code>.</figcaption>
+  </figure>
+
+  <h3>Lịch sử migration</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Version</th><th>Thay đổi</th></tr></thead>
+    <tbody>
+      <tr><td>V1</td><td>Schema ban đầu (24 bảng)</td></tr>
+      <tr><td>V2 · V3</td><td>Sequence cho employee/project/phase/request code · <code>projects.description</code></td></tr>
+      <tr><td>V4 · V5</td><td><code>users.token_version</code>, bỏ các cột boolean của Spring Security · xoá bảng <code>jwt_tokens</code></td></tr>
+      <tr><td>V6 · V7</td><td><code>audit_logs.trace_id</code>, chuẩn hoá action INSERT/UPDATE/DELETE + CHECK</td></tr>
+      <tr><td>V8</td><td>Mô hình ví hợp nhất (<code>owner_type</code>, <code>owner_id</code>, <code>locked_balance</code>) + bảng <code>ledger_entries</code></td></tr>
+      <tr><td>V9 · V10</td><td><code>requests.paid_at</code> + index · bảng <code>advance_balances</code></td></tr>
+      <tr><td>V11 · V12</td><td>Restart <code>seq_employee_code</code> · <code>system_funds</code> → <code>company_funds</code>, seed ví COMPANY_FUND &amp; FLOAT_MAIN</td></tr>
+      <tr><td>V13 · V14</td><td><code>withdrawal_requests</code> · expense category theo dự án (partial unique index)</td></tr>
+      <tr><td>V15 · V16</td><td><code>payroll_periods.netting_applied</code> · <code>deposit_logs</code> + <code>seq_deposit_code</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ═══════════════ NOTES ═══════════════ -->
+<section id="notes">
+  <div class="eyebrow">Phụ lục</div>
+  <h2>Ghi chú kỹ thuật</h2>
+  <p>Phần trên mô tả hệ thống đúng như code đang chạy. Dưới đây là những chỗ code lệch với docs/convention hoặc có rủi ro, phát hiện khi đọc source — kèm file để kiểm tra. Các mục chưa được chạy thử để xác nhận, trừ khi ghi rõ.</p>
+  <div class="tabs" id="note-tabs" role="group" aria-label="Lọc ghi chú">
+    <button class="tab" type="button" data-s="all" aria-pressed="true">Tất cả</button>
+    <button class="tab" type="button" data-s="bug" aria-pressed="false">Lỗi logic</button>
+    <button class="tab" type="button" data-s="sec" aria-pressed="false">Bảo mật</button>
+    <button class="tab" type="button" data-s="conv" aria-pressed="false">Convention</button>
+    <button class="tab" type="button" data-s="doc" aria-pressed="false">Docs lệch code</button>
+  </div>
+  <div class="notes" id="notes-list"></div>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const code = s => `<code>${esc(s)}</code>`;
+const list = arr => `<ul>${arr.map(x => `<li>${x}</li>`).join('')}</ul>`;
+
+/* ── theme ── */
+const root = document.documentElement;
+function setTheme(t){ if(t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme'); try{ t ? localStorage.setItem('ifms-arch-theme', t) : localStorage.removeItem('ifms-arch-theme'); }catch(e){} }
+try{ const t = localStorage.getItem('ifms-arch-theme'); if(t) root.setAttribute('data-theme', t); }catch(e){}
+$('#th-light').onclick = () => setTheme('light');
+$('#th-dark').onclick = () => setTheme('dark');
+$('#th-sys').onclick = () => setTheme(null);
+
+/* ── TOC highlight ── */
+const links = $$('#toc a');
+const secs = links.map(a => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+function onScroll(){
+  let cur = secs[0];
+  for(const s of secs){ if(s.getBoundingClientRect().top < 140) cur = s; }
+  links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#'+cur.id));
+}
+document.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+/* ── generic clickable svg nodes ── */
+function bindNodes(svg, render){
+  const nodes = $$('.node', svg);
+  const pick = n => { nodes.forEach(x => x.classList.toggle('sel', x === n)); render(n.dataset.id); };
+  nodes.forEach(n => {
+    n.addEventListener('click', () => pick(n));
+    n.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(n); } });
+  });
+}
+
+/* ═════════ SYSTEM CONTEXT ═════════ */
+const CTX = {
+  browser:{t:'Browser', k:'Client', d:'Người dùng thao tác qua giao diện web. Mọi request API đi qua Next.js cùng origin nên không vướng CORS.',
+    items:['Lưu access/refresh token ở localStorage, copy access token ra cookie cho middleware','Upload file đính kèm trực tiếp lên Cloudinary bằng chữ ký lấy từ '+code('GET /uploads/signature'),'Được chuyển sang trang VNPay khi nạp tiền, rồi quay về '+code('/payments/vnpay/return')]},
+  next:{t:'Next.js 16 (frontend)', k:'Port 3000', d:'App Router, gần như toàn bộ là client component. Không có route handler hay server action; chỉ đóng vai trò giao diện và proxy.',
+    items:[code('next.config.ts')+' rewrite '+code('/api/:path*')+' → '+code('NEXT_PUBLIC_API_URL'),code('middleware.ts')+': chuyển về '+code('/login?callbackUrl=…')+' khi chưa có cookie',code('lib/api-client.ts')+': Bearer, refresh khi 401, '+code('/maintenance')+' khi 503',code('lib/hooks/use-user-stream.ts')+': giữ một kết nối SSE cho mỗi tab']},
+  spring:{t:'Spring Boot 3.4.1 (backend)', k:'Port 8080 · /api/v1', d:'Modular monolith, 16 module trong '+code('com.mkwang.backend.modules')+'. Là nơi duy nhất đọc/ghi dữ liệu và giữ toàn bộ luật nghiệp vụ tài chính.',
+    items:['Security stateless: '+code('SecurityConfig')+', '+code('JwtAuthenticationFilter'),'Mọi dòng tiền qua '+code('WalletServiceImpl')+' (double-entry, pessimistic lock)','Audit tự động qua Hibernate POST_COMMIT listener','SSE: '+code('common/sse/SseService')+' giữ emitter trong bộ nhớ','Swagger UI: '+code('/api/v1/swagger-ui.html')]},
+  pg:{t:'PostgreSQL 16', k:'Docker ifms-postgres · 5433', d:'Database '+code('IFMSdb')+'. Schema do Flyway V1–V16 quản lý; Hibernate chỉ validate.',
+    items:['Cấu hình: '+code('DATABASE_URL')+', '+code('DB_USERNAME')+', '+code('DB_PASSWORD'),'Hikari pool min 1 / max 2','Sequence cho mã nghiệp vụ: '+code('seq_request_code')+', '+code('seq_deposit_code')+'…']},
+  redis:{t:'Redis 7', k:'Docker ifms-redis · 6379', d:'Không dùng cho session; chỉ giữ dữ liệu ngắn hạn và cache.',
+    items:[code('token_ver:{userId}')+' — single-session',code('first_login_setup:{uuid}')+' — 15 phút',code('password_reset_email: {email}')+' — OTP 5 phút',code('system_configs::{key}')+' — Spring Cache 24h']},
+  rabbit:{t:'RabbitMQ 3', k:'Docker ifms-rabbitmq · 5672 / UI 15672', d:'Tách các việc phụ ra khỏi request chính. 3 topic exchange, 5 queue, mỗi queue có DLX → DLQ.',
+    items:[code('mailExchange')+' → onboard / forget-password / warning',code('auditExchange')+' → '+code('auditQueue'),code('notificationExchange')+' → '+code('notificationQueue'),'Retry 3 lần (3s → 9s), sau đó vào DLQ']},
+  cloud:{t:'Cloudinary', k:'Dịch vụ ngoài', d:'Lưu avatar và chứng từ đính kèm. Backend chỉ ký (upload signature pattern), file đi thẳng từ trình duyệt.',
+    items:[code('CloudinaryService.generateSignature')+' ký '+code('{folder, timestamp}'),'Folder: '+code('AVATAR')+', '+code('REQUEST'),'Metadata lưu ở bảng '+code('file_storages')+' qua '+code('FileStorageService')]},
+  vnpay:{t:'VNPay sandbox', k:'Cổng thanh toán', d:'Kênh nạp tiền vào ví USER. Backend tạo URL ký HMAC-SHA512; kết quả chính thức đến qua IPN server-to-server.',
+    items:[code('VnpayPaymentGatewayService')+' qua '+code('PaymentGatewayFactory'),'IPN: '+code('GET /payments/{gateway}/ipn')+' (public)','Return URL chỉ hiển thị kết quả, không đổi trạng thái','Cấu hình: '+code('app.vnpay.*')]},
+  mockbank:{t:'MockBank', k:'Dịch vụ giả lập · 8081', d:'Ngân hàng giả lập cho rút tiền: backend gọi chuyển khoản từ tài khoản công ty sang tài khoản nhân viên.',
+    items:[code('BankingServiceImpl')+' → '+code('POST {baseUrl}/v1/transfers'),code('referenceNumber = withdrawCode')+' làm idempotency key; 409 được coi là trùng (mã 09)','Cấu hình: '+code('app.banking.base-url')+', '+code('api-key')+', '+code('company-account')]},
+  brevo:{t:'Brevo', k:'Email API', d:'Gửi email giao dịch (onboard, OTP quên mật khẩu). Chỉ được gọi từ '+code('MailConsumer')+', không bao giờ trong request của người dùng.',
+    items:[code('BrevoMailServiceImpl')+' dùng '+code('RestClient'),'Template Thymeleaf: '+code('templates/email/onboard-email')+', '+code('otp-email'),'Cấu hình: '+code('application.mail.*')]}
+};
+function renderCtx(id){
+  const n = CTX[id];
+  $('#ctx-detail').innerHTML = `<div><div class="kicker" style="margin-top:0">${esc(n.k)}</div><h4>${esc(n.t)}</h4><p>${n.d}</p></div><div class="body"><div class="kicker" style="margin-top:0">Trong code</div>${list(n.items)}</div>`;
+}
+bindNodes($('#ctx'), renderCtx); renderCtx('spring');
+
+/* ═════════ MODULES ═════════ */
+const MODS = {
+  auth:{ep:8, d:'Đăng nhập, refresh, logout, first-login, quên mật khẩu, đổi mật khẩu.', cls:['AuthController /auth','AuthServiceImpl','JwtService · JwtAuthenticationFilter','UserDetailsAdapter']},
+  user:{ep:11, d:'Quản lý tài khoản (admin), role, và các SSE stream.', cls:['AdminUserController /admin/users','UserController /users/*/stream','UserServiceImpl · UserSpecification','entity User, Role, Permission (enum)']},
+  profile:{ep:7, d:'Hồ sơ cá nhân, thông tin ngân hàng, avatar, transaction PIN.', cls:['ProfileController /users/me/*','BankController /banks','ProfileServiceImpl.verifyMyPin','entity UserProfile, UserSecuritySettings']},
+  organization:{ep:4, d:'Phòng ban.', cls:['AdminDepartmentController /admin/departments','DepartmentServiceImpl · DepartmentSpecification','entity Department']},
+  project:{ep:25, d:'Dự án, phase, thành viên, expense category, budget theo phase × category.', cls:['ManagerProjectController /manager','TeamLeaderProjectController · TeamLeaderCategoryController /team-leader','ProjectController /projects','ManagerProjectServiceImpl · TeamLeaderProjectServiceImpl · CategoryBudgetServiceImpl · ProjectQueryServiceImpl']},
+  request:{ep:23, d:'Yêu cầu tài chính cho cả 3 flow, lịch sử duyệt, đính kèm, AdvanceBalance.', cls:['RequestController /requests','TeamLeaderApprovalController · ManagerApprovalController · CfoApprovalController','AccountantDisbursementController','RequestServiceImpl (1201 dòng) · RequestSpecification']},
+  wallet:{ep:14, d:'Ví, transaction, ledger; nạp tiền (VNPay) và rút tiền (MockBank).', cls:['WalletController /wallet','DepositController · WithdrawController','AccountantLedgerController /accountant/ledger','WalletServiceImpl · DepositServiceImpl · WithdrawServiceImpl · WalletKey']},
+  payment:{ep:5, d:'Trừu tượng hoá cổng thanh toán; hiện có VNPay.', cls:['PaymentController /payments (ipn, return)','PaymentGatewayFactory','VnpayPaymentGatewayService · VnpayProperties']},
+  banking:{ep:0, d:'Client REST tới MockBank.', cls:['BankingServiceImpl → /v1/transfers']},
+  accounting:{ep:16, d:'Kỳ lương, phiếu lương, quỹ công ty và đối soát.', cls:['AccountantPayrollController /accountant/payroll','CompanyFundController /company-fund','PayslipController /payslips','PayrollManagementServiceImpl · CompanyFundServiceImpl']},
+  dashboard:{ep:9, d:'Tổng hợp số liệu cho dashboard từng role và analytics dòng tiền.', cls:['DashboardController /dashboard/*','AdminDashboardController · CfoDashboardController','DashboardServiceImpl']},
+  notification:{ep:5, d:'Thông báo: publish, consume, lưu DB, đẩy SSE, đánh dấu đã đọc.', cls:['NotificationController /notifications','NotificationPublisher · NotificationConsumer','NotificationScheduler (00:00)']},
+  audit:{ep:1, d:'Ghi audit log tự động cho mọi entity sau commit.', cls:['AdminAuditController /admin/audit','FinancialAuditListener · AuditPublisher · AuditLogConsumer','AuditContextFilter · AuditContextHolder']},
+  mail:{ep:0, d:'Gửi mail bất đồng bộ theo Strategy pattern.', cls:['MailPublisher · OnBoardMailStrategy · ForgetPasswordMailStragtegy','MailConsumer','BrevoMailServiceImpl']},
+  file:{ep:1, d:'Chữ ký upload Cloudinary và metadata file.', cls:['FileStorageController /uploads/signature','CloudinaryService · FileStorageService']},
+  config:{ep:8, d:'System config key-value có cache Redis.', cls:['SystemConfigController /system-configs','AdminSettingsController /admin/settings','SystemConfigServiceImpl']}
+};
+const EDGES = [
+  ['accounting','wallet','WalletService.transfer / systemTopup'],['accounting','request','RequestService.applyPayrollDeduction'],['accounting','notification','NotificationPublisher.publish'],
+  ['auth','profile','ProfileService.createSecuritySettings'],['auth','file','FileStorageService.getFile'],['auth','mail','MailPublisher (FORGET_PASSWORD)'],
+  ['user','profile','ProfileService.createProfile'],['user','wallet','WalletService.createWallet(USER)'],['user','mail','MailPublisher (ONBOARD)'],
+  ['organization','user','UserService.countUsersByDepartmentId'],['project','user','UserService.getActiveTeamLeadersByDepartmentId'],
+  ['request','user','UserService.getUserById'],['request','profile','ProfileService.verifyMyPin'],['request','project','ProjectQueryService · CategoryBudgetService.incrementSpent'],
+  ['request','wallet','lockFunds / settleAndTransfer / transfer'],['request','file','FileStorageService.saveAll'],['request','notification','NotificationPublisher.publish'],
+  ['profile','file','FileStorageService.save'],
+  ['wallet','payment','PaymentService.createPayment'],['wallet','banking','BankingService.transfer'],['wallet','profile','ProfileService.verifyMyPin'],['wallet','config','SystemConfigService (WITHDRAW_LIMIT_*)'],
+  ['payment','wallet','DepositService.processIpn'],
+  ['dashboard','user','UserService'],['dashboard','project','ManagerProjectService.getDeptBudgetSnapshot'],['dashboard','request','RequestService (count/sum)'],['dashboard','wallet','WalletService'],['dashboard','accounting','getLatestPayrollPeriod'],['dashboard','audit','AuditLogService'],['dashboard','organization','countDepartments'],
+  ['notification','user','UserService.getUserById']
+];
+const REPO_VIOL = {
+  accounting:['UserProfileRepository (profile)'], audit:['UserRepository (user)'], auth:['UserRepository (user)'],
+  dashboard:['DepartmentRepository','LedgerEntryRepository','AdvanceBalanceRepository'],
+  project:['RequestRepository','WalletRepository','UserRepository'], request:['ProjectMemberRepository'],
+  user:['DepartmentRepository','UserSecuritySettingsRepository','WalletRepository'],
+  wallet:['UserRepository (WithdrawServiceImpl, WalletMapper)','DepartmentRepository, ProjectRepository (WalletMapper)']
+};
+const modBox = $('#mods');
+Object.entries(MODS).forEach(([k,m]) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'mod'; b.dataset.m = k; b.setAttribute('role','option');
+  b.innerHTML = `<b>${k}</b><span class="ep">${m.ep} endpoint${m.ep===1?'':'s'}</span>`;
+  b.onclick = () => pickMod(k);
+  modBox.appendChild(b);
+});
+function pickMod(k){
+  const out = EDGES.filter(e => e[0] === k), inc = EDGES.filter(e => e[1] === k);
+  const outS = new Set(out.map(e => e[1])), inS = new Set(inc.map(e => e[0]));
+  $$('.mod', modBox).forEach(b => {
+    const m = b.dataset.m;
+    b.className = 'mod' + (m === k ? ' sel' : outS.has(m) ? ' out' : inS.has(m) ? ' in' : ' dim');
+    b.setAttribute('aria-selected', m === k);
+  });
+  const m = MODS[k];
+  let h = `<div class="kicker" style="margin-top:0">modules/${esc(k)} · ${m.ep} endpoints</div><h4>${esc(k)}</h4><p>${esc(m.d)}</p>`;
+  h += `<div class="kicker">Class chính</div>${list(m.cls.map(c => code(c)))}`;
+  h += `<div class="kicker">Gọi tới (${out.length})</div>` + (out.length ? list(out.map(e => `<b>${esc(e[1])}</b> — ${code(e[2])}`)) : '<p>Không gọi module nghiệp vụ nào.</p>');
+  h += `<div class="kicker">Được gọi bởi (${inc.length})</div>` + (inc.length ? list(inc.map(e => `<b>${esc(e[0])}</b> — ${code(e[2])}`)) : '<p>Không module nào gọi trực tiếp.</p>');
+  if(REPO_VIOL[k]) h += `<div class="kicker" style="color:var(--debit)">Inject repository của domain khác</div>${list(REPO_VIOL[k].map(esc))}`;
+  $('#mod-detail').innerHTML = h;
+}
+pickMod('request');
+
+/* ═════════ WALLET FLOWS ═════════ */
+const FLOWS = [
+ {id:'f1a', name:'Flow 1 · ADVANCE / EXPENSE', steps:[
+   {who:'EMPLOYEE', t:'Tạo yêu cầu tạm ứng', api:'POST /requests', st:['PENDING'], nodes:[], arrows:[], ledger:[['NONE','Chưa có dòng tiền']],
+    d:'<code>RequestServiceImpl.createRequest</code> kiểm tra role được tạo type này, bắt buộc project + phase + category (EXPENSE cần thêm chứng từ). Sinh mã <code>REQ-{dept}-MMYY-seq</code>, gửi notification cho Team Leader.'},
+   {who:'TEAM_LEADER', t:'Duyệt và giữ tiền', api:'PUT /team-leader/approvals/{id}/approve', st:['PENDING','APPROVED_BY_TEAM_LEADER'], nodes:['project'], lock:{project:'locked + approvedAmount'}, arrows:[], ledger:[['LOCK','PROJECT wallet: lockedBalance += approvedAmount (không tạo Transaction)']],
+    d:'Request phải thuộc dự án TL quản lý; <b>SoD</b>: TL không được duyệt yêu cầu của chính mình. <code>approvedAmount</code> có thể nhỏ hơn số xin. <code>walletService.lockFunds(PROJECT, projectId, amount)</code>, rồi báo cho kế toán.'},
+   {who:'ACCOUNTANT', t:'Giải ngân (nhập PIN)', api:'PUT /accountant/disbursements/{id}/disburse', st:['APPROVED_BY_TEAM_LEADER','PAID'], nodes:['project','user'], arrows:['pay'], ledger:[['DEBIT','PROJECT:{projectId} — settle (mở lock + trừ balance)'],['CREDIT','USER:{requesterId} — REQUEST_PAYMENT']],
+    d:'<code>profileService.verifyMyPin</code> rồi <code>walletService.settleAndTransfer(PROJECT → USER)</code>. Cập nhật <code>project.deductBudget</code>, <code>phase.addSpent</code>, <code>categoryBudgetService.incrementSpent</code>. Với ADVANCE: tạo <code>AdvanceBalance</code> OUTSTANDING.'},
+   {who:'HỆ THỐNG', t:'Đẩy realtime', api:'SSE wallet.updated · transaction.created', st:['PAID'], nodes:['user'], arrows:[], ledger:[['NONE','Không đổi số dư — chỉ thông báo']],
+    d:'<code>WalletServiceImpl</code> đẩy <code>wallet.updated</code> cho ví USER và cho người đang theo dõi ví PROJECT; notification <code>REQUEST_PAID</code> đi qua RabbitMQ tới người tạo.'}
+ ]},
+ {id:'f1r', name:'Flow 1 · REIMBURSE', steps:[
+   {who:'EMPLOYEE', t:'Nộp chứng từ hoàn ứng', api:'POST /requests (type REIMBURSE)', st:['PENDING'], nodes:[], arrows:[], ledger:[['NONE','Chưa có dòng tiền']],
+    d:'Bắt buộc <code>advanceBalanceId</code> thuộc chính người tạo, chưa SETTLED, và có file đính kèm.'},
+   {who:'TEAM_LEADER', t:'Duyệt', api:'PUT /team-leader/approvals/{id}/approve', st:['PENDING','APPROVED_BY_TEAM_LEADER'], nodes:[], arrows:[], ledger:[['NONE','REIMBURSE không lock tiền']],
+    d:'Cùng kiểm tra SoD như ADVANCE, nhưng không gọi <code>lockFunds</code> vì tiền đã ở ví nhân viên từ lúc tạm ứng.'},
+   {who:'ACCOUNTANT', t:'Quyết toán khoản tạm ứng', api:'PUT /accountant/disbursements/{id}/disburse', st:['APPROVED_BY_TEAM_LEADER','PAID'], nodes:['user'], arrows:[], ledger:[['NONE','Không có Transaction — AdvanceBalance.reimburse(amount)']],
+    d:'<code>advanceBalance.reimburse(amount)</code>: giảm <code>remaining</code>, chuyển PARTIALLY_SETTLED hoặc SETTLED. Số tiền lớn hơn phần còn lại → <code>InvalidSettlementAmountException</code>.'}
+ ]},
+ {id:'f2', name:'Flow 2 · PROJECT_TOPUP', steps:[
+   {who:'TEAM_LEADER', t:'Xin cấp vốn cho dự án', api:'POST /requests (type PROJECT_TOPUP)', st:['PENDING'], nodes:[], arrows:[], ledger:[['NONE','Chưa có dòng tiền']],
+    d:'Chỉ TEAM_LEADER được tạo type này; không có phase, category hay đính kèm.'},
+   {who:'MANAGER', t:'Duyệt và chuyển tiền ngay', api:'PUT /manager/approvals/{id}/approve', st:['PENDING','APPROVED_BY_MANAGER','PAID'], nodes:['dept','project'], arrows:['proj'], ledger:[['DEBIT','DEPARTMENT:{managerDeptId}'],['CREDIT','PROJECT:{projectId} — PROJECT_QUOTA_ALLOCATION']],
+    d:'<code>approveManagerRequest</code> trong một transaction: APPROVED_BY_MANAGER → <code>walletService.transfer(DEPARTMENT → PROJECT)</code> → <code>project.addBudget</code> → PAID (“Auto-paid on manager approval”).'}
+ ]},
+ {id:'f3', name:'Flow 3 · DEPARTMENT_TOPUP', steps:[
+   {who:'MANAGER', t:'Xin quota cho phòng ban', api:'POST /requests (type DEPARTMENT_TOPUP)', st:['PENDING'], nodes:[], arrows:[], ledger:[['NONE','Chưa có dòng tiền']],
+    d:'Chỉ MANAGER được tạo type này.'},
+   {who:'CFO', t:'Duyệt và cấp quota', api:'PUT /cfo/approvals/{id}/approve', st:['PENDING','APPROVED_BY_CFO','PAID'], nodes:['company','dept'], arrows:['quota'], ledger:[['DEBIT','COMPANY_FUND:1'],['CREDIT','DEPARTMENT:{deptId} — DEPT_QUOTA_ALLOCATION']],
+    d:'<code>approveCfoRequest</code>: APPROVED_BY_CFO → <code>transfer(COMPANY_FUND → DEPARTMENT)</code> → PAID trong cùng transaction.'}
+ ]},
+ {id:'pay', name:'Payroll', steps:[
+   {who:'ACCOUNTANT', t:'Tạo kỳ lương', api:'POST /accountant/payroll', st:['DRAFT'], nodes:[], arrows:[], ledger:[['NONE','Chưa có dòng tiền']],
+    d:'<code>PayrollPeriod</code> mã <code>PR-YYYY-MM</code>, status DRAFT.'},
+   {who:'ACCOUNTANT', t:'Import bảng lương Excel', api:'GET /template · POST /{id}/import', st:['DRAFT'], nodes:[], arrows:[], ledger:[['NONE','Tạo Payslip DRAFT']],
+    d:'Apache POI đọc file; <code>net = base + bonus + allowance − deduction</code>. Import lại cần <code>/confirm-overwrite</code>.'},
+   {who:'ACCOUNTANT', t:'Auto-netting khoản tạm ứng', api:'POST /{id}/auto-netting', st:['DRAFT'], nodes:[], arrows:[], ledger:[['NONE','Chỉ tính toán trên Payslip']],
+    d:'Mỗi phiếu: <code>advanceDeduct = min(nợ tạm ứng, 50% × gross)</code>, <code>finalNet = gross − advanceDeduct</code>; đặt <code>nettingApplied = true</code>.'},
+   {who:'ACCOUNTANT', t:'Chạy lương', api:'POST /{id}/run', st:['DRAFT','COMPLETED'], nodes:['company','user'], arrows:['salary'], ledger:[['DEBIT','COMPANY_FUND:1'],['CREDIT','USER:{userId} — PAYSLIP_PAYMENT (mỗi phiếu net > 0)']],
+    d:'Bắt buộc đã netting. Mỗi phiếu: <code>walletService.transfer(COMPANY_FUND → USER)</code>, rồi <code>requestService.applyPayrollDeduction</code> giảm AdvanceBalance (không ghi ledger). Payslip PAID, period COMPLETED, notification SALARY_PAID.'}
+ ]},
+ {id:'dep', name:'Deposit · VNPay', steps:[
+   {who:'USER', t:'Tạo lệnh nạp', api:'POST /wallet/deposit', st:['PENDING'], nodes:[], arrows:[], ledger:[['NONE','DepositLog PENDING']],
+    d:'<code>DepositServiceImpl.createDeposit</code> lưu <code>DepositLog</code> mã <code>DEP-YYYY-seq6</code>; <code>VnpayPaymentGatewayService</code> trả URL ký HMAC-SHA512 (<code>vnp_TxnRef = depositCode</code>).'},
+   {who:'USER', t:'Thanh toán trên VNPay', api:'redirect → VNPay → /payments/vnpay/return', st:['PENDING'], nodes:['bank'], arrows:[], ledger:[['NONE','Return URL chỉ hiển thị kết quả']],
+    d:'Trang return chỉ verify và hiển thị, không cập nhật trạng thái — tránh phụ thuộc vào trình duyệt.'},
+   {who:'VNPAY', t:'IPN xác nhận', api:'GET /payments/vnpay/ipn', st:['PENDING','COMPLETED'], nodes:['bank','user','float'], arrows:['deposit'], ledger:[['CREDIT','USER:{userId} — DEPOSIT (1 entry, provider VNPAY)'],['LOCK','FLOAT_MAIN += amount (đối ứng biên)']],
+    d:'Verify chữ ký; thành công khi <code>vnp_ResponseCode = 00</code> và <code>vnp_TransactionStatus = 00</code>. Nếu log không còn PENDING → trả “already done” (idempotency theo status).'}
+ ]},
+ {id:'wd', name:'Withdraw · MockBank', steps:[
+   {who:'USER', t:'Tạo lệnh rút (PIN)', api:'POST /wallet/withdraw', st:['PENDING'], nodes:['user'], lock:{user:'locked + amount'}, arrows:[], ledger:[['LOCK','USER wallet: lockedBalance += amount']],
+    d:'Verify PIN, lấy thông tin ngân hàng từ UserProfile, <code>lockFunds(USER)</code>, lưu <code>WithdrawRequest</code> <code>WD-YYYY-seq6</code>. Nếu số tiền ≤ <code>WITHDRAW_LIMIT_{ROLE}</code> thì tự thực hiện luôn.'},
+   {who:'ACCOUNTANT', t:'Thực hiện chuyển khoản', api:'PUT /wallet/withdraw/{id}/execute', st:['PENDING'], nodes:['user','bank'], lock:{user:'locked'}, arrows:[], ledger:[['NONE','Gọi MockBank POST /v1/transfers (referenceNumber = withdrawCode)']],
+    d:'<code>BankingServiceImpl.transfer</code>. Mã 00 = thành công, 09 (HTTP 409) = đã xử lý trước đó.'},
+   {who:'HỆ THỐNG', t:'Ghi sổ kết quả', api:'walletService.withdraw', st:['PENDING','COMPLETED'], nodes:['user','bank','float'], arrows:['withdraw'], ledger:[['DEBIT','USER:{userId} — WITHDRAW (settle, 1 entry)'],['LOCK','FLOAT_MAIN −= amount']],
+    d:'Thành công: settle + DEBIT ví USER, COMPLETED. Thất bại: <code>unlockFunds</code>, FAILED kèm lý do. Kế toán cũng có thể reject (REJECTED), chủ ví có thể huỷ khi còn PENDING (CANCELLED).'}
+ ]},
+ {id:'top', name:'System top-up', steps:[
+   {who:'ACCOUNTANT / CFO', t:'Nạp tiền vào quỹ công ty', api:'POST /company-fund/topup', st:['SUCCESS'], nodes:['bank','company','float'], arrows:['topup'], ledger:[['CREDIT','COMPANY_FUND:1 — SYSTEM_TOPUP (1 entry, provider INTERNAL)'],['LOCK','FLOAT_MAIN += amount']],
+    d:'Cần quyền <code>COMPANY_FUND_TOPUP</code>. <code>walletService.systemTopup</code>. Đối soát tại <code>GET /company-fund/reconciliation</code>: FLOAT_MAIN − Σ ví khác phải bằng 0.'}
+ ]}
+];
+const ARROWS = ['topup','quota','proj','pay','salary','deposit','withdraw'];
+const WNODES = ['bank','company','dept','project','user','float'];
+let curFlow = FLOWS[0], curStep = 0;
+const ftabs = $('#flow-tabs');
+FLOWS.forEach(f => {
+  const b = document.createElement('button');
+  b.type='button'; b.className='tab'; b.setAttribute('role','tab'); b.textContent=f.name; b.dataset.f=f.id;
+  b.onclick = () => { curFlow = f; curStep = 0; renderFlow(); };
+  ftabs.appendChild(b);
+});
+function renderFlow(){
+  $$('.tab', ftabs).forEach(b => b.setAttribute('aria-selected', b.dataset.f === curFlow.id));
+  const sl = $('#steplist'); sl.innerHTML = '';
+  curFlow.steps.forEach((s,i) => {
+    const li = document.createElement('li');
+    const b = document.createElement('button'); b.type='button';
+    b.innerHTML = `<span class="n">${String(i+1).padStart(2,'0')}</span><span><b>${esc(s.who)}</b> · ${esc(s.t)}</span>`;
+    if(i === curStep) b.setAttribute('aria-current','step');
+    b.onclick = () => { curStep = i; renderFlow(); };
+    li.appendChild(b); sl.appendChild(li);
+  });
+  const s = curFlow.steps[curStep];
+  WNODES.forEach(n => {
+    const g = $('#w-'+n);
+    const locked = s.lock && s.lock[n];
+    g.classList.toggle('hot', s.nodes.includes(n) && !locked);
+    g.classList.toggle('lock', !!locked);
+    $('#ws-'+n).textContent = locked ? s.lock[n] : '';
+  });
+  ARROWS.forEach(a => {
+    const on = s.arrows.includes(a);
+    const e = $('#e-'+a), l = $('#l-'+a);
+    e.classList.toggle('hot', on); l.classList.toggle('hot', on);
+    e.setAttribute('marker-end', on ? 'url(#fah)' : 'url(#fa)');
+  });
+  const stHtml = s.st.map((x,i) => `${i ? '<span aria-hidden="true">→</span>' : ''}<span class="chip ${i===s.st.length-1?'a':''}">${esc(x)}</span>`).join(' ');
+  $('#stepdetail').innerHTML = `<div class="who">Bước ${curStep+1}/${curFlow.steps.length} · ${esc(s.who)}</div><h4>${esc(s.t)}</h4>
+    <div>${code(s.api)}</div><div class="statusline">${stHtml}</div><p>${s.d}</p>
+    <div class="ledger">${s.ledger.map(l => `<div class="${l[0]}"><span class="dir">${l[0]==='NONE'?'—':l[0]==='LOCK'?'STATE':l[0]}</span><span>${esc(l[1])}</span></div>`).join('')}</div>
+    <div class="stepnav"><button class="btn" type="button" id="st-prev" ${curStep===0?'disabled':''}>← Bước trước</button><button class="btn" type="button" id="st-next" ${curStep===curFlow.steps.length-1?'disabled':''}>Bước tiếp →</button></div>`;
+  $('#st-prev').onclick = () => { if(curStep>0){ curStep--; renderFlow(); } };
+  $('#st-next').onclick = () => { if(curStep<curFlow.steps.length-1){ curStep++; renderFlow(); } };
+}
+renderFlow();
+
+/* ═════════ STATE MACHINE FILTER ═════════ */
+$$('#sm-tabs .tab').forEach(b => b.onclick = () => {
+  const f = b.dataset.f;
+  $$('#sm-tabs .tab').forEach(x => x.setAttribute('aria-pressed', x === b));
+  $$('#sm .sm, #sm .sm-l').forEach(el => {
+    const fs = (el.dataset.f || '').split(' ');
+    const on = f === 'all' || fs.includes(f);
+    el.classList.toggle('faded', !on);
+    if(el.classList.contains('sm')) el.classList.toggle('smhot', f !== 'all' && on);
+  });
+});
+
+/* ═════════ ER ═════════ */
+const ER = {
+  'Wallet & ledger':{
+    wallets:{c:[['PK','id'],['','owner_type (USER|DEPARTMENT|PROJECT|COMPANY_FUND|FLOAT_MAIN)'],['','owner_id'],['','balance DECIMAL(19,2)'],['','locked_balance'],['','version']], n:'UNIQUE(owner_type, owner_id). owner_id là tham chiếu đa hình.', r:['ledger_entries']},
+    transactions:{c:[['PK','id'],['UK','transaction_code'],['','amount, type, status'],['','payment_ref, gateway_provider'],['','reference_type, reference_id'],['','description, created_at']], n:'Immutable. reference_type/reference_id trỏ tới REQUEST, PAYSLIP, DEPOSIT, WITHDRAWAL…', r:['ledger_entries']},
+    ledger_entries:{c:[['PK','id'],['FK','transaction_id → transactions'],['FK','wallet_id → wallets'],['','direction (DEBIT|CREDIT)'],['','amount, balance_after, created_at']], n:'Append-only (updatable = false).', r:['transactions','wallets']},
+    deposit_logs:{c:[['PK','id'],['UK','deposit_code'],['','user_id'],['','amount, status'],['','vnp_transaction_no, vnp_response_code, paid_at']], n:'V16. user_id là Long thường, không phải quan hệ JPA.', r:['users']},
+    withdrawal_requests:{c:[['PK','id'],['UK','withdraw_code'],['','user_id, amount'],['','credit_account / name / bank_code / bank_name'],['','status, bank_transaction_id'],['','executed_by, executed_at, transaction_id, failure_reason']], n:'V13. Snapshot thông tin ngân hàng lúc tạo lệnh.', r:['users','transactions']}
+  },
+  'Organization & project':{
+    departments:{c:[['PK','id'],['UK','code'],['','name'],['FK','manager_id → users'],['','total_project_quota, total_available_balance']], n:'Số dư thật nằm ở ví DEPARTMENT.', r:['users','projects']},
+    projects:{c:[['PK','id'],['UK','project_code'],['FK','department_id → departments'],['FK','manager_id → users'],['','total_budget, available_budget, total_spent'],['','status'],['FK','current_phase_id → project_phases (UK)']], n:'Status: PLANNING → ACTIVE ⇄ PAUSED → CLOSED.', r:['departments','users','project_phases','project_members','expense_categories']},
+    project_phases:{c:[['PK','id'],['UK','phase_code'],['FK','project_id → projects'],['','name, budget_limit, current_spent'],['','status (PLANNED|ACTIVE|CLOSED)'],['','start_date, end_date']], n:'Tổng budget_limit các phase ≤ available_budget của dự án.', r:['projects','phase_category_budgets']},
+    project_members:{c:[['PK','project_id + user_id'],['','project_role (LEADER|MEMBER)'],['','position, joined_at']], n:'Thành viên phải cùng phòng ban.', r:['projects','users']},
+    expense_categories:{c:[['PK','id'],['','name, description'],['','is_system_default'],['FK','project_id → projects (nullable)']], n:'V14: NULL = category hệ thống, có giá trị = category riêng của dự án.', r:['projects','phase_category_budgets']},
+    phase_category_budgets:{c:[['PK','phase_id + category_id'],['','budget_limit, current_spent']], n:'Tổng limit các category ≤ limit của phase.', r:['project_phases','expense_categories']}
+  },
+  'Request':{
+    requests:{c:[['PK','id'],['UK','request_code'],['FK','requester_id → users'],['FK','project_id, phase_id, category_id'],['FK','advance_balance_id → advance_balances'],['','type, amount, approved_amount, status'],['','reject_reason, description, paid_at']], n:'Một bảng cho cả 5 RequestType.', r:['users','projects','project_phases','expense_categories','advance_balances','request_histories','request_attachments']},
+    request_histories:{c:[['PK','id'],['FK','request_id → requests'],['FK','actor_id → users'],['','action, status_after_action, comment, created_at']], n:'Append-only, một dòng cho mỗi bước duyệt.', r:['requests','users']},
+    request_attachments:{c:[['PK','request_id + file_id'],['FK','file_id → file_storages (UK)']], n:'Chứng từ đính kèm.', r:['requests','file_storages']},
+    advance_balances:{c:[['PK','id'],['FK','user_id → users'],['FK','advance_request_id → requests (UK)'],['','original_amount, reimbursed_amount, returned_amount'],['','remaining_amount CHECK ≥ 0'],['','status, settled_at']], n:'V10. OUTSTANDING → PARTIALLY_SETTLED → SETTLED.', r:['users','requests']}
+  },
+  'Accounting':{
+    payroll_periods:{c:[['PK','id'],['UK','period_code'],['','name, month, year, start_date, end_date'],['','status (DRAFT|PROCESSING|COMPLETED)'],['','netting_applied']], n:'V15 thêm netting_applied.', r:['payslips']},
+    payslips:{c:[['PK','id'],['UK','payslip_code'],['FK','period_id → payroll_periods'],['FK','user_id → users'],['','base_salary, bonus, allowance, deduction'],['','advance_deduct, final_net_salary'],['','status, payment_date']], n:'Được trả bằng PAYSLIP_PAYMENT từ COMPANY_FUND.', r:['payroll_periods','users']},
+    company_funds:{c:[['PK','id'],['','bank_account, bank_name'],['','external_bank_balance'],['','last_statement_date, last_statement_updated_by']], n:'Chỉ là metadata; số dư thật là ví COMPANY_FUND (ownerId = 1).', r:['wallets']}
+  },
+  'User, security & system':{
+    users:{c:[['PK','id'],['UK','email'],['','password (BCrypt), full_name'],['FK','role_id → roles'],['FK','department_id → departments'],['','status (ACTIVE|LOCKED|PENDING)'],['','is_first_login, token_version']], n:'token_version phục vụ single-session.', r:['roles','departments','user_profiles','user_security_settings','notifications','audit_logs']},
+    roles:{c:[['PK','id'],['UK','name'],['','description']], n:'6 role.', r:['role_permissions','users']},
+    role_permissions:{c:[['PK','role_id + permission'],['','permission VARCHAR(50) — tên enum']], n:'Tên permission là Java enum.', r:['roles']},
+    user_profiles:{c:[['PK/FK','user_id → users'],['UK','employee_code, phone_number'],['','job_title, date_of_birth, citizen_id, address'],['FK','avatar_file_id → file_storages'],['','bank_name, bank_account_num, bank_account_owner']], n:'@MapsId với users.', r:['users','file_storages']},
+    user_security_settings:{c:[['PK/FK','user_id → users'],['','transaction_pin (BCrypt)'],['','retry_count, locked_until']], n:'Transaction PIN.', r:['users']},
+    notifications:{c:[['PK','id'],['FK','user_id → users'],['','title, message, type'],['','ref_id, ref_type, is_read']], n:'Thông báo đã đọc bị xoá lúc 00:00 mỗi ngày.', r:['users']},
+    audit_logs:{c:[['PK','id'],['','trace_id'],['FK','actor_id → users (nullable)'],['','action (INSERT|UPDATE|DELETE)'],['','entity_name, entity_id'],['','old_values, new_values JSONB'],['','created_at']], n:'Append-only.', r:['users']},
+    file_storages:{c:[['PK','id'],['UK','cloudinary_public_id'],['','file_name, url, file_type, size']], n:'Metadata file trên Cloudinary.', r:['user_profiles','request_attachments']},
+    system_configs:{c:[['PK','config_key'],['','config_value VARCHAR(255)'],['','description']], n:'Cache Redis 24h.', r:[]}
+  }
+};
+const TBL = {}; Object.values(ER).forEach(g => Object.assign(TBL, g));
+const erg = $('#er-groups');
+Object.entries(ER).forEach(([g, tabs]) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<h5>${esc(g)}</h5>`;
+  const row = document.createElement('div'); row.className = 'row';
+  Object.keys(tabs).forEach(t => {
+    const b = document.createElement('button'); b.type='button'; b.className='tblbtn'; b.textContent=t; b.dataset.t=t;
+    b.onclick = () => pickTbl(t); row.appendChild(b);
+  });
+  wrap.appendChild(row); erg.appendChild(wrap);
+});
+function pickTbl(t){
+  const x = TBL[t]; const rel = new Set(x.r);
+  Object.entries(TBL).forEach(([k,v]) => { if(v.r.includes(t)) rel.add(k); });
+  $$('.tblbtn', erg).forEach(b => b.className = 'tblbtn' + (b.dataset.t === t ? ' sel' : rel.has(b.dataset.t) ? ' rel' : ''));
+  $('#er-detail').innerHTML = `<div class="kicker" style="margin-top:0">Bảng</div><h4 class="mono" style="font-family:var(--font-mono)">${esc(t)}</h4>
+    <ul class="cols-list">${x.c.map(c => `<li><span class="k">${esc(c[0])}</span><span>${esc(c[1])}</span></li>`).join('')}</ul>
+    <p>${esc(x.n)}</p><div class="kicker">Liên quan</div><div>${[...rel].map(r => `<span class="chip a">${esc(r)}</span>`).join('') || '<span class="chip">—</span>'}</div>`;
+}
+pickTbl('wallets');
+
+/* ═════════ NOTES ═════════ */
+const NOTES = [
+ ['bug','Department và project tạo mới không có ví','DepartmentServiceImpl.createDepartment và ManagerProjectServiceImpl.createProject không gọi WalletService.createWallet; ví DEPARTMENT/PROJECT chỉ được tạo bởi DataInitializer/DataSeeder. Flow 2, Flow 3 và bước lock của Flow 1 sẽ lỗi ResourceNotFoundException với dữ liệu tạo sau khi seed.'],
+ ['bug','Maintenance mode không bao giờ kích hoạt','WebMvcConfig đăng ký MaintenanceInterceptor cho /api/v1/**, nhưng pattern của interceptor không tính context path /api/v1 nên không khớp request nào.'],
+ ['bug','IPN VNPay không so số tiền và không khoá','DepositServiceImpl.processIpn không so result.amount với depositLog.amount; findByDepositCode không có lock nên hai IPN đồng thời có thể cùng qua kiểm tra PENDING.'],
+ ['bug','Request không có row lock hay @Version','Hai lệnh approve/disburse đồng thời trên cùng request có thể lock hoặc trả tiền hai lần (RequestServiceImpl).'],
+ ['bug','Tiền tạm ứng không quay lại ví dự án','REIMBURSE và payroll netting chỉ giảm AdvanceBalance, không ghi ledger; ADVANCE_RETURN, reversal() và SYSTEM_ADJUSTMENT chưa có luồng nào dùng. REIMBURSE còn gọi incrementSpent lần hai cho cùng category.'],
+ ['bug','Rút tiền gọi ngân hàng bên trong DB transaction','WithdrawServiceImpl: nếu MockBank đã chuyển thành công mà bước sau lỗi thì transaction rollback, WithdrawRequest biến mất trong khi tiền đã đi.'],
+ ['bug','Cache system_configs không bao giờ được đọc','getOrDefault/getAs* gọi get() trong cùng class nên bỏ qua proxy @Cacheable; mọi lượt đọc config đều xuống DB.'],
+ ['bug','Notification và SSE phát trước khi commit','RequestServiceImpl và PayrollManagementServiceImpl publish RabbitMQ trong transaction; WalletServiceImpl đẩy SSE trước commit. Rollback sẽ để lại thông báo "ma".'],
+ ['bug','Frontend: vòng lặp trang bảo trì và callbackUrl bị bỏ qua','middleware.ts đẩy user đã đăng nhập từ /maintenance về /dashboard; trang login không đọc callbackUrl, luôn về /dashboard.'],
+ ['sec','Refresh token dùng được như access token','JwtService.buildToken không có claim phân loại token; JwtAuthenticationFilter chấp nhận refresh token 7 ngày. Refresh cũng không rotate version.'],
+ ['sec','Hash PIN lọt vào audit log','SENSITIVE_FIELDS che password, pin, pinCode… nhưng field là transactionPin, nên hash BCrypt của PIN được ghi vào audit_logs.'],
+ ['sec','POST /notifications/test mở cho mọi user','Bất kỳ user đã đăng nhập nào cũng gửi được thông báo tới userId bất kỳ (NotificationController.test).'],
+ ['sec','Quên mật khẩu lưu mật khẩu mới dạng plaintext trong Redis','AuthServiceImpl.forgotPassword lưu newPassword trong ForgotPasswordOtpData; không giới hạn số lần nhập OTP; trả 404 lộ email tồn tại.'],
+ ['sec','SSE stream theo ví không kiểm tra quyền sở hữu','TL bất kỳ subscribe được /users/project/{id}/stream của mọi dự án; Manager tương tự với phòng ban (UserController).'],
+ ['sec','Token ở localStorage và cookie không HttpOnly','lib/api-client.ts; cookie sống 24h trong khi access token 30 phút; middleware chỉ kiểm tra cookie tồn tại.'],
+ ['sec','CORS * và demo reset bật mặc định','SecurityConfig cho mọi origin; app.demo.reset-accounts-on-startup = true đặt lại mật khẩu/PIN/số dư demo mỗi lần khởi động.'],
+ ['conv','Inject repository của domain khác','UserServiceImpl, DashboardServiceImpl, ManagerProjectServiceImpl, TeamLeaderProjectServiceImpl, WithdrawServiceImpl, WalletMapper… (xem khung chi tiết ở Hình 2).'],
+ ['conv','Code WebSocket/STOMP vẫn còn','WebSocketConfig, WebSocketAuthChannelInterceptor, dependency spring-boot-starter-websocket và whitelist /ws/** — trái quy ước "chỉ dùng SSE".'],
+ ['conv','Phân trang và DTO lệch chuẩn','NotificationListResponse thay cho PageResponse; NotificationRepository có 6 method theo tổ hợp filter thay vì Specification; tên NotificationDto, AuditMessageDTO.'],
+ ['conv','@PreAuthorize đặt ở controller','SystemConfigController (cấp class) và 3 SSE stream trong UserController.'],
+ ['conv','Raw exception và giá trị hardcode','AdvancedPaymentGatewayService ném UnsupportedOperationException; DataSeeder ném IllegalStateException; SSE timeout, Brevo URL, pool audit hardcode.'],
+ ['doc','Docs bị dời thư mục','Các file docs/*.md đã chuyển sang docs/project_1/; mọi link trong .claude/CLAUDE.md đang trỏ sai. CLAUDE.md ghi migration "V11"/"V1–V14", thực tế tới V16.'],
+ ['doc','SSE endpoint và auth khác mô tả','Docs ghi GET /notifications/stream và token qua query param; code dùng GET /users/stream và chỉ nhận header Authorization.'],
+ ['doc','Wallet "4-tier" thực tế có 5 owner type','Code có thêm FLOAT_MAIN làm ví kiểm soát; deposit/withdraw/system top-up là giao dịch 1 entry, không phải 2.'],
+ ['doc','Flow 2/3 không có scheduler auto-pay','financial-architecture.md mô tả "scheduler auto-pay 1 phút sau"; code chuyển tiền và PAID ngay trong transaction duyệt.'],
+ ['doc','RBAC doc liệt kê permission không tồn tại','rbac-model.md dùng WALLET_VIEW_OWN, REQUEST_APPROVE, USER_MANAGE… và nói ADMIN không có quyền tài chính; thực tế mọi role có WALLET_DEPOSIT/WITHDRAW, REQUEST_CREATE.']
+];
+const SEVL = {bug:'Lỗi logic', sec:'Bảo mật', conv:'Convention', doc:'Docs'};
+const nl = $('#notes-list');
+NOTES.forEach(n => {
+  const d = document.createElement('div'); d.className='note'; d.dataset.s = n[0];
+  d.innerHTML = `<span class="sev ${n[0]}">${SEVL[n[0]]}</span><div><h4>${esc(n[1])}</h4><p>${esc(n[2])}</p></div>`;
+  nl.appendChild(d);
+});
+$$('#note-tabs .tab').forEach(b => b.onclick = () => {
+  $$('#note-tabs .tab').forEach(x => x.setAttribute('aria-pressed', x === b));
+  $$('.note', nl).forEach(n => n.hidden = !(b.dataset.s === 'all' || n.dataset.s === b.dataset.s));
+});
+})();
+</script>
+</body>
+</html>
