@@ -48,6 +48,8 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    baseline-version: 16
+    baseline-description: Existing IFMS schema through V16
     locations: classpath:db/migration
 
 
