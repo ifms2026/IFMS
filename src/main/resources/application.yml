@@ -36,13 +36,13 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate          # Validate schema khi startup (không tự động tạo/alter)
+      ddl-auto: validate # Validate schema khi startup (không tự động tạo/alter)
     show-sql: false
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-    open-in-view: false                  # Tắt OSIV — tránh lazy loading trong controller layer
+    open-in-view: false # Tắt OSIV — tránh lazy loading trong controller layer
 
   # ── Flyway Database Migration ──────────────────────────────
   flyway:
@@ -52,25 +52,24 @@ spring:
     baseline-description: Existing IFMS schema through V16
     locations: classpath:db/migration
 
-
   # ── Jackson (JSON Serialization) ───────────────────────────
   jackson:
-    default-property-inclusion: non_null       # Loại bỏ trường null → giảm payload size
+    default-property-inclusion: non_null # Loại bỏ trường null → giảm payload size
     serialization:
-      write-dates-as-timestamps: false         # LocalDateTime → "2026-03-02T10:15:30" (ISO-8601)
-      fail-on-empty-beans: false               # Không throw khi serialize empty object
+      write-dates-as-timestamps: false # LocalDateTime → "2026-03-02T10:15:30" (ISO-8601)
+      fail-on-empty-beans: false # Không throw khi serialize empty object
     deserialization:
-      fail-on-unknown-properties: false        # Không throw khi nhận field lạ từ client
-    date-format: yyyy-MM-dd'T'HH:mm:ss        # Fallback format cho java.util.Date
+      fail-on-unknown-properties: false # Không throw khi nhận field lạ từ client
+    date-format: yyyy-MM-dd'T'HH:mm:ss # Fallback format cho java.util.Date
 
   # ── Async Task Executor ────────────────────────────────────
   # Core pool xử lý mail, notification gửi ngầm qua @Async
   task:
     execution:
       pool:
-        core-size: 10                    # Thread sẵn sàng
-        max-size: 20                     # Max thread khi queue đầy
-        queue-capacity: 100              # Hàng đợi trước khi tạo thread mới
+        core-size: 10 # Thread sẵn sàng
+        max-size: 20 # Max thread khi queue đầy
+        queue-capacity: 100 # Hàng đợi trước khi tạo thread mới
       thread-name-prefix: ifms-async-
 
   # ── Redis (Message Queue for Email, Caching) ────────────────
@@ -85,15 +84,13 @@ spring:
           max-active: 16
           max-wait: 3000ms
 
-
   # ── Spring Cache (Redis) ────────────────────────────────────
   cache:
     type: redis
     redis:
-      time-to-live: ${CACHE_TTL_MS:3600000}  # Default TTL: 1 giờ (ms)
-      use-key-prefix: true                    # Tạo prefix "cacheName::" cho dễ quản lý
+      time-to-live: ${CACHE_TTL_MS:3600000} # Default TTL: 1 giờ (ms)
+      use-key-prefix: true # Tạo prefix "cacheName::" cho dễ quản lý
       cache-null-values: false
-
 
   # ── Servlet (File Upload Limit) ────────────────────────────
   servlet:
@@ -143,8 +140,6 @@ spring:
       dlq: ${RABBITMQ_NOTIFICATION_DLQ:notificationDLQ}
       dlq-routing-key: ${RABBITMQ_NOTIFICATION_DLQ_ROUTING_KEY:notificationDead}
 
-
-
 # ── Cloudinary (SDK Connection Only) ───────────────────────
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:your_cloud_name}
@@ -156,9 +151,9 @@ application:
   security:
     jwt:
       secret-key: ${JWT_SECRET_KEY:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      expiration: ${JWT_EXPIRATION:1800000}                        # 30 minutes
+      expiration: ${JWT_EXPIRATION:1800000} # 30 minutes
       refresh-token:
-        expiration: ${JWT_REFRESH_EXPIRATION:604800000}            # 7 days
+        expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
     pin:
       length: ${PIN_LENGTH:5}
       max-retry: ${PIN_MAX_RETRY:5}
@@ -170,7 +165,6 @@ application:
     from-email: ${MAIL_FROM_EMAIL:noreply@ifms.vn}
     from-name: ${MAIL_FROM_NAME:IFMS System}
 
-
 # ── Server ─────────────────────────────────────────────────
 server:
   port: ${PORT:8080}
@@ -179,7 +173,7 @@ server:
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/plain
-    min-response-size: 1024              # Nén response > 1KB
+    min-response-size: 1024 # Nén response > 1KB
 
 # ── Logging ────────────────────────────────────────────────
 logging:
@@ -187,22 +181,21 @@ logging:
     root: INFO
     com.mkwang.backend: ${LOG_LEVEL:DEBUG}
     org.springframework.security: WARN
-    com.zaxxer.hikari: INFO              # Monitor connection pool
+    com.zaxxer.hikari: INFO # Monitor connection pool
     org.flywaydb: INFO
-
 
 # ── custom ttl ─────────────────────────────────────────────────
 app:
   otp:
-    ttl: ${OTP_TTL_MS:300000}            # 5 phút (ms)
+    ttl: ${OTP_TTL_MS:300000} # 5 phút (ms)
     length: ${OTP_LENGTH:6}
   auth:
-    setup-token-ttl-minutes: ${SETUP_TOKEN_TTL_MINUTES:15}   # First-login setup token TTL (phút)
+    setup-token-ttl-minutes: ${SETUP_TOKEN_TTL_MINUTES:15} # First-login setup token TTL (phút)
   demo:
     reset-accounts-on-startup: ${DEMO_RESET_ACCOUNTS_ON_STARTUP:true}
     reset-payroll-wallets-on-startup: ${DEMO_RESET_PAYROLL_WALLETS_ON_STARTUP:true}
   notification:
-    cleanup-cron: ${NOTIFICATION_CLEANUP_CRON:0 0 0 * * *}   # Xóa notification đã đọc lúc 00:00 mỗi ngày
+    cleanup-cron: ${NOTIFICATION_CLEANUP_CRON:0 0 0 * * *} # Xóa notification đã đọc lúc 00:00 mỗi ngày
 
   # ── MockBank (Corporate Banking API for Withdrawals) ────────────
   banking:
@@ -214,7 +207,7 @@ app:
 
   # ── Cache TTL per cache name ─────────────────────────────────────
   cache:
-    system-config-ttl-ms: ${SYSTEM_CONFIG_CACHE_TTL_MS:86400000}  # 24h — configs change rarely
+    system-config-ttl-ms: ${SYSTEM_CONFIG_CACHE_TTL_MS:86400000} # 24h — configs change rarely
 
   # ── VNPay (Deposit payment gateway) ────────────────────────────
   vnpay:
