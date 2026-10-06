@@ -58,6 +58,9 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>,
       @Param("transactionIds") List<Long> transactionIds,
       @Param("walletId") Long walletId);
 
+  @Query("SELECT e FROM LedgerEntry e JOIN FETCH e.wallet WHERE e.transaction.id IN :transactionIds ORDER BY e.id")
+  List<LedgerEntry> findByTransactionIdsWithWallet(@Param("transactionIds") List<Long> transactionIds);
+
   /**
    * Sum of CREDIT entries for a wallet in a date range — accountant inflow.
    */
@@ -89,6 +92,36 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>,
       @Param("walletId") Long walletId,
       @Param("from") java.time.LocalDateTime from,
       @Param("to") java.time.LocalDateTime to);
+
+  @Query("SELECT COALESCE(SUM(e.amount), 0) FROM LedgerEntry e JOIN e.transaction t " +
+      "WHERE e.wallet.id = :walletId AND e.direction = 'CREDIT' AND e.createdAt >= :from AND e.createdAt <= :to " +
+      "AND (:type IS NULL OR t.type = :type) AND (:status IS NULL OR t.status = :status) " +
+      "AND (:referenceType IS NULL OR t.referenceType = :referenceType)")
+  java.math.BigDecimal sumCreditByWalletAndFilter(@Param("walletId") Long walletId,
+      @Param("from") java.time.LocalDateTime from, @Param("to") java.time.LocalDateTime to,
+      @Param("type") com.mkwang.backend.modules.wallet.entity.TransactionType type,
+      @Param("status") com.mkwang.backend.modules.wallet.entity.TransactionStatus status,
+      @Param("referenceType") com.mkwang.backend.modules.wallet.entity.ReferenceType referenceType);
+
+  @Query("SELECT COALESCE(SUM(e.amount), 0) FROM LedgerEntry e JOIN e.transaction t " +
+      "WHERE e.wallet.id = :walletId AND e.direction = 'DEBIT' AND e.createdAt >= :from AND e.createdAt <= :to " +
+      "AND (:type IS NULL OR t.type = :type) AND (:status IS NULL OR t.status = :status) " +
+      "AND (:referenceType IS NULL OR t.referenceType = :referenceType)")
+  java.math.BigDecimal sumDebitByWalletAndFilter(@Param("walletId") Long walletId,
+      @Param("from") java.time.LocalDateTime from, @Param("to") java.time.LocalDateTime to,
+      @Param("type") com.mkwang.backend.modules.wallet.entity.TransactionType type,
+      @Param("status") com.mkwang.backend.modules.wallet.entity.TransactionStatus status,
+      @Param("referenceType") com.mkwang.backend.modules.wallet.entity.ReferenceType referenceType);
+
+  @Query("SELECT COUNT(DISTINCT e.transaction.id) FROM LedgerEntry e JOIN e.transaction t " +
+      "WHERE e.wallet.id = :walletId AND e.createdAt >= :from AND e.createdAt <= :to " +
+      "AND (:type IS NULL OR t.type = :type) AND (:status IS NULL OR t.status = :status) " +
+      "AND (:referenceType IS NULL OR t.referenceType = :referenceType)")
+  long countTransactionsByWalletAndFilter(@Param("walletId") Long walletId,
+      @Param("from") java.time.LocalDateTime from, @Param("to") java.time.LocalDateTime to,
+      @Param("type") com.mkwang.backend.modules.wallet.entity.TransactionType type,
+      @Param("status") com.mkwang.backend.modules.wallet.entity.TransactionStatus status,
+      @Param("referenceType") com.mkwang.backend.modules.wallet.entity.ReferenceType referenceType);
 
   /**
    * All entries for a transaction with wallet eagerly fetched — for detail view.

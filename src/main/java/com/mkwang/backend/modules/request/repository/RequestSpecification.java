@@ -113,7 +113,7 @@ public class RequestSpecification {
                 ? List.of(type)
                 : List.of(RequestType.ADVANCE, RequestType.EXPENSE, RequestType.REIMBURSE);
 
-        return Specification.where(hasStatus(RequestStatus.APPROVED_BY_TEAM_LEADER))
+        return Specification.where(hasStatusIn(List.of(RequestStatus.APPROVED_BY_TEAM_LEADER, RequestStatus.ACCOUNTANT_VERIFIED)))
                 .and(hasTypeIn(allowedTypes))
                 .and(matchesSearch(search));
     }

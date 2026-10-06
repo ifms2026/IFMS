@@ -5,6 +5,11 @@ import com.mkwang.backend.common.dto.PageResponse;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantLedgerItemResponse;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantLedgerSummaryResponse;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantTransactionDetailResponse;
+import com.mkwang.backend.modules.wallet.dto.response.AccountantWalletTransactionResponse;
+import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalDetailResponse;
+import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalItemResponse;
+import com.mkwang.backend.modules.accounting.dto.response.AdvanceEmployeeSummaryResponse;
+import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 import com.mkwang.backend.modules.wallet.entity.ReferenceType;
 import com.mkwang.backend.modules.wallet.entity.TransactionStatus;
 import com.mkwang.backend.modules.wallet.entity.TransactionType;
@@ -22,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/accountant/ledger")
@@ -31,6 +37,43 @@ import java.time.LocalDate;
 public class AccountantLedgerController {
 
     private final AccountantLedgerService accountantLedgerService;
+
+    @GetMapping("/wallet-transactions")
+    @Operation(summary = "List wallet transactions grouped by transaction")
+    public ResponseEntity<ApiResponse<PageResponse<AccountantWalletTransactionResponse>>> getWalletTransactions(
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) TransactionStatus status,
+            @RequestParam(required = false) ReferenceType referenceType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getWalletTransactions(
+                type, status, referenceType, from, to, page, limit)));
+    }
+
+    @GetMapping("/journals")
+    @Operation(summary = "List accounting journals")
+    public ResponseEntity<ApiResponse<PageResponse<AccountingJournalItemResponse>>> getJournals(
+            @RequestParam(required = false) AccountingJournalEvent event,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getJournals(event, from, to, page, limit)));
+    }
+
+    @GetMapping("/journals/{journalId}")
+    @Operation(summary = "Get accounting journal detail")
+    public ResponseEntity<ApiResponse<AccountingJournalDetailResponse>> getJournalDetail(@PathVariable Long journalId) {
+        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getJournalDetail(journalId)));
+    }
+
+    @GetMapping("/advances/outstanding")
+    @Operation(summary = "List unsettled advances grouped by employee")
+    public ResponseEntity<ApiResponse<List<AdvanceEmployeeSummaryResponse>>> getOutstandingAdvances() {
+        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getOutstandingAdvancesByEmployee()));
+    }
 
     @GetMapping
     @Operation(summary = "Get transaction ledger",
@@ -56,11 +99,14 @@ public class AccountantLedgerController {
                description = "CompanyFund balance snapshot plus inflow/outflow aggregates for the given date range. " +
                              "When from/to are omitted, all-time aggregates are returned.")
     public ResponseEntity<ApiResponse<AccountantLedgerSummaryResponse>> getLedgerSummary(
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) TransactionStatus status,
+            @RequestParam(required = false) ReferenceType referenceType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
         return ResponseEntity.ok(ApiResponse.success(
-                accountantLedgerService.getLedgerSummary(from, to)));
+                accountantLedgerService.getLedgerSummary(type, status, referenceType, from, to)));
     }
 
     @GetMapping("/{transactionId}")

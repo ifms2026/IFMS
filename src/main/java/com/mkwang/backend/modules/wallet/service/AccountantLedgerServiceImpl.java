@@ -2,10 +2,19 @@ package com.mkwang.backend.modules.wallet.service;
 
 import com.mkwang.backend.common.dto.PageResponse;
 import com.mkwang.backend.common.exception.ResourceNotFoundException;
+import com.mkwang.backend.common.exception.BadRequestException;
+import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalDetailResponse;
+import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalItemResponse;
+import com.mkwang.backend.modules.accounting.dto.response.AdvanceEmployeeSummaryResponse;
+import com.mkwang.backend.modules.accounting.entity.AccountingJournal;
+import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
+import com.mkwang.backend.modules.accounting.repository.AccountingJournalRepository;
+import com.mkwang.backend.modules.accounting.service.AccountingJournalService;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantLedgerEntryResponse;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantLedgerItemResponse;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantLedgerSummaryResponse;
 import com.mkwang.backend.modules.wallet.dto.response.AccountantTransactionDetailResponse;
+import com.mkwang.backend.modules.wallet.dto.response.AccountantWalletTransactionResponse;
 import com.mkwang.backend.modules.wallet.entity.LedgerEntry;
 import com.mkwang.backend.modules.wallet.entity.ReferenceType;
 import com.mkwang.backend.modules.wallet.entity.Transaction;
@@ -33,6 +42,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +59,8 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final WalletRepository walletRepository;
     private final WalletMapper walletMapper;
+    private final AccountingJournalRepository accountingJournalRepository;
+    private final AccountingJournalService accountingJournalService;
 
     // ─────────────────────────────────────────────────────────────────
     // GET /accountant/ledger
@@ -81,7 +97,9 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
     @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
-    public AccountantLedgerSummaryResponse getLedgerSummary(LocalDate from, LocalDate to) {
+    public AccountantLedgerSummaryResponse getLedgerSummary(TransactionType type, TransactionStatus status,
+            ReferenceType referenceType, LocalDate from, LocalDate to) {
+        validateFilters(from, to);
         Wallet cf = walletRepository.findByOwnerTypeAndOwnerId(CF_TYPE, CF_ID)
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet", "owner", "COMPANY_FUND:1"));
 
@@ -91,9 +109,9 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
         LocalDateTime dtFrom = from != null ? from.atStartOfDay() : LocalDateTime.of(2000, 1, 1, 0, 0);
         LocalDateTime dtTo   = to   != null ? LocalDateTime.of(to, LocalTime.MAX) : LocalDateTime.now();
 
-        BigDecimal totalInflow  = ledgerEntryRepository.sumCreditByWalletAndRange(cfWalletId, dtFrom, dtTo);
-        BigDecimal totalOutflow = ledgerEntryRepository.sumDebitByWalletAndRange(cfWalletId, dtFrom, dtTo);
-        long txCount            = ledgerEntryRepository.countTransactionsByWalletAndRange(cfWalletId, dtFrom, dtTo);
+        BigDecimal totalInflow  = ledgerEntryRepository.sumCreditByWalletAndFilter(cfWalletId, dtFrom, dtTo, type, status, referenceType);
+        BigDecimal totalOutflow = ledgerEntryRepository.sumDebitByWalletAndFilter(cfWalletId, dtFrom, dtTo, type, status, referenceType);
+        long txCount            = ledgerEntryRepository.countTransactionsByWalletAndFilter(cfWalletId, dtFrom, dtTo, type, status, referenceType);
 
         return new AccountantLedgerSummaryResponse(
                 cf.getBalance(),
@@ -101,6 +119,53 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
                 totalOutflow,
                 txCount
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public PageResponse<AccountantWalletTransactionResponse> getWalletTransactions(
+            TransactionType type, TransactionStatus status, ReferenceType referenceType,
+            LocalDate from, LocalDate to, int page, int limit) {
+        validatePage(from, to, page, limit);
+        Page<Transaction> result = transactionRepository.findAll(
+                com.mkwang.backend.modules.wallet.repository.TransactionSpecification.filter(type, status, referenceType, from, to),
+                PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"))));
+        List<Long> ids = result.getContent().stream().map(Transaction::getId).toList();
+        Map<Long, List<AccountantLedgerEntryResponse>> movementsByTransaction = ids.isEmpty() ? Map.of()
+                : ledgerEntryRepository.findByTransactionIdsWithWallet(ids).stream()
+                        .collect(Collectors.groupingBy(entry -> entry.getTransaction().getId(), LinkedHashMap::new,
+                                Collectors.mapping(walletMapper::toAccountantLedgerEntryResponse, Collectors.toList())));
+        List<AccountantWalletTransactionResponse> items = result.getContent().stream().map(transaction ->
+                new AccountantWalletTransactionResponse(transaction.getId(), transaction.getTransactionCode(),
+                        transaction.getType(), transaction.getStatus(), transaction.getAmount(),
+                        transaction.getReferenceType(), transaction.getReferenceId(), transaction.getDescription(),
+                        transaction.getCreatedAt(), movementsByTransaction.getOrDefault(transaction.getId(), List.of())))
+                .toList();
+        return PageResponse.<AccountantWalletTransactionResponse>builder().items(items).total(result.getTotalElements())
+                .page(page).size(limit).totalPages(result.getTotalPages()).build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event,
+            LocalDate from, LocalDate to, int page, int limit) {
+        return accountingJournalService.getJournals(event, from, to, page, limit);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public AccountingJournalDetailResponse getJournalDetail(Long journalId) {
+        return accountingJournalService.getJournalDetail(journalId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee() {
+        return accountingJournalService.getOutstandingAdvancesByEmployee();
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -150,6 +215,18 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
         Long ownerId = primaryEntry != null ? primaryEntry.getWallet().getOwnerId() : null;
         String ownerName = walletMapper.resolveWalletOwnerName(ownerType, ownerId);
 
+        LinkedHashSet<Long> journalIds = new LinkedHashSet<>();
+        accountingJournalRepository.findByWalletTransactionIdOrderByIdAsc(txn.getId())
+                .forEach(journal -> journalIds.add(journal.getId()));
+        if (txn.getReferenceType() == ReferenceType.REQUEST && txn.getReferenceId() != null) {
+            accountingJournalRepository.findByRequestIdOrderByIdAsc(txn.getReferenceId())
+                    .forEach(journal -> journalIds.add(journal.getId()));
+        }
+        if (txn.getReferenceType() == ReferenceType.ADVANCE_BALANCE && txn.getReferenceId() != null) {
+            accountingJournalRepository.findActivitiesForAdvance(txn.getReferenceId())
+                    .forEach(journal -> journalIds.add(journal.getId()));
+        }
+
         return new AccountantTransactionDetailResponse(
                 txn.getId(),
                 txn.getTransactionCode(),
@@ -166,6 +243,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
                 ownerName,
                 txn.getDescription(),
                 entryResponses,
+                List.copyOf(journalIds),
                 txn.getCreatedAt()
         );
     }
@@ -178,6 +256,15 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
         return walletRepository.findByOwnerTypeAndOwnerId(CF_TYPE, CF_ID)
                 .map(Wallet::getId)
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet", "owner", "COMPANY_FUND:1"));
+    }
+
+    private void validatePage(LocalDate from, LocalDate to, int page, int limit) {
+        validateFilters(from, to);
+        if (page < 1 || limit < 1 || limit > 100) throw new BadRequestException("Invalid page or limit");
+    }
+
+    private void validateFilters(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) throw new BadRequestException("from must be before or equal to to");
     }
 
 }

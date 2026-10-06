@@ -27,6 +27,7 @@ import com.mkwang.backend.modules.request.dto.request.CreateRequestRequest;
 import com.mkwang.backend.modules.request.dto.request.DisburseRequest;
 import com.mkwang.backend.modules.request.dto.request.RejectRequestRequest;
 import com.mkwang.backend.modules.request.dto.request.UpdateRequestRequest;
+import com.mkwang.backend.modules.request.dto.request.AdvanceReturnRequest;
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementSummaryResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantRejectResponse;
@@ -35,6 +36,8 @@ import com.mkwang.backend.modules.request.dto.response.CfoApprovalSummaryRespons
 import com.mkwang.backend.modules.request.dto.response.CfoApproveResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoRejectResponse;
 import com.mkwang.backend.modules.request.dto.response.DisburseResponse;
+import com.mkwang.backend.modules.request.dto.response.AdvanceReturnResponse;
+import com.mkwang.backend.modules.request.dto.response.AdvanceSettlementAllocationResponse;
 import com.mkwang.backend.modules.request.dto.response.EmployeeRequestSummaryResponse;
 import com.mkwang.backend.modules.request.dto.response.ManagerApprovalDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.ManagerApprovalSummaryResponse;
@@ -59,6 +62,7 @@ import com.mkwang.backend.modules.request.mapper.RequestMapper;
 import com.mkwang.backend.modules.request.repository.AdvanceBalanceRepository;
 import com.mkwang.backend.modules.request.repository.RequestRepository;
 import com.mkwang.backend.modules.request.repository.RequestSpecification;
+import com.mkwang.backend.modules.accounting.service.AccountingJournalService;
 import com.mkwang.backend.modules.profile.dto.request.VerifyMyPinRequest;
 import com.mkwang.backend.modules.profile.dto.response.PinVerifyResponse;
 import com.mkwang.backend.modules.profile.service.ProfileService;
@@ -105,6 +109,7 @@ public class RequestServiceImpl implements RequestService {
     private final RequestMapper requestMapper;
     private final WalletService walletService;
     private final NotificationPublisher notificationPublisher;
+    private final AccountingJournalService accountingJournalService;
 
     @Override
     @Transactional(readOnly = true)
@@ -204,8 +209,15 @@ public class RequestServiceImpl implements RequestService {
             if (!advanceBalance.getUser().getId().equals(userId)) {
                 throw new BadRequestException("Advance balance does not belong to you");
             }
+            if (advanceBalance.getAdvanceRequest().getProject() == null
+                    || !advanceBalance.getAdvanceRequest().getProject().getId().equals(req.getProjectId())) {
+                throw new BadRequestException("A reimbursement must use the project linked to its advance");
+            }
             if (advanceBalance.isSettled()) {
                 throw new AdvanceBalanceAlreadySettledException(advanceBalance.getId());
+            }
+            if (req.getAmount().compareTo(advanceBalance.getRemainingAmount()) > 0) {
+                throw new BadRequestException("Reimbursement amount exceeds the remaining advance balance");
             }
         }
 
@@ -446,6 +458,8 @@ public class RequestServiceImpl implements RequestService {
 
         if (request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE) {
             walletService.lockFunds(WalletOwnerType.PROJECT, request.getProject().getId(), effectiveAmount);
+            request.reserve(effectiveAmount);
+            requestRepository.save(request);
         }
 
         List<User> accountants = userService.getActiveUsersByRoleName("ACCOUNTANT");
@@ -860,14 +874,40 @@ public class RequestServiceImpl implements RequestService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("approvedAmount is required before disbursement");
         }
+        if ((request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE)
+                && (request.getReservedAmount() == null || request.getReservedAmount().compareTo(amount) < 0)) {
+            throw new BadRequestException("The request does not have enough reserved funds for this payout");
+        }
 
         String description = (req.getNote() != null && !req.getNote().isBlank())
                 ? req.getNote().trim()
                 : request.getType() + " payout - " + request.getRequestCode();
 
         String transactionCode = null;
+        User actor = userService.getUserById(accountantId);
 
-        if (request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE) {
+        if (request.getType() == RequestType.EXPENSE) {
+            if (request.getAttachmentFiles().isEmpty()) {
+                throw new BadRequestException("EXPENSE cannot be verified without supporting documents");
+            }
+            request.getProject().deductBudget(amount);
+            if (request.getPhase() != null) request.getPhase().addSpent(amount);
+            if (request.getPhase() != null && request.getCategory() != null) {
+                categoryBudgetService.incrementSpent(request.getPhase().getId(), request.getCategory().getId(), amount);
+            }
+            request.setStatus(RequestStatus.ACCOUNTANT_VERIFIED);
+            request.getHistories().add(RequestHistory.builder().request(request).actor(actor)
+                    .action(RequestAction.VERIFY).statusAfterAction(RequestStatus.ACCOUNTANT_VERIFIED)
+                    .comment(req.getNote()).build());
+            requestRepository.save(request);
+            accountingJournalService.recordExpenseVerified(request);
+            notify(request.getRequester(), "EXPENSE_VERIFIED", "Chi phí đã được xác nhận",
+                    "Chứng từ của yêu cầu " + request.getRequestCode()
+                            + " đã hợp lệ. Khoản hoàn chi đang chờ Kế toán thanh toán.", request.getId());
+            return requestMapper.toDisburseResponse(request, null);
+        }
+
+        if (request.getType() == RequestType.ADVANCE) {
             Long projectId = request.getProject().getId();
             Long requesterId = request.getRequester().getId();
 
@@ -880,21 +920,12 @@ public class RequestServiceImpl implements RequestService {
                     description
             );
             transactionCode = txn.getTransactionCode();
+            request.consumeReservation(amount);
 
-            if (request.getType() == RequestType.ADVANCE) {
-                AdvanceBalance advanceBalance = AdvanceBalance.builder()
-                        .user(request.getRequester())
-                        .advanceRequest(request)
-                        .originalAmount(amount)
-                        .remainingAmount(amount)
-                        .build();
-                advanceBalanceRepository.save(advanceBalance);
-            }
-
-            request.getProject().deductBudget(amount);
-            if (request.getPhase() != null) {
-                request.getPhase().addSpent(amount);
-            }
+            AdvanceBalance advanceBalance = AdvanceBalance.builder().user(request.getRequester())
+                    .advanceRequest(request).originalAmount(amount).remainingAmount(amount).build();
+            advanceBalanceRepository.save(advanceBalance);
+            accountingJournalService.recordAdvanceDisbursed(request, advanceBalance, txn);
         } else if (request.getType() == RequestType.REIMBURSE) {
             AdvanceBalance advanceBalance = request.getAdvanceBalance();
             if (advanceBalance == null) {
@@ -902,17 +933,14 @@ public class RequestServiceImpl implements RequestService {
             }
             advanceBalance.reimburse(amount);
             advanceBalanceRepository.save(advanceBalance);
+            request.getProject().deductBudget(amount);
+            if (request.getPhase() != null) request.getPhase().addSpent(amount);
+            if (request.getPhase() != null && request.getCategory() != null) {
+                categoryBudgetService.incrementSpent(request.getPhase().getId(), request.getCategory().getId(), amount);
+            }
+            accountingJournalService.recordReimburseSettled(request, advanceBalance);
         }
 
-        if (request.getPhase() != null && request.getCategory() != null) {
-            categoryBudgetService.incrementSpent(
-                    request.getPhase().getId(),
-                    request.getCategory().getId(),
-                    amount
-            );
-        }
-
-        User actor = userService.getUserById(accountantId);
         request.setStatus(RequestStatus.PAID);
         request.setPaidAt(LocalDateTime.now());
         request.getHistories().add(RequestHistory.builder()
@@ -925,13 +953,66 @@ public class RequestServiceImpl implements RequestService {
 
         requestRepository.save(request);
 
-        notify(request.getRequester(), "REQUEST_PAID",
-                "Yêu cầu đã được giải ngân",
-                formatAmount(amount) + " VND đã được giải ngân vào ví của bạn cho yêu cầu "
-                        + request.getRequestCode() + ".",
-                request.getId());
+        String message = request.getType() == RequestType.ADVANCE
+                ? formatAmount(amount) + " VND đã được tạm ứng vào ví của bạn cho yêu cầu " + request.getRequestCode() + "."
+                : "Chứng từ quyết toán của yêu cầu " + request.getRequestCode() + " đã được ghi nhận.";
+        notify(request.getRequester(), "REQUEST_PAID", "Yêu cầu đã được xử lý", message, request.getId());
 
         return requestMapper.toDisburseResponse(request, transactionCode);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = {UnauthorizedException.class, LockedException.class})
+    @PreAuthorize("hasAuthority('REQUEST_PAYOUT')")
+    public DisburseResponse payExpense(Long id, Long accountantId, DisburseRequest req) {
+        PinVerifyResponse pinResult = profileService.verifyMyPin(accountantId, new VerifyMyPinRequest(req.getPin()));
+        if (!pinResult.isValid()) throw new UnauthorizedException("PIN không đúng");
+        Request request = requestRepository.findDetailByIdForAccountant(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+        if (request.getType() != RequestType.EXPENSE || request.getStatus() != RequestStatus.ACCOUNTANT_VERIFIED) {
+            throw new BadRequestException("Only verified EXPENSE requests can be paid");
+        }
+        BigDecimal amount = request.getApprovedAmount();
+        if (request.getReservedAmount() == null || request.getReservedAmount().compareTo(amount) < 0) {
+            throw new BadRequestException("The request does not have enough reserved funds for this reimbursement");
+        }
+        String description = req.getNote() == null || req.getNote().isBlank()
+                ? "Hoàn chi " + request.getRequestCode() : req.getNote().trim();
+        var transaction = walletService.settleAndTransfer(WalletOwnerType.PROJECT, request.getProject().getId(),
+                WalletOwnerType.USER, request.getRequester().getId(), amount, TransactionType.REQUEST_PAYMENT,
+                ReferenceType.REQUEST, request.getId(), description);
+        accountingJournalService.recordExpensePaid(request, transaction);
+        request.consumeReservation(amount);
+        User actor = userService.getUserById(accountantId);
+        request.setStatus(RequestStatus.PAID);
+        request.setPaidAt(LocalDateTime.now());
+        request.getHistories().add(RequestHistory.builder().request(request).actor(actor).action(RequestAction.PAYOUT)
+                .statusAfterAction(RequestStatus.PAID).comment(req.getNote()).build());
+        requestRepository.save(request);
+        notify(request.getRequester(), "EXPENSE_PAID", "Khoản hoàn chi đã được thanh toán",
+                formatAmount(amount) + " VND đã được chuyển vào ví của bạn cho yêu cầu " + request.getRequestCode() + ".",
+                request.getId());
+        return requestMapper.toDisburseResponse(request, transaction.getTransactionCode());
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasAuthority('REQUEST_VIEW_SELF')")
+    public AdvanceReturnResponse returnAdvanceBalance(Long advanceBalanceId, Long userId, AdvanceReturnRequest request) {
+        AdvanceBalance balance = advanceBalanceRepository.findByIdForUpdate(advanceBalanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("AdvanceBalance", "id", advanceBalanceId));
+        if (!balance.getUser().getId().equals(userId)) throw new BadRequestException("Advance balance does not belong to you");
+        Request advanceRequest = balance.getAdvanceRequest();
+        Long projectId = advanceRequest.getProject().getId();
+        String description = request.note() == null || request.note().isBlank()
+                ? "Hoàn tiền tạm ứng " + advanceRequest.getRequestCode() : request.note().trim();
+        var transaction = walletService.transfer(WalletOwnerType.USER, userId, WalletOwnerType.PROJECT, projectId,
+                request.amount(), TransactionType.ADVANCE_RETURN, ReferenceType.ADVANCE_BALANCE,
+                balance.getId(), description);
+        balance.returnCash(request.amount());
+        advanceBalanceRepository.save(balance);
+        accountingJournalService.recordAdvanceReturned(balance, transaction, request.amount(), description);
+        return new AdvanceReturnResponse(balance.getId(), transaction.getTransactionCode(), request.amount(), balance.getRemainingAmount());
     }
 
     @Override
@@ -945,11 +1026,12 @@ public class RequestServiceImpl implements RequestService {
             throw new BadRequestException("Only APPROVED_BY_TEAM_LEADER requests can be rejected at this stage");
         }
 
-        if (request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE) {
+        if ((request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE)
+                && request.getReservedAmount() != null && request.getReservedAmount().signum() > 0) {
             walletService.unlockFunds(
                     WalletOwnerType.PROJECT,
                     request.getProject().getId(),
-                    request.getApprovedAmount()
+                    request.releaseReservation()
             );
         }
 
@@ -1186,16 +1268,22 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
-    public void applyPayrollDeduction(Long userId, java.math.BigDecimal amount) {
+    public List<AdvanceSettlementAllocationResponse> applyPayrollDeduction(Long userId, java.math.BigDecimal amount) {
         List<com.mkwang.backend.modules.request.entity.AdvanceBalance> advances =
                 advanceBalanceRepository.findUnsettledByUserIdForUpdate(userId);
         java.math.BigDecimal remaining = amount;
+        List<AdvanceSettlementAllocationResponse> allocations = new java.util.ArrayList<>();
         for (com.mkwang.backend.modules.request.entity.AdvanceBalance advance : advances) {
             if (remaining.compareTo(java.math.BigDecimal.ZERO) <= 0) break;
             java.math.BigDecimal deduct = remaining.min(advance.getRemainingAmount());
-            advance.returnCash(deduct);
+            advance.applyPayrollOffset(deduct);
+            allocations.add(new AdvanceSettlementAllocationResponse(advance.getId(), deduct));
             remaining = remaining.subtract(deduct);
         }
+        if (remaining.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            throw new BadRequestException("Payroll advance deduction exceeds the employee's current outstanding balances");
+        }
+        return allocations;
     }
 }
 

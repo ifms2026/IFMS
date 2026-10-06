@@ -5,7 +5,9 @@ import com.mkwang.backend.common.dto.PageResponse;
 import com.mkwang.backend.modules.auth.security.UserDetailsAdapter;
 import com.mkwang.backend.modules.request.dto.request.CreateRequestRequest;
 import com.mkwang.backend.modules.request.dto.request.UpdateRequestRequest;
+import com.mkwang.backend.modules.request.dto.request.AdvanceReturnRequest;
 import com.mkwang.backend.modules.request.dto.response.AdvanceBalanceItem;
+import com.mkwang.backend.modules.request.dto.response.AdvanceReturnResponse;
 import com.mkwang.backend.modules.request.dto.response.RequestDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.RequestSummaryResponse;
 import com.mkwang.backend.modules.request.entity.RequestStatus;
@@ -132,6 +134,16 @@ public class RequestController {
             @AuthenticationPrincipal UserDetailsAdapter principal) {
         return ResponseEntity.ok(ApiResponse.success(
                 requestService.getMyAdvanceBalances(principal.getUser().getId())));
+    }
+
+    @PostMapping("/my-advance-balances/{advanceBalanceId}/return")
+    @Operation(summary = "Return remaining advance money", description = "Transfers money from the employee wallet to the project wallet linked to this advance and reduces its outstanding balance.")
+    public ResponseEntity<ApiResponse<AdvanceReturnResponse>> returnAdvance(
+            @PathVariable Long advanceBalanceId,
+            @Valid @RequestBody AdvanceReturnRequest request,
+            @AuthenticationPrincipal UserDetailsAdapter principal) {
+        return ResponseEntity.ok(ApiResponse.success(requestService.returnAdvanceBalance(
+                advanceBalanceId, principal.getUser().getId(), request)));
     }
 }
 

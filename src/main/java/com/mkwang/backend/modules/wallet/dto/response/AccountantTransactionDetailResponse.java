@@ -32,5 +32,6 @@ public record AccountantTransactionDetailResponse(
         String walletOwnerName,
         String description,
         List<AccountantLedgerEntryResponse> ledgerEntries,
+        List<Long> accountingJournalIds,
         LocalDateTime createdAt
 ) {}

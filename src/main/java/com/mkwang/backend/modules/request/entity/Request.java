@@ -1,6 +1,7 @@
 package com.mkwang.backend.modules.request.entity;
 
 import com.mkwang.backend.common.base.BaseEntity;
+import com.mkwang.backend.common.exception.BadRequestException;
 import com.mkwang.backend.modules.project.entity.ExpenseCategory;
 import com.mkwang.backend.modules.file.entity.FileStorage;
 import com.mkwang.backend.modules.project.entity.Project;
@@ -97,6 +98,28 @@ public class Request extends BaseEntity {
    */
   @Column(name = "approved_amount", precision = 19, scale = 2)
   private BigDecimal approvedAmount;
+
+  /** Funds reserved for this specific approved request; consumed or released once processed. */
+  @Column(name = "reserved_amount", precision = 19, scale = 2, nullable = false)
+  @Builder.Default
+  private BigDecimal reservedAmount = BigDecimal.ZERO;
+
+  public void reserve(BigDecimal amount) {
+    this.reservedAmount = amount;
+  }
+
+  public void consumeReservation(BigDecimal amount) {
+    if (this.reservedAmount == null || this.reservedAmount.compareTo(amount) < 0) {
+      throw new BadRequestException("Request reservation is smaller than the payout amount");
+    }
+    this.reservedAmount = this.reservedAmount.subtract(amount);
+  }
+
+  public BigDecimal releaseReservation() {
+    BigDecimal released = this.reservedAmount == null ? BigDecimal.ZERO : this.reservedAmount;
+    this.reservedAmount = BigDecimal.ZERO;
+    return released;
+  }
 
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 25)

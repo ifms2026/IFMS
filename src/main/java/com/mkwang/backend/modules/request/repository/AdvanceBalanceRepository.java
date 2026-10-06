@@ -5,6 +5,7 @@ import com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -35,7 +36,7 @@ public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, 
    * Locks all rows to prevent concurrent REIMBURSE while payroll is running.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("SELECT ab FROM AdvanceBalance ab WHERE ab.user.id = :userId AND ab.status <> 'SETTLED'")
+  @Query("SELECT ab FROM AdvanceBalance ab WHERE ab.user.id = :userId AND ab.status <> 'SETTLED' ORDER BY ab.createdAt, ab.id")
   List<AdvanceBalance> findUnsettledByUserIdForUpdate(@Param("userId") Long userId);
 
   /**
@@ -46,6 +47,10 @@ public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, 
   Optional<AdvanceBalance> findByIdForUpdate(@Param("id") Long id);
 
   Optional<AdvanceBalance> findByAdvanceRequestId(Long requestId);
+
+  @EntityGraph(attributePaths = {"user", "user.department", "advanceRequest", "advanceRequest.project",
+      "advanceRequest.phase", "advanceRequest.category"})
+  List<AdvanceBalance> findByStatusNotOrderByCreatedAtAscIdAsc(AdvanceBalanceStatus status);
 
   @Query("""
       SELECT COALESCE(SUM(ab.remainingAmount), 0) FROM AdvanceBalance ab

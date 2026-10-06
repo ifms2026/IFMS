@@ -31,6 +31,9 @@ public enum RequestStatus {
   APPROVED_BY_TEAM_LEADER,
   // TEAM_LEADER đã duyệt, chờ xử lý thanh toán theo flow
 
+  /** EXPENSE only: Accountant verified the employee-funded receipt; reimbursement is still unpaid. */
+  ACCOUNTANT_VERIFIED,
+
   // ─ Flow 2: PROJECT_TOPUP ─
   APPROVED_BY_MANAGER,
   // Manager đã duyệt, scheduler sẽ auto-pay trong vài phút

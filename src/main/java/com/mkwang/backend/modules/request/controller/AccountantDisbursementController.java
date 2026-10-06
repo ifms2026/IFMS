@@ -67,7 +67,7 @@ public class AccountantDisbursementController {
     @PostMapping("/{id}/disburse")
     @Operation(
         summary = "Execute disbursement",
-        description = "Executes the payout for an APPROVED request. For ADVANCE: transfers approved_amount from Project wallet to Employee wallet. For EXPENSE: marks as paid without wallet transfer (direct vendor payment). For REIMBURSE: settles the linked advance_balance. Phase and category current_spent are incremented atomically."
+        description = "For ADVANCE, transfers approved funds and opens an advance balance. For EXPENSE, verifies the employee-funded receipt and records the expense; the separate /pay endpoint transfers the reimbursement. For REIMBURSE, records valid costs against an existing advance without another wallet transfer."
     )
     public ResponseEntity<ApiResponse<DisburseResponse>> disburse(
             @PathVariable Long id,
@@ -75,6 +75,17 @@ public class AccountantDisbursementController {
             @AuthenticationPrincipal UserDetailsAdapter principal) {
         return ResponseEntity.ok(ApiResponse.success(
                 requestService.disburse(id, principal.getUser().getId(), req)
+        ));
+    }
+
+    @PostMapping("/{id}/pay")
+    @Operation(summary = "Pay a verified employee expense", description = "Transfers the approved reimbursement amount after a valid expense receipt has been recorded.")
+    public ResponseEntity<ApiResponse<DisburseResponse>> payExpense(
+            @PathVariable Long id,
+            @Valid @RequestBody DisburseRequest req,
+            @AuthenticationPrincipal UserDetailsAdapter principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                requestService.payExpense(id, principal.getUser().getId(), req)
         ));
     }
 

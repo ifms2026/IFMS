@@ -16,13 +16,10 @@ import java.util.List;
  * AdvanceBalance — tracks the outstanding debt from an ADVANCE request.
  *
  * One record is created per approved ADVANCE payout.
- * It is reduced by two mechanisms:
- *   1. REIMBURSE request approved (expense invoices submitted) → reimbursedAmount increases.
- *      No wallet movement — purely an accounting settlement.
- *   2. Cash returned or payroll deducted → returnedAmount increases.
- *      Wallet movement: DEBIT user, CREDIT project (ADVANCE_RETURN transaction).
+ * It is settled by approved expense receipts, actual cash returned by the employee,
+ * or a payroll offset. These amounts remain separate for audit and reconciliation.
  *
- * remaining = original - reimbursed - returned
+ * remaining = original - reimbursed - cash returned - payroll offset - legacy unclassified
  * When remaining = 0 → status = SETTLED.
  *
  * Audit trail:
@@ -74,12 +71,21 @@ public class AdvanceBalance {
   private BigDecimal reimbursedAmount = BigDecimal.ZERO;
 
   /**
-   * Total returned as actual cash (manual return or payroll deduction).
-   * Increases when ADVANCE_RETURN transaction is executed. Wallet is debited.
+   * Actual money returned by the employee through an ADVANCE_RETURN wallet transaction.
    */
-  @Column(name = "returned_amount", precision = 19, scale = 2, nullable = false)
+  @Column(name = "cash_returned_amount", precision = 19, scale = 2, nullable = false)
   @Builder.Default
-  private BigDecimal returnedAmount = BigDecimal.ZERO;
+  private BigDecimal cashReturnedAmount = BigDecimal.ZERO;
+
+  /** Amount offset against payroll; no wallet transfer is created for this amount. */
+  @Column(name = "payroll_offset_amount", precision = 19, scale = 2, nullable = false)
+  @Builder.Default
+  private BigDecimal payrollOffsetAmount = BigDecimal.ZERO;
+
+  /** Historical settlement value whose source (cash return or payroll) cannot be reconstructed. */
+  @Column(name = "legacy_unclassified_amount", precision = 19, scale = 2, nullable = false)
+  @Builder.Default
+  private BigDecimal legacyUnclassifiedAmount = BigDecimal.ZERO;
 
   /**
    * Remaining debt = original - reimbursed - returned.
@@ -126,14 +132,21 @@ public class AdvanceBalance {
   }
 
   /**
-   * Called when remaining cash is returned manually or deducted from payroll.
-   * Reduces remaining debt — wallet DEBIT happens separately via ADVANCE_RETURN transaction.
+   * Called atomically with an actual USER → PROJECT ADVANCE_RETURN wallet transfer.
    *
    * @param amount the amount being returned
    */
   public void returnCash(BigDecimal amount) {
     validateSettlementAmount(amount);
-    this.returnedAmount  = this.returnedAmount.add(amount);
+    this.cashReturnedAmount = this.cashReturnedAmount.add(amount);
+    this.remainingAmount = this.remainingAmount.subtract(amount);
+    updateStatus();
+  }
+
+  /** Apply a payroll offset. This is a balance settlement, not a cash return. */
+  public void applyPayrollOffset(BigDecimal amount) {
+    validateSettlementAmount(amount);
+    this.payrollOffsetAmount = this.payrollOffsetAmount.add(amount);
     this.remainingAmount = this.remainingAmount.subtract(amount);
     updateStatus();
   }

@@ -31,6 +31,8 @@ import com.mkwang.backend.modules.profile.repository.UserProfileRepository;
 import com.mkwang.backend.modules.notification.publisher.NotificationEvent;
 import com.mkwang.backend.modules.notification.publisher.NotificationPublisher;
 import com.mkwang.backend.modules.request.service.RequestService;
+import com.mkwang.backend.modules.accounting.service.AccountingJournalService;
+import com.mkwang.backend.modules.wallet.entity.Transaction;
 import com.mkwang.backend.modules.wallet.entity.ReferenceType;
 import com.mkwang.backend.modules.wallet.entity.TransactionType;
 import com.mkwang.backend.modules.wallet.entity.WalletOwnerType;
@@ -76,6 +78,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     private final BusinessCodeGenerator businessCodeGenerator;
     private final UserProfileRepository userProfileRepository;
     private final RequestService requestService;
+    private final AccountingJournalService accountingJournalService;
     private final WalletService walletService;
     private final NotificationPublisher notificationPublisher;
 
@@ -512,9 +515,10 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
 
         for (Payslip payslip : period.getPayslips()) {
             BigDecimal finalNet = safe(payslip.getFinalNetSalary());
+            Transaction payrollTransaction = null;
 
             if (finalNet.compareTo(BigDecimal.ZERO) > 0) {
-                walletService.transfer(
+                payrollTransaction = walletService.transfer(
                         WalletOwnerType.COMPANY_FUND, 1L,
                         WalletOwnerType.USER, payslip.getUser().getId(),
                         finalNet,
@@ -525,9 +529,12 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
             }
 
             BigDecimal advanceDeduct = safe(payslip.getAdvanceDeduct());
+            List<com.mkwang.backend.modules.request.dto.response.AdvanceSettlementAllocationResponse> advanceAllocations = List.of();
             if (advanceDeduct.compareTo(BigDecimal.ZERO) > 0) {
-                requestService.applyPayrollDeduction(payslip.getUser().getId(), advanceDeduct);
+                advanceAllocations = requestService.applyPayrollDeduction(payslip.getUser().getId(), advanceDeduct);
             }
+
+            accountingJournalService.recordPayrollSettlement(payslip, payrollTransaction, advanceAllocations);
 
             payslip.setStatus(PayslipStatus.PAID);
             payslip.setPaymentDate(LocalDateTime.now());

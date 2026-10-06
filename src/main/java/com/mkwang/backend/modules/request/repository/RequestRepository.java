@@ -97,7 +97,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             LEFT JOIN FETCH r.attachments att
             LEFT JOIN FETCH att.file
             WHERE r.id = :id
-              AND r.status = 'APPROVED_BY_TEAM_LEADER'
+              AND r.status IN ('APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
               AND r.type IN ('ADVANCE', 'EXPENSE', 'REIMBURSE')
             """)
     Optional<Request> findDetailByIdForAccountant(@Param("id") Long id);
@@ -117,7 +117,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             SELECT r.requester.id, COUNT(r)
             FROM Request r
             WHERE r.requester.id IN :userIds
-              AND r.status IN ('PENDING', 'APPROVED_BY_TEAM_LEADER')
+              AND r.status IN ('PENDING', 'APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
             GROUP BY r.requester.id
             """)
     List<Object[]> countPendingByRequesterIds(@Param("userIds") List<Long> userIds);
@@ -126,7 +126,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             SELECT COUNT(r)
             FROM Request r
             WHERE r.requester.id = :userId
-              AND r.status IN ('PENDING', 'APPROVED_BY_TEAM_LEADER')
+              AND r.status IN ('PENDING', 'APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
             """)
     int countPendingForRequester(@Param("userId") Long userId);
 
@@ -139,7 +139,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             SELECT COUNT(r) FROM Request r
             WHERE r.requester.id = :userId
               AND r.project.id IN :projectIds
-              AND r.status IN ('PENDING', 'APPROVED_BY_TEAM_LEADER')
+              AND r.status IN ('PENDING', 'APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
             """)
     int countPendingForMemberInProjects(
             @Param("userId") Long userId,
@@ -174,7 +174,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
 
     @Query("""
             SELECT COUNT(r) FROM Request r
-            WHERE r.status = 'APPROVED_BY_TEAM_LEADER'
+            WHERE r.status IN ('APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
               AND r.type IN ('ADVANCE', 'EXPENSE', 'REIMBURSE')
             """)
     long countPendingDisbursements();

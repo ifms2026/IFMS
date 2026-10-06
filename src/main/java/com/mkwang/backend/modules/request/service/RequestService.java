@@ -28,6 +28,9 @@ import com.mkwang.backend.modules.request.entity.RequestStatus;
 import com.mkwang.backend.modules.request.entity.RequestType;
 
 import com.mkwang.backend.modules.request.dto.response.AdvanceBalanceItem;
+import com.mkwang.backend.modules.request.dto.request.AdvanceReturnRequest;
+import com.mkwang.backend.modules.request.dto.response.AdvanceReturnResponse;
+import com.mkwang.backend.modules.request.dto.response.AdvanceSettlementAllocationResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoDeptTopupItemResponse;
 
 import java.math.BigDecimal;
@@ -83,6 +86,10 @@ public interface RequestService {
 
     DisburseResponse disburse(Long id, Long accountantId, DisburseRequest req);
 
+    DisburseResponse payExpense(Long id, Long accountantId, DisburseRequest req);
+
+    AdvanceReturnResponse returnAdvanceBalance(Long advanceBalanceId, Long userId, AdvanceReturnRequest request);
+
     AccountantRejectResponse accountantReject(Long id, Long accountantId, RejectRequestRequest req);
 
     // ── Dashboard aggregates ──────────────────────────────────────────
@@ -115,6 +122,6 @@ public interface RequestService {
      * No wallet movement — the salary simply wasn't credited.
      * Must be called within a transaction (propagates REQUIRED).
      */
-    void applyPayrollDeduction(Long userId, BigDecimal amount);
+    List<AdvanceSettlementAllocationResponse> applyPayrollDeduction(Long userId, BigDecimal amount);
 }
 
