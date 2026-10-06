@@ -3237,6 +3237,25 @@ Chi tiết một giao dịch trong sổ cái.
 ---
 
 
+## Current Ledger API — 06/10/2026
+
+This section supersedes the earlier ledger examples above where field names or behavior differ. The legacy GET /accountant/ledger and GET /accountant/ledger/{transactionId} remain available.
+
+| Method and path | Purpose |
+|---|---|
+| GET /accountant/ledger/wallet-transactions?type=&status=&referenceType=&from=&to=&page=1&limit=20 | One row per wallet transaction, with wallet movements nested under it. |
+| GET /accountant/ledger/summary?type=&status=&referenceType=&from=&to= | Filtered inflow/outflow and count for the COMPANY_FUND wallet; currentBalance remains its current snapshot. |
+| GET /accountant/ledger/journals?event=&from=&to=&page=1&limit=20 | Paginated journal list filtered by event and posting date. |
+| GET /accountant/ledger/journals/{journalId} | Journal header, account lines, debit/credit totals and balance result. |
+| GET /accountant/ledger/advances/outstanding | Open advance balances grouped by employee, with settlement breakdown and journal activity. |
+| POST /accountant/disbursements/{id}/disburse | ADVANCE payout; EXPENSE receipt verification; REIMBURSE settlement. |
+| POST /accountant/disbursements/{id}/pay | Pay a previously verified EXPENSE reimbursement. |
+| POST /requests/my-advance-balances/{advanceBalanceId}/return | Employee returns actual money to the original project wallet. |
+
+EXPENSE moves through APPROVED_BY_TEAM_LEADER → ACCOUNTANT_VERIFIED → PAID. Verification records expense and an employee payable; payment transfers money and clears that payable without recording the cost again. REIMBURSE records supported project cost and lowers the linked advance without a wallet transfer.
+
+Journal events currently include ADVANCE_DISBURSED, EXPENSE_VERIFIED, EXPENSE_PAID, REIMBURSE_SETTLED, ADVANCE_RETURNED and PAYROLL_SETTLEMENT. Journal account codes are IFMS internal mappings, not a statutory chart of accounts.
+
 ### GET `/accountant/payslips/:payslipId`
 Chi tiết một payslip cụ thể. Dùng khi Accountant cần tra cứu payslip từ ledger → `referenceId`.
 

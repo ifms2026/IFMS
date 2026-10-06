@@ -276,3 +276,14 @@ public enum RequestStatus {
 | `PROJECT` | projectId | Ví dự án |
 | `COMPANY_FUND` | 1 (singleton) | Quỹ công ty — tiền còn lại sau cấp phát |
 | `FLOAT_MAIN` | 0 (sentinel) | Control wallet — invariant checker, không có owner thực |
+
+## Ledger and Advance Settlement Rules — current implementation
+
+- ADVANCE transfers Project → User, creates an open AdvanceBalance and does not increase project expense.
+- EXPENSE means an employee paid personally and submitted evidence. Accountant verification records the project expense and employee payable; the later payment transfers Project → User and clears that payable without recording expense twice.
+- REIMBURSE accepts evidence against a selected AdvanceBalance, records supported expense and reduces the balance without another wallet transfer.
+- ADVANCE_RETURN transfers real money from the employee wallet to the same project wallet that issued the advance.
+- Payroll advanceDeduct reduces open AdvanceBalance records FIFO. It is not a fake User → Project transaction; the payroll journal links the offset amount to each advance.
+- Actual cash return, payroll offset, and old settlement rows whose source cannot be reconstructed are stored separately.
+- Each approved ADVANCE/EXPENSE request tracks its own reserved amount. This prevents one request from consuming funds reserved for another.
+- The accountant ledger separates wallet transactions (Transaction/LedgerEntry) from account journals (AccountingJournal/AccountingJournalLine). Journal postings are implemented for ADVANCE, EXPENSE, REIMBURSE, ADVANCE_RETURN, and payroll; top-ups, deposits, withdrawals, and internal allocations remain wallet movements only.

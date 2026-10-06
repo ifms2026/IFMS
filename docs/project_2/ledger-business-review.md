@@ -191,8 +191,7 @@ liệu bút toán và màn hình Kế toán/báo cáo. Không cần viết lại
 số lượng sáu vai trò hiện có; cần rà lại quyền xem, xác nhận chứng từ, ghi sổ và
 điều chỉnh.
 
-**Trạng thái:** Sổ cái kế toán theo tài khoản và các thay đổi nêu trên mới là yêu
-cầu nghiệp vụ; chưa được triển khai trong mã nguồn.
+**Trạng thái cập nhật 06/10/2026:** Các hạng mục trong phạm vi đồ án đã được triển khai ở backend IFMS và giao diện Sổ cái: giao dịch ví gộp theo transaction, journal riêng theo tài khoản, tách xác nhận EXPENSE khỏi thanh toán hoàn chi, theo dõi tạm ứng theo nhân viên và phân biệt tiền hoàn thật với khấu trừ lương. Chi tiết API, quy tắc và giới hạn còn lại nằm trong [tài liệu triển khai sổ cái](ledger-accounting-implementation.md).
 
 ### Mã nguồn đã đối chiếu
 

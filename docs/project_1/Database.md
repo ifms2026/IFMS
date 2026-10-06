@@ -537,3 +537,13 @@ Purpose: key-value configuration store managed in DB.
 - Money fields consistently use `DECIMAL(19,2)` for financial precision.
 - Append-only intent is clear for `audit_logs`, `ledger_entries`, and `request_histories`.
 
+## 7) Ledger schema update — migration V19
+
+Migration V19__ADD_ACCOUNTING_JOURNALS_AND_ADVANCE_SETTLEMENT_BREAKDOWN.sql adds:
+
+- accounting_journals: posting header with code, event, posting date/period, source reference, employee/project snapshots, linked wallet transaction and total amount. (event_type, source_type, source_id) is unique to prevent duplicate posting for one source event.
+- accounting_journal_lines: account code/name, debit and credit amounts, effect description, and optional request/advance/employee/project references. A check constraint requires exactly one positive side per line; the service also checks the journal totals before saving.
+- requests.reserved_amount: amount locked for that approved ADVANCE/EXPENSE request; existing approved requests are backfilled from approved_amount.
+- advance_balances.cash_returned_amount, payroll_offset_amount, legacy_unclassified_amount: separate actual cash, salary offset, and historical settlement whose source cannot be reconstructed.
+
+The previous advance_balances.returned_amount column is migrated to legacy_unclassified_amount and removed. remaining_amount is preserved during migration to avoid changing existing outstanding totals.
