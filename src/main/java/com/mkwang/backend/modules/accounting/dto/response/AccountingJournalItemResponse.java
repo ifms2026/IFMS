@@ -4,6 +4,7 @@ import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 
 public record AccountingJournalItemResponse(
         Long id,
@@ -22,5 +23,8 @@ public record AccountingJournalItemResponse(
         String projectName,
         Long walletTransactionId,
         BigDecimal totalAmount,
-        boolean balanced
+        boolean balanced,
+        Long createdByUserId,
+        String createdByName,
+        Instant createdAt
 ) {}

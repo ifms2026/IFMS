@@ -29,6 +29,7 @@ public class CompanyFundServiceImpl implements CompanyFundService {
     private final CompanyFundRepository companyFundRepository;
     private final WalletService         walletService;
     private final WalletMapper          walletMapper;
+    private final AccountingJournalService accountingJournalService;
 
     @Override
     @Transactional(readOnly = true)
@@ -48,6 +49,7 @@ public class CompanyFundServiceImpl implements CompanyFundService {
                 request.getPaymentRef(),
                 request.getDescription()
         );
+        accountingJournalService.recordSystemTopup(txn);
         return walletMapper.toTransactionResponse(txn);
     }
 

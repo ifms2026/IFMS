@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /** Item in GET /requests/my-advance-balances — one unsettled AdvanceBalance. */
 @Getter
@@ -12,13 +13,14 @@ import java.math.BigDecimal;
 public class AdvanceBalanceItem {
     private Long id;
     private String requestCode;
+    private String projectName;
+    private LocalDate disbursedDate;
     private BigDecimal originalAmount;
     private BigDecimal remainingAmount;
     private AdvanceBalanceStatus status;
 
     // Project / phase / category of the original advance — pre-filled on the reimbursement form
     private Long projectId;
-    private String projectName;
     private Long phaseId;
     private String phaseName;
     private Long categoryId;

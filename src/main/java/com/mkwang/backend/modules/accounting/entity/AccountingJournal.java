@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -75,6 +76,15 @@ public class AccountingJournal {
 
     @Column(name = "total_amount", precision = 19, scale = 2, nullable = false)
     private BigDecimal totalAmount;
+
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
+    @Column(name = "created_by_name", length = 200)
+    private String createdByName;
+
+    @Column(name = "created_at")
+    private Instant createdAt;
 
     @OneToMany(mappedBy = "journal", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

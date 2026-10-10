@@ -4,6 +4,7 @@ import com.mkwang.backend.common.dto.PageResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalDetailResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalItemResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AdvanceEmployeeSummaryResponse;
+import com.mkwang.backend.modules.accounting.dto.response.LedgerProjectBudgetResponse;
 import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 import com.mkwang.backend.modules.accounting.entity.Payslip;
 import com.mkwang.backend.modules.request.entity.AdvanceBalance;
@@ -22,9 +23,14 @@ public interface AccountingJournalService {
     void recordReimburseSettled(Request request, AdvanceBalance balance);
     void recordAdvanceReturned(AdvanceBalance balance, Transaction transaction, BigDecimal amount, String description);
     void recordPayrollSettlement(Payslip payslip, Transaction transaction, List<AdvanceSettlementAllocationResponse> allocations);
+    void recordSystemTopup(Transaction transaction);
+    void recordDepartmentAllocation(Request request, Transaction transaction, String departmentName);
+    void recordProjectAllocation(Request request, Transaction transaction, String departmentName);
 
     PageResponse<AccountingJournalItemResponse> getJournals(
-            AccountingJournalEvent event, LocalDate from, LocalDate to, int page, int limit);
+            AccountingJournalEvent event, LocalDate from, LocalDate to, Long employeeId,
+            Long projectId, Long requestId, int page, int limit);
     AccountingJournalDetailResponse getJournalDetail(Long journalId);
     List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee();
+    List<LedgerProjectBudgetResponse> getBudgetExposure();
 }

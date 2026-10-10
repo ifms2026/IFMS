@@ -9,6 +9,7 @@ import com.mkwang.backend.modules.wallet.dto.response.AccountantWalletTransactio
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalDetailResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalItemResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AdvanceEmployeeSummaryResponse;
+import com.mkwang.backend.modules.accounting.dto.response.LedgerProjectBudgetResponse;
 import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 import com.mkwang.backend.modules.wallet.entity.ReferenceType;
 import com.mkwang.backend.modules.wallet.entity.TransactionStatus;
@@ -58,9 +59,13 @@ public class AccountantLedgerController {
             @RequestParam(required = false) AccountingJournalEvent event,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long employeeId,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Long requestId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
-        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getJournals(event, from, to, page, limit)));
+        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getJournals(
+                event, from, to, employeeId, projectId, requestId, page, limit)));
     }
 
     @GetMapping("/journals/{journalId}")
@@ -73,6 +78,12 @@ public class AccountantLedgerController {
     @Operation(summary = "List unsettled advances grouped by employee")
     public ResponseEntity<ApiResponse<List<AdvanceEmployeeSummaryResponse>>> getOutstandingAdvances() {
         return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getOutstandingAdvancesByEmployee()));
+    }
+
+    @GetMapping("/budget-exposure")
+    @Operation(summary = "Get project budget exposure by project, phase, and expense category")
+    public ResponseEntity<ApiResponse<List<LedgerProjectBudgetResponse>>> getBudgetExposure() {
+        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getBudgetExposure()));
     }
 
     @GetMapping

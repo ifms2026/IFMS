@@ -13,39 +13,61 @@ import com.mkwang.backend.modules.accounting.entity.Payslip;
 import com.mkwang.backend.modules.request.entity.AdvanceBalance;
 import com.mkwang.backend.modules.request.entity.Request;
 import com.mkwang.backend.modules.request.repository.AdvanceBalanceRepository;
+import com.mkwang.backend.modules.request.repository.RequestRepository;
 import com.mkwang.backend.modules.request.dto.response.AdvanceSettlementAllocationResponse;
+import com.mkwang.backend.modules.project.entity.ExpenseCategory;
+import com.mkwang.backend.modules.project.entity.PhaseCategoryBudget;
+import com.mkwang.backend.modules.project.entity.Project;
+import com.mkwang.backend.modules.project.entity.ProjectPhase;
+import com.mkwang.backend.modules.project.repository.ExpenseCategoryRepository;
+import com.mkwang.backend.modules.project.repository.PhaseCategoryBudgetRepository;
+import com.mkwang.backend.modules.project.repository.ProjectPhaseRepository;
+import com.mkwang.backend.modules.project.repository.ProjectRepository;
 import com.mkwang.backend.modules.wallet.entity.Transaction;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import com.mkwang.backend.modules.user.entity.User;
 
 @Service
 @RequiredArgsConstructor
 public class AccountingJournalServiceImpl implements AccountingJournalService {
     private static final String ACCOUNT_ADVANCE = "ADVANCE_RECEIVABLE";
-    private static final String ACCOUNT_PROJECT_WALLET = "PROJECT_WALLET";
     private static final String ACCOUNT_EXPENSE = "PROJECT_EXPENSE";
     private static final String ACCOUNT_EMPLOYEE_PAYABLE = "EMPLOYEE_REIMBURSEMENT_PAYABLE";
     private static final String ACCOUNT_PAYROLL_EXPENSE = "PAYROLL_EXPENSE";
     private static final String ACCOUNT_PAYROLL_DEDUCTION = "PAYROLL_DEDUCTION_CLEARING";
     private static final String ACCOUNT_COMPANY_FUND = "COMPANY_FUND_WALLET";
+    private static final String ACCOUNT_EXTERNAL_BANK = "EXTERNAL_BANK_CASH";
+    private static final String ACCOUNT_DEPARTMENT_WALLET = "DEPARTMENT_WALLET";
+    private static final String ACCOUNT_PROJECT_WALLET = "PROJECT_WALLET";
 
     private final AccountingJournalRepository journalRepository;
     private final AdvanceBalanceRepository advanceBalanceRepository;
+    private final RequestRepository requestRepository;
+    private final ProjectRepository projectRepository;
+    private final ProjectPhaseRepository projectPhaseRepository;
+    private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
+    private final ExpenseCategoryRepository expenseCategoryRepository;
 
     @Override
     @Transactional
@@ -60,6 +82,62 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                                 "Khoản nhân viên còn phải quyết toán tăng", balance.getId(), request.getId(), employeeId, projectId),
                         credit(ACCOUNT_PROJECT_WALLET, "Tiền trong ví dự án", transaction.getAmount(),
                                 "Tiền trong ví dự án giảm khi giải ngân", balance.getId(), request.getId(), employeeId, projectId)));
+    }
+
+    @Override
+    @Transactional
+    public void recordSystemTopup(Transaction transaction) {
+        BigDecimal amount = transaction.getAmount();
+        String description = "Nạp tiền từ nguồn ngân hàng vào quỹ công ty";
+        if (transaction.getPaymentRef() != null && !transaction.getPaymentRef().isBlank()) {
+            description += " · mã đối soát " + transaction.getPaymentRef();
+        }
+        saveJournal(AccountingJournalEvent.SYSTEM_TOPUP, "TRANSACTION", transaction.getId(), null, null,
+                null, null, null, null, transaction.getId(), amount,
+                transaction.getDescription() == null || transaction.getDescription().isBlank()
+                        ? description : transaction.getDescription() + " · " + description,
+                List.of(
+                        debit(ACCOUNT_COMPANY_FUND, "Quỹ công ty", amount,
+                                "Tiền vào ví quỹ công ty tăng", null, null, null, null),
+                        credit(ACCOUNT_EXTERNAL_BANK, "Tiền tại ngân hàng/nguồn bên ngoài", amount,
+                                "Tiền tại nguồn bên ngoài giảm khi chuyển vào quỹ IFMS", null, null, null, null)));
+    }
+
+    @Override
+    @Transactional
+    public void recordDepartmentAllocation(Request request, Transaction transaction, String departmentName) {
+        BigDecimal amount = transaction.getAmount();
+        Long projectId = null;
+        String requestCode = request.getRequestCode();
+        saveJournal(AccountingJournalEvent.DEPARTMENT_ALLOCATION, "REQUEST", request.getId(), request.getId(), null,
+                request.getRequester().getId(), request.getRequester().getFullName(), projectId, null,
+                transaction.getId(), amount, "Cấp ngân sách cho phòng ban " + departmentName + " · " + requestCode,
+                List.of(
+                        debit(ACCOUNT_DEPARTMENT_WALLET, "Quỹ phòng ban: " + departmentName, amount,
+                                "Số dư quỹ phòng ban tăng do được cấp ngân sách", null, request.getId(),
+                                request.getRequester().getId(), null),
+                        credit(ACCOUNT_COMPANY_FUND, "Quỹ công ty", amount,
+                                "Số dư quỹ công ty giảm khi phân bổ ngân sách nội bộ", null, request.getId(),
+                                request.getRequester().getId(), null)));
+    }
+
+    @Override
+    @Transactional
+    public void recordProjectAllocation(Request request, Transaction transaction, String departmentName) {
+        BigDecimal amount = transaction.getAmount();
+        Long projectId = request.getProject().getId();
+        String projectName = request.getProject().getName();
+        saveJournal(AccountingJournalEvent.PROJECT_ALLOCATION, "REQUEST", request.getId(), request.getId(), null,
+                request.getRequester().getId(), request.getRequester().getFullName(), projectId, projectName,
+                transaction.getId(), amount, "Cấp vốn dự án " + projectName + " từ phòng ban " + departmentName
+                        + " · " + request.getRequestCode(),
+                List.of(
+                        debit(ACCOUNT_PROJECT_WALLET, "Quỹ dự án: " + projectName, amount,
+                                "Số dư quỹ dự án tăng do nhận phân bổ nội bộ", null, request.getId(),
+                                request.getRequester().getId(), projectId),
+                        credit(ACCOUNT_DEPARTMENT_WALLET, "Quỹ phòng ban: " + departmentName, amount,
+                                "Số dư quỹ phòng ban giảm khi cấp vốn cho dự án", null, request.getId(),
+                                request.getRequester().getId(), projectId)));
     }
 
     @Override
@@ -171,10 +249,11 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
-    public PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event, LocalDate from, LocalDate to, int page, int limit) {
+    public PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event, LocalDate from, LocalDate to,
+            Long employeeId, Long projectId, Long requestId, int page, int limit) {
         validatePage(from, to, page, limit);
         Page<AccountingJournal> result = journalRepository.findAll(
-                AccountingJournalSpecification.filter(event, from, to),
+                AccountingJournalSpecification.filter(event, from, to, employeeId, projectId, requestId),
                 PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "postingDate").and(Sort.by(Sort.Direction.DESC, "id"))));
         List<AccountingJournalItemResponse> items = result.getContent().stream().map(this::toItem).toList();
         return PageResponse.<AccountingJournalItemResponse>builder().items(items).total(result.getTotalElements())
@@ -201,7 +280,8 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 journal.getPostingDate(), journal.getPostingPeriod(), journal.getDescription(), journal.getSourceType(),
                 journal.getSourceId(), journal.getRequestId(), journal.getAdvanceBalanceId(), journal.getEmployeeId(),
                 journal.getEmployeeName(), journal.getProjectId(), journal.getProjectName(), journal.getWalletTransactionId(),
-                journal.getTotalAmount(), debit.compareTo(credit) == 0, debit, credit, lines);
+                journal.getTotalAmount(), debit.compareTo(credit) == 0, debit, credit, lines,
+                journal.getCreatedByUserId(), journal.getCreatedByName(), journal.getCreatedAt());
     }
 
     @Override
@@ -225,6 +305,89 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                     user.getDepartment() == null ? null : user.getDepartment().getName(),
                     balances.size(), totalDisbursed, totalRemaining, details);
         }).sorted(Comparator.comparing(AdvanceEmployeeSummaryResponse::totalRemaining).reversed()).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public List<LedgerProjectBudgetResponse> getBudgetExposure() {
+        Map<ScopeKey, BigDecimal> lockedByScope = new LinkedHashMap<>();
+        for (Object[] row : requestRepository.sumActiveReservationsForLedger()) {
+            ScopeKey key = new ScopeKey(((Number) row[0]).longValue(),
+                    row[1] == null ? null : ((Number) row[1]).longValue(),
+                    row[2] == null ? null : ((Number) row[2]).longValue());
+            lockedByScope.put(key, nz((BigDecimal) row[3]));
+        }
+
+        Map<ScopeKey, BigDecimal> advancesByScope = new LinkedHashMap<>();
+        for (AdvanceBalance balance : advanceBalanceRepository.findByStatusNotOrderByCreatedAtAscIdAsc(
+                com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)) {
+            if (balance.getRemainingAmount() == null || balance.getRemainingAmount().signum() <= 0) continue;
+            Request request = balance.getAdvanceRequest();
+            if (request.getProject() == null) continue;
+            ScopeKey key = new ScopeKey(request.getProject().getId(),
+                    request.getPhase() == null ? null : request.getPhase().getId(),
+                    request.getCategory() == null ? null : request.getCategory().getId());
+            advancesByScope.merge(key, balance.getRemainingAmount(), BigDecimal::add);
+        }
+
+        List<LedgerProjectBudgetResponse> result = new ArrayList<>();
+        for (Project project : projectRepository.findAllByOrderByCreatedAtDesc()) {
+            Long projectId = project.getId();
+            BigDecimal projectLocked = sumForProject(lockedByScope, projectId);
+            BigDecimal projectAdvances = sumForProject(advancesByScope, projectId);
+            List<LedgerPhaseBudgetResponse> phases = new ArrayList<>();
+            for (ProjectPhase phase : projectPhaseRepository.findByProject_IdOrderByCreatedAtAsc(projectId)) {
+                Long phaseId = phase.getId();
+                List<LedgerCategoryBudgetResponse> categories = new ArrayList<>();
+                Map<Long, PhaseCategoryBudget> categoryBudgets = new LinkedHashMap<>();
+                for (PhaseCategoryBudget categoryBudget : phaseCategoryBudgetRepository.findByIdPhaseId(phaseId)) {
+                    categoryBudgets.put(categoryBudget.getCategory().getId(), categoryBudget);
+                }
+                Set<Long> categoryIds = new LinkedHashSet<>(categoryBudgets.keySet());
+                addCategoryIds(categoryIds, lockedByScope, projectId, phaseId);
+                addCategoryIds(categoryIds, advancesByScope, projectId, phaseId);
+                Map<Long, ExpenseCategory> expenseCategories = new LinkedHashMap<>();
+                expenseCategoryRepository.findAllById(categoryIds)
+                        .forEach(category -> expenseCategories.put(category.getId(), category));
+                for (Long categoryId : categoryIds) {
+                    ScopeKey scope = new ScopeKey(projectId, phaseId, categoryId);
+                    PhaseCategoryBudget categoryBudget = categoryBudgets.get(categoryId);
+                    ExpenseCategory category = expenseCategories.get(categoryId);
+                    if (category == null) continue;
+                    categories.add(new LedgerCategoryBudgetResponse(categoryId, category.getName(),
+                            categoryBudget == null ? BigDecimal.ZERO : nz(categoryBudget.getBudgetLimit()),
+                            categoryBudget == null ? BigDecimal.ZERO : nz(categoryBudget.getCurrentSpent()),
+                            lockedByScope.getOrDefault(scope, BigDecimal.ZERO),
+                            advancesByScope.getOrDefault(scope, BigDecimal.ZERO)));
+                }
+                BigDecimal phaseLocked = sumForPhase(lockedByScope, projectId, phaseId);
+                BigDecimal phaseAdvances = sumForPhase(advancesByScope, projectId, phaseId);
+                phases.add(new LedgerPhaseBudgetResponse(phaseId, phase.getName(), nz(phase.getBudgetLimit()),
+                        nz(phase.getCurrentSpent()), phaseLocked, phaseAdvances, categories));
+            }
+            result.add(new LedgerProjectBudgetResponse(projectId, project.getProjectCode(), project.getName(),
+                    nz(project.getTotalBudget()), nz(project.getAvailableBudget()), nz(project.getTotalSpent()),
+                    projectLocked, projectAdvances, phases));
+        }
+        return result;
+    }
+
+    private BigDecimal sumForProject(Map<ScopeKey, BigDecimal> values, Long projectId) {
+        return values.entrySet().stream().filter(entry -> entry.getKey().projectId().equals(projectId))
+                .map(Map.Entry::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal sumForPhase(Map<ScopeKey, BigDecimal> values, Long projectId, Long phaseId) {
+        return values.entrySet().stream().filter(entry -> entry.getKey().projectId().equals(projectId)
+                        && java.util.Objects.equals(entry.getKey().phaseId(), phaseId))
+                .map(Map.Entry::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private void addCategoryIds(Set<Long> categoryIds, Map<ScopeKey, BigDecimal> values, Long projectId, Long phaseId) {
+        values.keySet().stream().filter(key -> key.projectId().equals(projectId)
+                        && java.util.Objects.equals(key.phaseId(), phaseId) && key.categoryId() != null)
+                .map(ScopeKey::categoryId).forEach(categoryIds::add);
     }
 
     private AdvanceBalanceDetailResponse toAdvanceDetail(AdvanceBalance balance) {
@@ -254,7 +417,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 journal.getPostingDate(), journal.getPostingPeriod(), journal.getDescription(), journal.getSourceType(),
                 journal.getSourceId(), journal.getRequestId(), journal.getAdvanceBalanceId(), journal.getEmployeeId(),
                 journal.getEmployeeName(), journal.getProjectId(), journal.getProjectName(), journal.getWalletTransactionId(),
-                journal.getTotalAmount(), true);
+                journal.getTotalAmount(), true, journal.getCreatedByUserId(), journal.getCreatedByName(), journal.getCreatedAt());
     }
 
     private AccountingJournal saveJournal(AccountingJournalEvent event, String sourceType, Long uniqueSourceId,
@@ -270,13 +433,15 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
         if (totalAmount == null || totalAmount.signum() <= 0) throw new BadRequestException("Journal amount must be positive");
 
         LocalDate postingDate = LocalDate.now();
+        ActorSnapshot actor = currentActor();
         AccountingJournal journal = AccountingJournal.builder()
                 .journalCode("JRN-" + postingDate.toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .eventType(event).postingDate(postingDate).postingPeriod(YearMonth.from(postingDate).toString())
                 .description(description).sourceType(sourceType).sourceId(sourceId).requestId(requestId)
                 .advanceBalanceId(advanceBalanceId).employeeId(employeeId).employeeName(employeeName)
                 .projectId(projectId).projectName(projectName).walletTransactionId(walletTransactionId)
-                .totalAmount(totalAmount).build();
+                .totalAmount(totalAmount).createdByUserId(actor.userId()).createdByName(actor.name())
+                .createdAt(Instant.now()).build();
         for (int i = 0; i < drafts.size(); i++) {
             LineDraft draft = drafts.get(i);
             journal.getLines().add(AccountingJournalLine.builder().journal(journal).lineNumber(i + 1)
@@ -305,6 +470,17 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
 
     private BigDecimal nz(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
 
+    private ActorSnapshot currentActor() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) return new ActorSnapshot(null, "system");
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof User user) return new ActorSnapshot(user.getId(), user.getFullName());
+        String name = authentication.getName();
+        return new ActorSnapshot(null, name == null || name.isBlank() || "anonymousUser".equals(name) ? "system" : name);
+    }
+
     private record LineDraft(String accountCode, String accountName, BigDecimal debit, BigDecimal credit,
             String effect, Long advanceBalanceId, Long requestId, Long employeeId, Long projectId) {}
+    private record ActorSnapshot(Long userId, String name) {}
+    private record ScopeKey(Long projectId, Long phaseId, Long categoryId) {}
 }

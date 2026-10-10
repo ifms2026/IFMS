@@ -12,11 +12,22 @@ import com.mkwang.backend.modules.request.entity.RequestStatus;
 import com.mkwang.backend.modules.request.entity.RequestType;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpecificationExecutor<Request> {
+
+    @Query("""
+            SELECT r.project.id, r.phase.id, r.category.id, COALESCE(SUM(r.reservedAmount), 0)
+            FROM Request r
+            WHERE r.project IS NOT NULL
+              AND r.reservedAmount > 0
+              AND r.status IN ('APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
+            GROUP BY r.project.id, r.phase.id, r.category.id
+            """)
+    List<Object[]> sumActiveReservationsForLedger();
 
     @Query("""
             SELECT r.status, COUNT(r) FROM Request r

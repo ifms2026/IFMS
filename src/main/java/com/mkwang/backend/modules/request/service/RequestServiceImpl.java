@@ -352,6 +352,8 @@ public class RequestServiceImpl implements RequestService {
                     return com.mkwang.backend.modules.request.dto.response.AdvanceBalanceItem.builder()
                             .id(ab.getId())
                             .requestCode(advance.getRequestCode())
+                        .disbursedDate(advance.getPaidAt() == null
+                            ? null : advance.getPaidAt().toLocalDate())
                             .originalAmount(ab.getOriginalAmount())
                             .remainingAmount(ab.getRemainingAmount())
                             .status(ab.getStatus())
@@ -612,7 +614,7 @@ public class RequestServiceImpl implements RequestService {
                 .build());
 
         Long projectId = request.getProject().getId();
-        walletService.transfer(
+        var allocationTransaction = walletService.transfer(
                 WalletOwnerType.DEPARTMENT, departmentId,
                 WalletOwnerType.PROJECT, projectId,
                 effectiveAmount,
@@ -634,6 +636,9 @@ public class RequestServiceImpl implements RequestService {
                 .build());
 
         requestRepository.save(request);
+        String departmentName = request.getRequester().getDepartment() == null
+                ? "Phòng ban không xác định" : request.getRequester().getDepartment().getName();
+        accountingJournalService.recordProjectAllocation(request, allocationTransaction, departmentName);
 
         notify(request.getRequester(), "PROJECT_TOPUP_APPROVED",
                 "Yêu cầu nạp quỹ dự án được duyệt",
@@ -760,7 +765,7 @@ public class RequestServiceImpl implements RequestService {
         CfoApproveResponse response = requestMapper.toCfoApproveResponse(request, req.getComment());
 
         Long departmentId = request.getRequester().getDepartment().getId();
-        walletService.transfer(
+        var allocationTransaction = walletService.transfer(
                 WalletOwnerType.COMPANY_FUND, 1L,
                 WalletOwnerType.DEPARTMENT, departmentId,
                 effectiveAmount,
@@ -780,6 +785,9 @@ public class RequestServiceImpl implements RequestService {
                 .build());
 
         requestRepository.save(request);
+        String departmentName = request.getRequester().getDepartment() == null
+                ? "Phòng ban không xác định" : request.getRequester().getDepartment().getName();
+        accountingJournalService.recordDepartmentAllocation(request, allocationTransaction, departmentName);
 
         notify(request.getRequester(), "DEPT_TOPUP_APPROVED",
                 "Yêu cầu nạp ngân sách phòng ban được duyệt",

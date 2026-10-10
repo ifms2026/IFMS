@@ -6,6 +6,7 @@ import com.mkwang.backend.common.exception.BadRequestException;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalDetailResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalItemResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AdvanceEmployeeSummaryResponse;
+import com.mkwang.backend.modules.accounting.dto.response.LedgerProjectBudgetResponse;
 import com.mkwang.backend.modules.accounting.entity.AccountingJournal;
 import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 import com.mkwang.backend.modules.accounting.repository.AccountingJournalRepository;
@@ -150,8 +151,8 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event,
-            LocalDate from, LocalDate to, int page, int limit) {
-        return accountingJournalService.getJournals(event, from, to, page, limit);
+            LocalDate from, LocalDate to, Long employeeId, Long projectId, Long requestId, int page, int limit) {
+        return accountingJournalService.getJournals(event, from, to, employeeId, projectId, requestId, page, limit);
     }
 
     @Override
@@ -166,6 +167,13 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee() {
         return accountingJournalService.getOutstandingAdvancesByEmployee();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public List<LedgerProjectBudgetResponse> getBudgetExposure() {
+        return accountingJournalService.getBudgetExposure();
     }
 
     // ─────────────────────────────────────────────────────────────────

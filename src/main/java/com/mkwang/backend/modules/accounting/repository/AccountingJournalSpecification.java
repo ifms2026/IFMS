@@ -21,7 +21,21 @@ public final class AccountingJournalSpecification {
         return (root, query, cb) -> to == null ? null : cb.lessThanOrEqualTo(root.get("postingDate"), to);
     }
 
-    public static Specification<AccountingJournal> filter(AccountingJournalEvent event, LocalDate from, LocalDate to) {
-        return Specification.where(hasEvent(event)).and(postedOnOrAfter(from)).and(postedOnOrBefore(to));
+    public static Specification<AccountingJournal> hasEmployee(Long employeeId) {
+        return (root, query, cb) -> employeeId == null ? null : cb.equal(root.get("employeeId"), employeeId);
+    }
+
+    public static Specification<AccountingJournal> hasProject(Long projectId) {
+        return (root, query, cb) -> projectId == null ? null : cb.equal(root.get("projectId"), projectId);
+    }
+
+    public static Specification<AccountingJournal> hasRequest(Long requestId) {
+        return (root, query, cb) -> requestId == null ? null : cb.equal(root.get("requestId"), requestId);
+    }
+
+    public static Specification<AccountingJournal> filter(AccountingJournalEvent event, LocalDate from, LocalDate to,
+            Long employeeId, Long projectId, Long requestId) {
+        return Specification.where(hasEvent(event)).and(postedOnOrAfter(from)).and(postedOnOrBefore(to))
+                .and(hasEmployee(employeeId)).and(hasProject(projectId)).and(hasRequest(requestId));
     }
 }

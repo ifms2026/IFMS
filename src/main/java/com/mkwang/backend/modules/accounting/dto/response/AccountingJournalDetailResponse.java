@@ -4,6 +4,7 @@ import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.List;
 
 public record AccountingJournalDetailResponse(
@@ -26,5 +27,8 @@ public record AccountingJournalDetailResponse(
         boolean balanced,
         BigDecimal totalDebit,
         BigDecimal totalCredit,
-        List<AccountingJournalLineResponse> lines
+        List<AccountingJournalLineResponse> lines,
+        Long createdByUserId,
+        String createdByName,
+        Instant createdAt
 ) {}

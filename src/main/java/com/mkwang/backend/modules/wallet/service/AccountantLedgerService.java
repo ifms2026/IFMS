@@ -8,6 +8,7 @@ import com.mkwang.backend.modules.wallet.dto.response.AccountantWalletTransactio
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalDetailResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingJournalItemResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AdvanceEmployeeSummaryResponse;
+import com.mkwang.backend.modules.accounting.dto.response.LedgerProjectBudgetResponse;
 import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 import com.mkwang.backend.modules.wallet.entity.ReferenceType;
 import com.mkwang.backend.modules.wallet.entity.TransactionStatus;
@@ -29,11 +30,13 @@ public interface AccountantLedgerService {
             TransactionStatus status, ReferenceType referenceType, LocalDate from, LocalDate to, int page, int limit);
 
     PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event,
-            LocalDate from, LocalDate to, int page, int limit);
+            LocalDate from, LocalDate to, Long employeeId, Long projectId, Long requestId, int page, int limit);
 
     AccountingJournalDetailResponse getJournalDetail(Long journalId);
 
     List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee();
+
+    List<LedgerProjectBudgetResponse> getBudgetExposure();
 
     AccountantTransactionDetailResponse getTransactionDetail(Long transactionId);
 }
