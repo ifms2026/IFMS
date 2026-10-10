@@ -194,6 +194,9 @@ app:
   demo:
     reset-accounts-on-startup: ${DEMO_RESET_ACCOUNTS_ON_STARTUP:true}
     reset-payroll-wallets-on-startup: ${DEMO_RESET_PAYROLL_WALLETS_ON_STARTUP:true}
+    # Giữ phase demo PH-IMPL-02 luôn ACTIVE (ngày tính theo hôm nay) để luôn tạo được yêu cầu chi
+    keep-active-phase: ${DEMO_KEEP_ACTIVE_PHASE:true}
+    active-phase-days-ahead: ${DEMO_ACTIVE_PHASE_DAYS_AHEAD:90}
   notification:
     cleanup-cron: ${NOTIFICATION_CLEANUP_CRON:0 0 0 * * *} # Xóa notification đã đọc lúc 00:00 mỗi ngày
 
@@ -204,6 +207,25 @@ app:
     company-account: ${COMPANY_BANK_ACCOUNT:9704366000000001}
     connect-timeout-ms: ${BANK_CONNECT_TIMEOUT_MS:5000}
     read-timeout-ms: ${BANK_READ_TIMEOUT_MS:10000}
+
+  # ── AI receipt scan (đọc chứng từ, tự điền form tạo yêu cầu) ──────
+  # provider=gemini cần GEMINI_API_KEY (đặt trong .env); thiếu key → tính năng tự tắt, app vẫn chạy.
+  # provider=mock trả dữ liệu mẫu, dùng để demo offline / phát triển FE.
+  ai:
+    enabled: ${AI_ENABLED:true}
+    provider: ${AI_PROVIDER:gemini}
+    timeout-ms: ${AI_TIMEOUT_MS:20000}
+    max-calls-per-user-per-day: ${AI_MAX_CALLS_PER_DAY:30}
+    cache-ttl-hours: ${AI_CACHE_TTL_HOURS:168}
+    amount-mismatch-percent: ${AI_AMOUNT_MISMATCH_PERCENT:2}
+    max-invoice-age-days: ${AI_MAX_INVOICE_AGE_DAYS:180}
+    max-amount: ${AI_MAX_AMOUNT:1000000000}
+    gemini:
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-flash-latest}
+      # Thử lần lượt khi model chính quá tải (503/5xx), bị giới hạn (429) hoặc không còn cấp cho key (404)
+      fallback-models: ${GEMINI_FALLBACK_MODELS:gemini-flash-lite-latest}
 
   # ── Cache TTL per cache name ─────────────────────────────────────
   cache:

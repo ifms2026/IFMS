@@ -8,6 +8,8 @@ import com.mkwang.backend.common.exception.ResourceNotFoundException;
 import com.mkwang.backend.common.exception.UnauthorizedException;
 import com.mkwang.backend.common.utils.businesscodegenerator.BusinessCodeGenerator;
 import com.mkwang.backend.common.utils.businesscodegenerator.BusinessCodeType;
+import com.mkwang.backend.modules.ai.dto.request.ExtractionAttachmentLinkRequest;
+import com.mkwang.backend.modules.ai.service.ReceiptExtractionService;
 import com.mkwang.backend.modules.file.dto.request.FileStorageRequest;
 import com.mkwang.backend.modules.file.entity.FileStorage;
 import com.mkwang.backend.modules.file.service.FileStorageService;
@@ -110,6 +112,7 @@ public class RequestServiceImpl implements RequestService {
     private final WalletService walletService;
     private final NotificationPublisher notificationPublisher;
     private final AccountingJournalService accountingJournalService;
+    private final ReceiptExtractionService receiptExtractionService;
 
     @Override
     @Transactional(readOnly = true)
@@ -239,6 +242,7 @@ public class RequestServiceImpl implements RequestService {
 
         savedFiles.forEach(request::addAttachment);
         Request saved = requestRepository.save(request);
+        linkReceiptExtractions(req.getAttachments(), savedFiles, saved, userId);
 
         // Flow 1: ADVANCE/EXPENSE/REIMBURSE → notify Team Leader(s) of the project
         if (FLOW1_TYPES.contains(req.getType()) && project != null) {
@@ -343,13 +347,22 @@ public class RequestServiceImpl implements RequestService {
         return advanceBalanceRepository
                 .findByUserIdAndStatusNot(userId, com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)
                 .stream()
-                .map(ab -> com.mkwang.backend.modules.request.dto.response.AdvanceBalanceItem.builder()
-                        .id(ab.getId())
-                        .requestCode(ab.getAdvanceRequest().getRequestCode())
-                        .originalAmount(ab.getOriginalAmount())
-                        .remainingAmount(ab.getRemainingAmount())
-                        .status(ab.getStatus())
-                        .build())
+                .map(ab -> {
+                    Request advance = ab.getAdvanceRequest();
+                    return com.mkwang.backend.modules.request.dto.response.AdvanceBalanceItem.builder()
+                            .id(ab.getId())
+                            .requestCode(advance.getRequestCode())
+                            .originalAmount(ab.getOriginalAmount())
+                            .remainingAmount(ab.getRemainingAmount())
+                            .status(ab.getStatus())
+                            .projectId(advance.getProject() != null ? advance.getProject().getId() : null)
+                            .projectName(advance.getProject() != null ? advance.getProject().getName() : null)
+                            .phaseId(advance.getPhase() != null ? advance.getPhase().getId() : null)
+                            .phaseName(advance.getPhase() != null ? advance.getPhase().getName() : null)
+                            .categoryId(advance.getCategory() != null ? advance.getCategory().getId() : null)
+                            .categoryName(advance.getCategory() != null ? advance.getCategory().getName() : null)
+                            .build();
+                })
                 .collect(java.util.stream.Collectors.toList());
     }
 
@@ -1118,6 +1131,27 @@ public class RequestServiceImpl implements RequestService {
 
         if (!allowed) {
             throw new BadRequestException("Role " + roleName + " is not allowed to create request type " + type);
+        }
+    }
+
+    /**
+     * Links AI receipt extractions to the new request. savedFiles is in the same order as the
+     * attachments (FileStorageService.saveAll keeps input order). Never blocks request creation.
+     */
+    private void linkReceiptExtractions(List<AttachmentRequest> attachments, List<FileStorage> savedFiles,
+                                        Request saved, Long userId) {
+        if (attachments == null || attachments.isEmpty()) {
+            return;
+        }
+        List<ExtractionAttachmentLinkRequest> links = new java.util.ArrayList<>();
+        for (int i = 0; i < attachments.size() && i < savedFiles.size(); i++) {
+            Long extractionId = attachments.get(i).getExtractionId();
+            if (extractionId != null) {
+                links.add(new ExtractionAttachmentLinkRequest(extractionId, savedFiles.get(i).getId()));
+            }
+        }
+        if (!links.isEmpty()) {
+            receiptExtractionService.linkToRequest(userId, saved.getId(), saved.getAmount(), links);
         }
     }
 

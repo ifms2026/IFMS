@@ -19,5 +19,8 @@ public class AttachmentRequest {
 
     private String fileType;
     private Long size;
+
+    /** Optional: id returned by POST /ai/receipts/extract for this file. */
+    private Long extractionId;
 }
 

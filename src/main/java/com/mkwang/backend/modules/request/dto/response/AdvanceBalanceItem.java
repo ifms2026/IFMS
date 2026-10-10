@@ -15,4 +15,12 @@ public class AdvanceBalanceItem {
     private BigDecimal originalAmount;
     private BigDecimal remainingAmount;
     private AdvanceBalanceStatus status;
+
+    // Project / phase / category of the original advance — pre-filled on the reimbursement form
+    private Long projectId;
+    private String projectName;
+    private Long phaseId;
+    private String phaseName;
+    private Long categoryId;
+    private String categoryName;
 }

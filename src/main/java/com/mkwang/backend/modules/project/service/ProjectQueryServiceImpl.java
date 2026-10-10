@@ -3,6 +3,7 @@ package com.mkwang.backend.modules.project.service;
 import com.mkwang.backend.common.exception.BadRequestException;
 import com.mkwang.backend.common.exception.ResourceNotFoundException;
 import com.mkwang.backend.common.exception.UnauthorizedException;
+import com.mkwang.backend.modules.project.dto.response.ExpenseCategoryCandidateResponse;
 import com.mkwang.backend.modules.project.dto.response.ExpenseCategoryListResponse;
 import com.mkwang.backend.modules.project.dto.response.ExpenseCategoryOptionResponse;
 import com.mkwang.backend.modules.project.dto.response.ExpenseCategoryResponse;
@@ -139,6 +140,20 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
                 .toList();
 
         return new ExpenseCategoryListResponse(items);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExpenseCategoryCandidateResponse> getPhaseCategoryCandidates(User currentUser, Long phaseId) {
+        ProjectPhase phase = projectPhaseRepository.findById(phaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectPhase", "id", phaseId));
+        assertProjectAccess(currentUser, phase.getProject());
+
+        return phaseCategoryBudgetRepository.findByIdPhaseId(phaseId).stream()
+                .map(PhaseCategoryBudget::getCategory)
+                .sorted(Comparator.comparing(ExpenseCategory::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(c -> new ExpenseCategoryCandidateResponse(c.getId(), c.getName(), c.getDescription()))
+                .toList();
     }
 
     @Override

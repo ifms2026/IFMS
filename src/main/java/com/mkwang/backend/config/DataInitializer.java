@@ -37,6 +37,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -110,6 +111,12 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${app.demo.reset-payroll-wallets-on-startup:true}")
     private boolean resetDemoPayrollWalletsOnStartup;
 
+    @Value("${app.demo.keep-active-phase:true}")
+    private boolean keepActiveDemoPhase;
+
+    @Value("${app.demo.active-phase-days-ahead:90}")
+    private long activeDemoPhaseDaysAhead;
+
     private record DemoPayrollAccount(String email, BigDecimal netSalary) {}
 
     // =========================================================
@@ -132,6 +139,7 @@ public class DataInitializer implements CommandLineRunner {
         initSystemConfigs();
         initExpenseCategories();
         initProjects();
+        ensureActiveDemoPhase();
         normalizeProjectPhaseStatuses();
 
         log.info("╔══════════════════════════════════════════╗");
@@ -502,7 +510,8 @@ public class DataInitializer implements CommandLineRunner {
                 new Object[]{"Travel & Accommodation", "Công tác phí, di chuyển, khách sạn, vé máy bay"},
                 new Object[]{"Equipment & Software", "Mua sắm thiết bị, bản quyền phần mềm, server, license"},
                 new Object[]{"Meals & Entertainment", "Ăn uống, tiếp khách, team building, sự kiện"},
-                new Object[]{"Outsourcing & Services", "Thuê ngoài, dịch vụ tư vấn, freelancer"}
+                new Object[]{"Outsourcing & Services", "Thuê ngoài, dịch vụ tư vấn, freelancer"},
+                new Object[]{"Office Supplies", "Văn phòng phẩm, giấy in, mực in, dụng cụ và vật tư văn phòng"}
         );
 
         for (Object[] row : categories) {
@@ -602,6 +611,87 @@ public class DataInitializer implements CommandLineRunner {
         setPhaseCategoryBudgetIfAbsent(phase, catOutsource, new BigDecimal( "80000000")); //  80 triệu
         setPhaseCategoryBudgetIfAbsent(phase, catMeals,     new BigDecimal( "40000000")); //  40 triệu
         setPhaseCategoryBudgetIfAbsent(phase, catTravel,    new BigDecimal( "30000000")); //  30 triệu
+    }
+
+    // =========================================================
+    // ROLLING DEMO PHASE
+    // =========================================================
+    // Seed phases use fixed dates, so they expire as time passes and
+    // normalizeProjectPhaseStatuses() closes them — leaving the ERP project
+    // without an ACTIVE phase and employees unable to create expense requests.
+    //
+    // PH-IMPL-02 keeps its dates relative to today (start = today − 30 days,
+    // end = today + app.demo.active-phase-days-ahead), so the demo always has
+    // an ACTIVE phase. It only becomes the current phase when the project has
+    // no other phase still running, so a phase set up by a Team Leader wins.
+    // =========================================================
+    private static final String DEMO_ACTIVE_PHASE_CODE = "PH-IMPL-02";
+
+    private void ensureActiveDemoPhase() {
+        if (!keepActiveDemoPhase) {
+            return;
+        }
+        Project project = projectRepository.findAll().stream()
+                .filter(p -> "PRJ-ERP-2026".equals(p.getProjectCode()))
+                .findFirst()
+                .orElse(null);
+        if (project == null) {
+            return;
+        }
+        log.info("── Ensuring an ACTIVE demo phase ...");
+
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate start = today.minusDays(30);
+        LocalDate end = today.plusDays(activeDemoPhaseDaysAhead);
+
+        ProjectPhase phase = createPhaseIfNotExists(
+                DEMO_ACTIVE_PHASE_CODE,
+                "Phase 2 – Triển Khai & Kiểm Thử",
+                project,
+                new BigDecimal("150000000"), // 150 triệu — tổng các phase = tổng ngân sách dự án (500 triệu)
+                start,
+                end
+        );
+
+        // Budgets for every system category, so any expense type can be submitted (total = 150 triệu)
+        Map<String, BigDecimal> limits = Map.of(
+                "Equipment & Software", new BigDecimal("50000000"),
+                "Outsourcing & Services", new BigDecimal("40000000"),
+                "Meals & Entertainment", new BigDecimal("25000000"),
+                "Travel & Accommodation", new BigDecimal("20000000"),
+                "Office Supplies", new BigDecimal("15000000"));
+        limits.forEach((name, limit) -> expenseCategoryRepository.findByName(name)
+                .ifPresent(category -> setPhaseCategoryBudgetIfAbsent(phase, category, limit)));
+
+        ProjectPhase current = project.getCurrentPhase();
+        boolean otherPhaseRunning = current != null
+                && !current.getId().equals(phase.getId())
+                && current.getStatus() != PhaseStatus.CLOSED
+                && (current.getEndDate() == null || !current.getEndDate().isBefore(today));
+        if (otherPhaseRunning) {
+            log.info("   Phase {} is running — demo phase left as is", current.getPhaseCode());
+            return;
+        }
+
+        boolean changed = false;
+        if (phase.getStartDate() == null || phase.getStartDate().isAfter(today)) {
+            phase.setStartDate(start);
+            changed = true;
+        }
+        if (phase.getEndDate() == null || phase.getEndDate().isBefore(today.plusDays(30))) {
+            phase.setEndDate(end);
+            changed = true;
+        }
+        if (phase.getStatus() != PhaseStatus.ACTIVE) {
+            phase.setStatus(PhaseStatus.ACTIVE);
+            changed = true;
+        }
+        if (changed) {
+            projectPhaseRepository.save(phase);
+        }
+        project.setCurrentPhase(phase);
+        projectRepository.save(project);
+        log.info("   📋 Demo phase {} ACTIVE: {} → {}", phase.getPhaseCode(), phase.getStartDate(), phase.getEndDate());
     }
 
     // =========================================================
