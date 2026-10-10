@@ -34,7 +34,7 @@ Hệ thống **chưa có sổ cái kế toán theo tài khoản**.
 
 - **Trả lương (Payroll):** chuyển lương ròng vào ví nhân viên; khoản khấu trừ tạm
   ứng vào lương (advanceDeduct) làm giảm số dư tạm ứng.
-  
+
 - **Tra cứu và đảo giao dịch:** Kế toán xem danh sách/chi tiết giao dịch. Có nghiệp
   vụ đảo giao dịch (REVERSAL), nhưng liên kết về giao dịch gốc và chống đảo trùng
   chưa đầy đủ.
@@ -191,7 +191,7 @@ liệu bút toán và màn hình Kế toán/báo cáo. Không cần viết lại
 số lượng sáu vai trò hiện có; cần rà lại quyền xem, xác nhận chứng từ, ghi sổ và
 điều chỉnh.
 
-**Trạng thái cập nhật 06/10/2026:** Các hạng mục trong phạm vi đồ án đã được triển khai ở backend IFMS và giao diện Sổ cái: giao dịch ví gộp theo transaction, journal riêng theo tài khoản, tách xác nhận EXPENSE khỏi thanh toán hoàn chi, theo dõi tạm ứng theo nhân viên và phân biệt tiền hoàn thật với khấu trừ lương. Chi tiết API, quy tắc và giới hạn còn lại nằm trong [tài liệu triển khai sổ cái](ledger-accounting-implementation.md).
+**Trạng thái cập nhật 10/10/2026:** Ngoài luồng ADVANCE/EXPENSE/REIMBURSE/hoàn tạm ứng/payroll, code đã bổ sung journal cho SYSTEM_TOPUP và phân bổ nội bộ, audit người tạo/thời điểm, khóa sửa/xóa journal ở database, API lọc theo nhân viên/dự án/yêu cầu, tổng hợp ngân sách tách chi phí/tiền khóa/tạm ứng, và giao diện nhân viên hoàn tiền thật tại trang Ví. Backend compile và frontend build thành công; chưa áp dụng migration hoặc nghiệm thu end-to-end với database. Mapping tài khoản vẫn là mapping nội bộ cần GVHD/người phụ trách duyệt; backfill chỉ thực hiện khi đủ chứng từ. Chi tiết nằm trong [tài liệu triển khai sổ cái](ledger-accounting-implementation.md) và plan ở frontend.
 
 ### Mã nguồn đã đối chiếu
 

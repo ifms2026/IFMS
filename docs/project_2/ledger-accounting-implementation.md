@@ -1,67 +1,68 @@
-# IFMS — triển khai sổ cái và theo dõi tạm ứng
+# IFMS — triển khai sổ cái và theo dõi ngân sách/tạm ứng
 
-**Cập nhật:** 06/10/2026  
-**Phạm vi:** backend IFMS hiện tại, các API được gọi bởi trang Kế toán ở frontend.
+**Cập nhật:** 10/10/2026
+**Phạm vi:** Backend IFMS và các API được dùng bởi trang Kế toán ở frontend.
+**Trạng thái:** Code đã compile; chưa chạy migration hoặc luồng end-to-end với database.
 
-## Màn hình và dữ liệu
+## Mô hình dữ liệu và nghiệp vụ
 
-Trang Sổ cái có ba phần tra cứu riêng:
+- Transaction ghi một nghiệp vụ chuyển tiền; LedgerEntry ghi biến động số dư của từng ví.
+- AccountingJournal và AccountingJournalLine ghi tác động của nghiệp vụ lên các tài khoản nội bộ. Mỗi journal phải cân bằng và duy nhất theo event/source.
+- AdvanceBalance theo dõi phần tạm ứng còn phải quyết toán, tách riêng chứng từ hợp lệ, hoàn tiền thật, khấu trừ lương và lịch sử cũ không xác định được nguồn.
 
-1. **Giao dịch ví:** mỗi dòng là một Transaction; chi tiết liệt kê các ví tăng/giảm. Các dòng LedgerEntry là biến động ví, không phải journal theo tài khoản.
-2. **Sổ cái kế toán:** mỗi dòng là một AccountingJournal, có ngày/kỳ ghi sổ, nghiệp vụ nguồn và các dòng tài khoản. Journal được lưu cùng nghiệp vụ tạo ra, có tổng hai bên bằng nhau và có mã nguồn duy nhất để tránh ghi trùng.
-3. **Tạm ứng còn mở:** nhóm theo nhân viên, mở rộng tới từng AdvanceBalance, gồm khoản ban đầu, chứng từ đã quyết toán, tiền mặt đã hoàn, khấu trừ lương, số lịch sử chưa phân loại và số còn phải quyết toán.
+| Nghiệp vụ | Hạch toán/ghi nhận | Tiền thực tế |
+|---|---|---|
+| ADVANCE | Tăng khoản phải quyết toán, giảm quỹ dự án; chưa ghi chi phí. | Dự án → nhân viên. |
+| EXPENSE xác nhận | Tăng chi phí, tăng khoản phải hoàn nhân viên. | Chưa chuyển tiền ở bước xác nhận. |
+| EXPENSE thanh toán | Giảm khoản phải hoàn; không ghi chi phí lần hai. | Dự án → nhân viên. |
+| REIMBURSE | Tăng chi phí và giảm khoản tạm ứng đã liên kết. | Không có transfer mới. |
+| ADVANCE_RETURN | Giảm khoản tạm ứng. | Nhân viên → đúng dự án gốc; cập nhật ví và AdvanceBalance trong một transaction. |
+| Payroll advanceDeduct | Giảm khoản tạm ứng theo các allocation FIFO. | Không giả lập transfer hoàn tiền. |
+| SYSTEM_TOPUP | Tăng quỹ công ty, giảm tài khoản ngân hàng/nguồn ngoài. | Nguồn ngoài → COMPANY_FUND. |
+| DEPARTMENT_ALLOCATION | Tăng quỹ phòng ban, giảm COMPANY_FUND. | Chuyển nội bộ. |
+| PROJECT_ALLOCATION | Tăng quỹ dự án, giảm quỹ phòng ban. | Chuyển nội bộ. |
+| DEPOSIT/WITHDRAW cá nhân | Không tạo journal công ty theo quyết định đã xác nhận. | Theo dõi trong ví cá nhân. |
 
-## Quy tắc đang được thực hiện
+Các mã tài khoản cho các event mới là mapping quản trị nội bộ. Chúng chưa phải hệ thống tài khoản pháp định và cần GVHD/người phụ trách nghiệp vụ duyệt.
 
-| Nghiệp vụ | Khi nào ghi nhận | Tác động ví | Tác động số dư tạm ứng |
-|---|---|---|---|
-| Tạm ứng (ADVANCE) | Khi Kế toán giải ngân yêu cầu đã duyệt | Ví dự án → ví nhân viên | Tạo khoản phải quyết toán; chưa ghi chi phí |
-| Nhân viên tự chi (EXPENSE) | Kế toán xác nhận chứng từ hợp lệ | Chưa chuyển tiền; tiền đã được nhân viên tự chi | Không tác động |
-| Thanh toán hoàn chi (EXPENSE paid) | Khi Kế toán thanh toán khoản đã xác nhận | Ví dự án → ví nhân viên | Không ghi chi phí lần hai |
-| Quyết toán tạm ứng (REIMBURSE) | Khi Kế toán chấp nhận chứng từ gắn với tạm ứng | Không chuyển thêm tiền | Giảm khoản tạm ứng và ghi chi phí đúng một lần |
-| Hoàn tiền tạm ứng (ADVANCE_RETURN) | Khi nhân viên hoàn tiền thật qua API của mình | Ví nhân viên → đúng ví dự án gốc | Giảm khoản phải quyết toán cùng giao dịch |
-| Khấu trừ qua lương (advanceDeduct) | Khi chạy bảng lương | Không tạo giao dịch hoàn tiền giả | Phân bổ FIFO vào từng khoản tạm ứng; ghi journal lương có tham chiếu từng khoản |
-
-EXPENSE có trạng thái trung gian ACCOUNTANT_VERIFIED. Việc xác nhận chứng từ và thanh toán hoàn chi là hai thao tác khác nhau. Số đã ghi chi phí không tăng lại khi thanh toán.
-
-Khoản tiền giữ được gắn theo số tiền đã duyệt của từng yêu cầu. ADVANCE và EXPENSE chỉ được chi trong giới hạn số tiền đã giữ cho chính yêu cầu đó. REIMBURSE không giữ thêm tiền trong ví dự án vì không có lần chuyển tiền mới.
-
-## Các API được trang Sổ cái sử dụng
+## API
 
 | API | Chức năng |
 |---|---|
-| GET /api/v1/accountant/ledger/wallet-transactions | Giao dịch ví gộp theo transaction, lọc theo loại/trạng thái/nguồn/ngày |
-| GET /api/v1/accountant/ledger/summary | Tổng hợp biến động của ví COMPANY_FUND; cùng bộ lọc với danh sách |
-| GET /api/v1/accountant/ledger/journals | Danh sách journal, lọc theo nghiệp vụ và ngày |
-| GET /api/v1/accountant/ledger/journals/{journalId} | Chi tiết dòng tài khoản và kiểm tra cân bằng |
+| GET /api/v1/accountant/ledger/wallet-transactions | Giao dịch ví gộp theo transaction, lọc loại/trạng thái/nguồn/ngày |
+| GET /api/v1/accountant/ledger/summary | Tổng hợp COMPANY_FUND theo bộ lọc; số dư là snapshot hiện tại |
+| GET /api/v1/accountant/ledger/journals | Danh sách journal; lọc event, from/to, employeeId, projectId, requestId |
+| GET /api/v1/accountant/ledger/journals/{journalId} | Chi tiết journal, dòng tài khoản, tổng hai phía và audit |
 | GET /api/v1/accountant/ledger/advances/outstanding | Tạm ứng còn mở, nhóm theo nhân viên |
-| GET /api/v1/accountant/ledger/{transactionId} | Chi tiết giao dịch ví, kèm các journal liên quan nếu có |
-| POST /api/v1/accountant/disbursements/{id}/disburse | Giải ngân ADVANCE; xác nhận chứng từ EXPENSE; ghi nhận quyết toán REIMBURSE |
-| POST /api/v1/accountant/disbursements/{id}/pay | Thanh toán khoản hoàn chi EXPENSE đã xác nhận |
-| POST /api/v1/requests/my-advance-balances/{advanceBalanceId}/return | Nhân viên hoàn tiền thật về ví dự án gốc |
+| GET /api/v1/accountant/ledger/budget-exposure | Chi phí, khoản khóa và tạm ứng còn mở theo dự án/giai đoạn/danh mục |
+| GET /api/v1/accountant/ledger/{transactionId} | Chi tiết giao dịch ví và các journal liên quan |
+| GET /api/v1/requests/my-advance-balances | Khoản tạm ứng chưa quyết toán của nhân viên đang đăng nhập |
+| POST /api/v1/requests/my-advance-balances/{advanceBalanceId}/return | Hoàn tiền thật từ ví nhân viên về ví dự án gốc |
 
-Các thao tác Kế toán tiếp tục yêu cầu quyền PAYROLL_MANAGE hoặc REQUEST_PAYOUT theo endpoint; hoàn tiền tạm ứng yêu cầu chính nhân viên sở hữu khoản đó.
+Các API ghi nhận nghiệp vụ chạy trong transaction nghiệp vụ tương ứng. Bảng journal có unique event/source để chống tạo trùng; service kiểm tra cân bằng trước khi lưu.
 
-## Journal nội bộ
+## Báo cáo ngân sách và quy tắc không cộng trùng
 
-Mã tài khoản dưới đây là tên tài khoản quản trị nội bộ của IFMS để thể hiện đúng chiều tăng/giảm trong phạm vi đồ án; chúng chưa phải bảng hệ thống tài khoản pháp định:
+API budget-exposure tổng hợp riêng:
 
-- ADVANCE: tăng khoản tạm ứng phải quyết toán, giảm tiền ví dự án.
-- EXPENSE xác nhận: tăng chi phí dự án, tăng khoản phải hoàn nhân viên.
-- EXPENSE thanh toán: giảm khoản phải hoàn, giảm tiền ví dự án.
-- REIMBURSE: tăng chi phí dự án, giảm khoản tạm ứng phải quyết toán.
-- ADVANCE_RETURN: tăng tiền ví dự án, giảm khoản tạm ứng phải quyết toán.
-- Payroll: ghi chi phí lương theo các trường hiện có; tách tiền lương thực chuyển, khoản khấu trừ đang chưa phân loại và phần bù trừ tạm ứng theo từng AdvanceBalance.
+- Chi phí đã xác nhận từ bộ đếm ngân sách project/phase/category hiện hữu.
+- reservedAmount của yêu cầu được duyệt hoặc đã xác nhận chứng từ, tức tiền đang khóa theo yêu cầu.
+- remainingAmount từ AdvanceBalance, tức tạm ứng còn mở.
+- availableBudget từ Project, tức số dư quỹ dự án trong dữ liệu hiện có; tiền khóa và advance còn mở hiển thị riêng.
 
-## Dữ liệu và giới hạn
+Các trường này mô tả các trạng thái khác nhau, không cộng chung thành số “đã chi”. ADVANCE không ghi chi phí khi giải ngân. EXPENSE ghi chi phí lúc chứng từ hợp lệ được xác nhận; thanh toán sau đó không ghi chi phí lần nữa. REIMBURSE chỉ ghi chi phí theo chứng từ gắn vào advance.
 
-- Migration V19 tạo bảng journal/header-lines, lưu khoản đã giữ theo yêu cầu, và tách tiền hoàn thật, khấu trừ lương, lịch sử chưa phân loại.
-- Giá trị returned_amount cũ được chuyển nguyên vẹn vào legacy_unclassified_amount, không tự đoán đó là tiền mặt hay khấu trừ lương; số dư còn lại hiện có được giữ nguyên.
-- Sổ journal hiện bao phủ ADVANCE, EXPENSE, REIMBURSE, ADVANCE_RETURN và payroll. SYSTEM_TOPUP, nạp/rút cá nhân và phân bổ nội bộ vẫn tra cứu ở giao dịch ví, chưa tạo journal.
-- currentSpent hiện chỉ phản ánh chi phí đã xác nhận; hệ thống chưa có chỉ tiêu ngân sách riêng cho tiền đã giữ, tạm ứng đang mở và cam kết chưa giải ngân. Request.reservedAmount bảo vệ khoản giữ ở ví theo từng yêu cầu, không thay thế các chỉ tiêu ngân sách này.
-- Chưa có giao diện khóa kỳ, đảo journal hoặc thao tác hoàn tiền tạm ứng từ trang Kế toán. Giao dịch gốc không bị sửa; các trường hợp sửa sai sau kỳ cần thiết kế nghiệp vụ đảo/điều chỉnh riêng.
-- Tên tài khoản là mapping nội bộ; cần GVHD xác nhận cách trình bày phù hợp trước khi xem đây là hệ thống tài khoản hoàn chỉnh.
+## Audit, kỳ và dữ liệu lịch sử
+
+- Mỗi journal mới lưu createdByUserId, createdByName và createdAt. Khi phát sinh từ tiến trình không có người dùng, tên tác vụ có thể là system.
+- Journal lịch sử được để trống thông tin actor/time nếu không thể khôi phục đáng tin cậy.
+- Migration V19 tạo journal/header-lines, số tiền giữ trên request và các trường settlement breakdown cho AdvanceBalance.
+- Migration V20 thêm audit columns và trigger PostgreSQL chặn UPDATE/DELETE trên journal và journal lines. Dữ liệu chỉ thêm mới ở database.
+- Posting date hiện lấy từ ngày xử lý backend; kỳ là tháng tương ứng. Chưa có period close hoặc API đảo/điều chỉnh; ngày/kỳ xử lý khi phát hiện lỗi sau kỳ đóng vẫn cần chốt.
+- Chưa backfill giao dịch cũ. Chỉ làm khi có chứng từ, nguồn giao dịch và số liệu đối chiếu đủ căn cứ. Dữ liệu thiếu chứng từ phải được trình bày là legacy chưa có journal.
 
 ## Kiểm chứng
 
-Lệnh mvnw.cmd -DskipTests compile chạy thành công trên repo backend IFMS sau các thay đổi. Chưa chạy bộ kiểm thử hoặc kết nối migration với database trong phiên này.
+- mvnw.cmd -q -DskipTests compile thành công sau các thay đổi này.
+- Chưa chạy test suite hoặc API integration test.
+- Chưa áp dụng V19/V20: tại lượt kiểm tra DATABASE_URL chưa được cấu hình và Docker Engine chưa chạy. Chưa xác nhận schema, trigger, query mới hoặc số dư trên database thật.
