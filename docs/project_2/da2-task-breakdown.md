@@ -1,5 +1,7 @@
 # IFMS — Chia task phát triển Đồ án 2
 
+> **Cập nhật phạm vi ngày 18/10/2026:** Các phần sổ cái A1, import Excel A3 và việc tách demo liên quan được thay bằng [plan rà soát code hiện tại](<../../../../DA1/financial-wallet-frontend/docs/ledger-completion-and-excel-plan.md>). Không dùng lại số migration V17 hoặc thiết kế gắn tài khoản trực tiếp vào dòng ví từ kế hoạch cũ cho phần journal đã triển khai. Các hạng mục Đồ án 2 khác vẫn theo tài liệu này cho tới khi được rà soát riêng.
+
 > Bám theo phạm vi đã chốt ở [da2-improvement-request.md](da2-improvement-request.md).
 > Lập ngày 2026-09-23.
 
