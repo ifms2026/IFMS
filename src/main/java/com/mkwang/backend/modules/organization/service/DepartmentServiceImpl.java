@@ -32,6 +32,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DepartmentServiceImpl implements DepartmentService {
+    private final com.mkwang.backend.modules.wallet.service.WalletService walletService;
 
     private final DepartmentRepository departmentRepository;
     private final UserService          userService;
@@ -96,6 +97,8 @@ public class DepartmentServiceImpl implements DepartmentService {
         User manager = null;
         if (request.getManagerId() != null) {
             manager = userService.getUserById(request.getManagerId());
+            if(!"MANAGER".equals(manager.getRole().getName()) || manager.getDepartment()!=null)
+                throw new BadRequestException("Chọn quản lý chưa được gán phòng ban khi tạo phòng mới");
         }
 
         BigDecimal quota = request.getTotalProjectQuota() != null
@@ -110,7 +113,10 @@ public class DepartmentServiceImpl implements DepartmentService {
                 .totalAvailableBalance(quota)
                 .build();
 
+        if (quota.signum() < 0) throw new BadRequestException("Hạn mức không thể âm");
         dept = departmentRepository.save(dept);
+        if(manager!=null) manager.setDepartment(dept);
+        walletService.createWallet(com.mkwang.backend.modules.wallet.entity.WalletOwnerType.DEPARTMENT, dept.getId());
         log.info("Admin created department: {} ({})", name, code);
 
         return departmentMapper.toDetail(dept, List.of());
@@ -137,6 +143,9 @@ public class DepartmentServiceImpl implements DepartmentService {
             dept.setManager(null);
         } else if (request.getManagerId() != null) {
             User manager = userService.getUserById(request.getManagerId());
+            if(!"MANAGER".equals(manager.getRole().getName()) || (manager.getDepartment()!=null && !manager.getDepartment().getId().equals(id)))
+                throw new BadRequestException("Quản lý phải thuộc phòng ban này hoặc chưa được gán phòng ban");
+            manager.setDepartment(dept);
             dept.setManager(manager);
         }
 

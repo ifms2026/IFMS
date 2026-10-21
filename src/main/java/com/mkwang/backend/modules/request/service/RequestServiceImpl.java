@@ -94,6 +94,24 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class RequestServiceImpl implements RequestService {
+    @Override
+    @Transactional
+    public void lockEmployeeFinancialScope(Long userId) { userService.lockFinancialScope(userId); }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasAuthority('REQUEST_CREATE')")
+    public void validateImportRequest(CreateRequestRequest req, Long actorId) {
+        User requester = userService.getUserById(actorId);
+        validateCreateRequest(req,requester);
+        Request request = Request.builder().requester(requester).type(req.getType()).amount(req.getAmount())
+                .project(projectQueryService.getProjectEntityById(req.getProjectId()))
+                .phase(projectQueryService.getPhaseEntityById(req.getPhaseId()))
+                .category(projectQueryService.getCategoryEntityById(req.getCategoryId()))
+                .advanceBalance(req.getAdvanceBalanceId() == null ? null : advanceBalanceRepository.findById(req.getAdvanceBalanceId())
+                        .orElseThrow(() -> new ResourceNotFoundException("AdvanceBalance not found"))).build();
+        validateFinancialRequest(request,req.getAmount(),true);
+    }
 
     private static final List<RequestType> FLOW1_TYPES =
             List.of(RequestType.ADVANCE, RequestType.EXPENSE, RequestType.REIMBURSE);
@@ -109,6 +127,8 @@ public class RequestServiceImpl implements RequestService {
     private final CategoryBudgetService categoryBudgetService;
     private final BusinessCodeGenerator codeGenerator;
     private final RequestMapper requestMapper;
+    private final com.mkwang.backend.modules.accounting.service.FinancialDocumentService financialDocuments;
+    private final com.mkwang.backend.modules.accounting.service.FinancialOperationService financialOperations;
     private final WalletService walletService;
     private final NotificationPublisher notificationPublisher;
     private final AccountingJournalService accountingJournalService;
@@ -240,6 +260,7 @@ public class RequestServiceImpl implements RequestService {
                 .status(RequestStatus.PENDING)
                 .build();
 
+        validateFinancialRequest(request, request.getAmount(), true);
         savedFiles.forEach(request::addAttachment);
         Request saved = requestRepository.save(request);
         linkReceiptExtractions(req.getAttachments(), savedFiles, saved, userId);
@@ -288,6 +309,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_CREATE')")
     public RequestDetailResponse updateRequest(Long id, UpdateRequestRequest req, Long userId) {
+        lockRequest(id);
         Request request = requestRepository.findByIdAndRequesterId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
@@ -312,6 +334,7 @@ public class RequestServiceImpl implements RequestService {
             files.forEach(request::addAttachment);
         }
 
+        validateFinancialRequest(request, request.getAmount(), true);
         requestRepository.save(request);
         return getRequestDetail(id, userId);
     }
@@ -320,6 +343,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_CREATE')")
     public void cancelRequest(Long id, Long userId) {
+        lockRequest(id);
         Request request = requestRepository.findByIdAndRequesterId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
@@ -434,6 +458,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_TEAM_LEADER')")
     public TlApproveResponse approveTlRequest(Long id, Long leaderId, ApproveRequestRequest req) {
+        lockRequest(id);
         List<Long> leaderProjectIds = projectQueryService.getLeaderProjectIds(leaderId);
         if (leaderProjectIds.isEmpty()) {
             throw new ResourceNotFoundException("Request not found");
@@ -457,6 +482,7 @@ public class RequestServiceImpl implements RequestService {
             throw new BadRequestException("approvedAmount cannot exceed requested amount");
         }
 
+        validateFinancialRequest(request, effectiveAmount, true);
         request.setStatus(RequestStatus.APPROVED_BY_TEAM_LEADER);
         request.setApprovedAmount(effectiveAmount);
 
@@ -491,6 +517,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_TEAM_LEADER')")
     public TlRejectResponse rejectTlRequest(Long id, Long leaderId, RejectRequestRequest req) {
+        lockRequest(id);
         List<Long> leaderProjectIds = projectQueryService.getLeaderProjectIds(leaderId);
         if (leaderProjectIds.isEmpty()) {
             throw new ResourceNotFoundException("Request not found");
@@ -584,6 +611,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_PROJECT_TOPUP')")
     public ManagerApproveResponse approveManagerRequest(Long id, Long managerId, ApproveRequestRequest req) {
+        lockRequest(id);
         Long departmentId = getManagerDepartmentId(managerId);
 
         Request request = requestRepository.findDetailByIdForManager(id, departmentId)
@@ -614,6 +642,10 @@ public class RequestServiceImpl implements RequestService {
                 .build());
 
         Long projectId = request.getProject().getId();
+        Project lockedProject = projectQueryService.lockFinancialProject(projectId);
+        if (lockedProject.getAvailableBudget().add(lockedProject.getTotalSpent()).add(effectiveAmount).compareTo(lockedProject.getTotalBudget()) > 0) {
+            throw new BadRequestException("Cấp vốn vượt ngân sách kế hoạch của dự án");
+        }
         var allocationTransaction = walletService.transfer(
                 WalletOwnerType.DEPARTMENT, departmentId,
                 WalletOwnerType.PROJECT, projectId,
@@ -636,8 +668,7 @@ public class RequestServiceImpl implements RequestService {
                 .build());
 
         requestRepository.save(request);
-        String departmentName = request.getRequester().getDepartment() == null
-                ? "Phòng ban không xác định" : request.getRequester().getDepartment().getName();
+        String departmentName = request.getProject().getDepartment().getName();
         accountingJournalService.recordProjectAllocation(request, allocationTransaction, departmentName);
 
         notify(request.getRequester(), "PROJECT_TOPUP_APPROVED",
@@ -653,6 +684,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_PROJECT_TOPUP')")
     public ManagerRejectResponse rejectManagerRequest(Long id, Long managerId, RejectRequestRequest req) {
+        lockRequest(id);
         Long departmentId = getManagerDepartmentId(managerId);
 
         Request request = requestRepository.findDetailByIdForManager(id, departmentId)
@@ -738,6 +770,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_DEPT_TOPUP')")
     public CfoApproveResponse approveCfoRequest(Long id, Long cfoId, ApproveRequestRequest req) {
+        lockRequest(id);
         Request request = requestRepository.findDetailByIdForCfo(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
@@ -802,6 +835,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_DEPT_TOPUP')")
     public CfoRejectResponse rejectCfoRequest(Long id, Long cfoId, RejectRequestRequest req) {
+        lockRequest(id);
         Request request = requestRepository.findDetailByIdForCfo(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
@@ -879,6 +913,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional(noRollbackFor = {UnauthorizedException.class, LockedException.class})
     @PreAuthorize("hasAuthority('REQUEST_PAYOUT')")
     public DisburseResponse disburse(Long id, Long accountantId, DisburseRequest req) {
+        lockRequest(id);
         PinVerifyResponse pinResult = profileService.verifyMyPin(accountantId, new VerifyMyPinRequest(req.getPin()));
         if (!pinResult.isValid()) {
             throw new UnauthorizedException("PIN không đúng");
@@ -900,6 +935,7 @@ public class RequestServiceImpl implements RequestService {
             throw new BadRequestException("The request does not have enough reserved funds for this payout");
         }
 
+        validateFinancialRequest(request, amount, request.getType() != RequestType.REIMBURSE);
         String description = (req.getNote() != null && !req.getNote().isBlank())
                 ? req.getNote().trim()
                 : request.getType() + " payout - " + request.getRequestCode();
@@ -911,6 +947,7 @@ public class RequestServiceImpl implements RequestService {
             if (request.getAttachmentFiles().isEmpty()) {
                 throw new BadRequestException("EXPENSE cannot be verified without supporting documents");
             }
+            financialDocuments.allocate(request.getId(), amount, accountantId, req.getDocuments());
             request.getProject().deductBudget(amount);
             if (request.getPhase() != null) request.getPhase().addSpent(amount);
             if (request.getPhase() != null && request.getCategory() != null) {
@@ -948,7 +985,9 @@ public class RequestServiceImpl implements RequestService {
             advanceBalanceRepository.save(advanceBalance);
             accountingJournalService.recordAdvanceDisbursed(request, advanceBalance, txn);
         } else if (request.getType() == RequestType.REIMBURSE) {
-            AdvanceBalance advanceBalance = request.getAdvanceBalance();
+            financialDocuments.allocate(request.getId(), amount, accountantId, req.getDocuments());
+            AdvanceBalance advanceBalance = request.getAdvanceBalance() == null ? null : advanceBalanceRepository.findByIdForUpdate(request.getAdvanceBalance().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("AdvanceBalance not found"));
             if (advanceBalance == null) {
                 throw new BadRequestException("REIMBURSE request must have a linked advance balance");
             }
@@ -986,6 +1025,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional(noRollbackFor = {UnauthorizedException.class, LockedException.class})
     @PreAuthorize("hasAuthority('REQUEST_PAYOUT')")
     public DisburseResponse payExpense(Long id, Long accountantId, DisburseRequest req) {
+        lockRequest(id);
         PinVerifyResponse pinResult = profileService.verifyMyPin(accountantId, new VerifyMyPinRequest(req.getPin()));
         if (!pinResult.isValid()) throw new UnauthorizedException("PIN không đúng");
         Request request = requestRepository.findDetailByIdForAccountant(id)
@@ -1020,6 +1060,17 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_VIEW_SELF')")
     public AdvanceReturnResponse returnAdvanceBalance(Long advanceBalanceId, Long userId, AdvanceReturnRequest request) {
+        return financialOperations.execute(userId,"ADVANCE_RETURN",request.idempotencyKey(),
+                java.util.List.of(advanceBalanceId,request.amount(),request.note()==null?"":request.note().trim()),
+                AdvanceReturnResponse.class,()->performAdvanceReturn(advanceBalanceId,userId,request));
+    }
+
+    private AdvanceReturnResponse performAdvanceReturn(Long advanceBalanceId, Long userId, AdvanceReturnRequest request) {
+        userService.lockFinancialScope(userId);
+        AdvanceBalance observed = advanceBalanceRepository.findById(advanceBalanceId)
+                .orElseThrow(() -> new ResourceNotFoundException("AdvanceBalance", "id", advanceBalanceId));
+        if (!observed.getUser().getId().equals(userId)) throw new BadRequestException("Advance balance does not belong to you");
+        projectQueryService.lockFinancialProject(observed.getAdvanceRequest().getProject().getId());
         AdvanceBalance balance = advanceBalanceRepository.findByIdForUpdate(advanceBalanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("AdvanceBalance", "id", advanceBalanceId));
         if (!balance.getUser().getId().equals(userId)) throw new BadRequestException("Advance balance does not belong to you");
@@ -1027,10 +1078,10 @@ public class RequestServiceImpl implements RequestService {
         Long projectId = advanceRequest.getProject().getId();
         String description = request.note() == null || request.note().isBlank()
                 ? "Hoàn tiền tạm ứng " + advanceRequest.getRequestCode() : request.note().trim();
+        balance.returnCash(request.amount());
         var transaction = walletService.transfer(WalletOwnerType.USER, userId, WalletOwnerType.PROJECT, projectId,
                 request.amount(), TransactionType.ADVANCE_RETURN, ReferenceType.ADVANCE_BALANCE,
                 balance.getId(), description);
-        balance.returnCash(request.amount());
         advanceBalanceRepository.save(balance);
         accountingJournalService.recordAdvanceReturned(balance, transaction, request.amount(), description);
         return new AdvanceReturnResponse(balance.getId(), transaction.getTransactionCode(), request.amount(), balance.getRemainingAmount());
@@ -1040,6 +1091,7 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @PreAuthorize("hasAuthority('REQUEST_PAYOUT')")
     public AccountantRejectResponse accountantReject(Long id, Long accountantId, RejectRequestRequest req) {
+        lockRequest(id);
         Request request = requestRepository.findDetailByIdForAccountant(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
@@ -1211,13 +1263,87 @@ public class RequestServiceImpl implements RequestService {
         }
     }
 
-    private void notify(User recipient, String type, String title, String message, Long refId) {
-        try {
-            notificationPublisher.publish(new NotificationEvent(
-                    recipient.getId(), recipient.getEmail(), type, title, message, refId, "REQUEST"));
-        } catch (Exception e) {
-            // Notification failure must never break the business transaction
+    /** Lock project before checking all commitments; advances are not expenses. */
+    private void validateFinancialRequest(Request request, BigDecimal amount, boolean requireActive) {
+        if (amount == null || amount.signum() <= 0) throw new BadRequestException("Số tiền phải lớn hơn 0");
+        if (request.getType() == RequestType.PROJECT_TOPUP) {
+            if (request.getProject() == null) throw new BadRequestException("Cần chọn dự án");
+            var project = projectQueryService.lockFinancialProject(request.getProject().getId());
+            boolean leader = projectMemberRepository.findByProject_IdAndProjectRole(project.getId(), ProjectRole.LEADER)
+                    .stream().anyMatch(member -> member.getUser().getId().equals(request.getRequester().getId()));
+            if (!leader || project.getStatus() != com.mkwang.backend.modules.project.entity.ProjectStatus.ACTIVE)
+                throw new BadRequestException("Chỉ trưởng nhóm của dự án đang hoạt động được yêu cầu cấp quỹ");
+            return;
         }
+        if (request.getType() == RequestType.DEPARTMENT_TOPUP && request.getRequester().getDepartment() == null)
+            throw new BadRequestException("Người yêu cầu chưa được gán phòng ban");
+        if (!FLOW1_TYPES.contains(request.getType())) return;
+        userService.lockFinancialScope(request.getRequester().getId());
+        if (amount == null || amount.signum() <= 0) throw new BadRequestException("Số tiền phải lớn hơn 0");
+        if (request.getProject() == null || request.getPhase() == null || request.getCategory() == null) {
+            throw new BadRequestException("Hồ sơ thiếu dự án, giai đoạn hoặc danh mục; cần bổ sung trước khi xử lý");
+        }
+        Long projectId = request.getProject().getId();
+        Long phaseId = request.getPhase().getId();
+        Long categoryId = request.getCategory().getId();
+        Project project = projectQueryService.lockFinancialProject(projectId);
+        projectQueryService.validateFinancialScope(projectId, phaseId, categoryId, request.getRequester().getId(),
+                requireActive && request.getType() != RequestType.REIMBURSE);
+        boolean settlement = request.getType() == RequestType.REIMBURSE;
+        if (settlement) {
+            AdvanceBalance balance = advanceBalanceRepository.findByIdForUpdate(request.getAdvanceBalance().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("AdvanceBalance not found"));
+            Request original = balance.getAdvanceRequest();
+            if (!balance.getUser().getId().equals(request.getRequester().getId())
+                    || !original.getProject().getId().equals(projectId)
+                    || !original.getPhase().getId().equals(phaseId)
+                    || !original.getCategory().getId().equals(categoryId)) {
+                throw new BadRequestException("Quyết toán phải đúng nhân viên, dự án, giai đoạn và danh mục của tạm ứng gốc");
+            }
+            if (amount.compareTo(balance.getRemainingAmount()) > 0) throw new BadRequestException("Quyết toán vượt số tạm ứng còn lại");
+        }
+        BigDecimal categoryRemaining = categoryBudgetService.getRemainingBudget(phaseId, categoryId);
+        BigDecimal phaseRemaining = request.getPhase().getRemainingBudget();
+        BigDecimal projectRemaining = project.getAvailableBudget().min(project.getTotalBudget().subtract(project.getTotalSpent()));
+        if (amount.compareTo(categoryRemaining) > 0 || amount.compareTo(phaseRemaining) > 0 || amount.compareTo(projectRemaining) > 0) {
+            throw new BadRequestException("Số tiền vượt ngân sách còn lại của dự án, giai đoạn hoặc danh mục");
+        }
+        BigDecimal projectExposure = BigDecimal.ZERO, phaseExposure = BigDecimal.ZERO, categoryExposure = BigDecimal.ZERO;
+        for (Request pending : requestRepository.findByProject_IdAndStatusIn(projectId, List.of(RequestStatus.APPROVED_BY_TEAM_LEADER))) {
+            if (java.util.Objects.equals(pending.getId(), request.getId())) continue;
+            BigDecimal held = pending.getReservedAmount() == null ? BigDecimal.ZERO : pending.getReservedAmount();
+            projectExposure = projectExposure.add(held);
+            if (pending.getPhase() != null && pending.getPhase().getId().equals(phaseId)) {
+                phaseExposure = phaseExposure.add(held);
+                if (pending.getCategory() != null && pending.getCategory().getId().equals(categoryId)) categoryExposure = categoryExposure.add(held);
+            }
+        }
+        for (AdvanceBalance balance : advanceBalanceRepository.findByAdvanceRequest_Project_IdAndStatusNot(projectId,
+                com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)) {
+            Request original = balance.getAdvanceRequest();
+            BigDecimal open = balance.getRemainingAmount();
+            projectExposure = projectExposure.add(open);
+            if (original.getPhase() != null && original.getPhase().getId().equals(phaseId)) {
+                phaseExposure = phaseExposure.add(open);
+                if (original.getCategory() != null && original.getCategory().getId().equals(categoryId)) categoryExposure = categoryExposure.add(open);
+            }
+        }
+        BigDecimal additional = settlement ? BigDecimal.ZERO : amount;
+        if (projectExposure.add(additional).compareTo(projectRemaining) > 0
+                || phaseExposure.add(additional).compareTo(phaseRemaining) > 0
+                || categoryExposure.add(additional).compareTo(categoryRemaining) > 0) {
+            throw new BadRequestException("Ngân sách đã được cam kết hoặc đang nằm ở tạm ứng chưa quyết toán");
+        }
+    }
+
+    private void lockRequest(Long id) {
+        requestRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Request", "id", id));
+    }
+
+    private void notify(User recipient, String type, String title, String message, Long refId) {
+        NotificationEvent event = new NotificationEvent(recipient.getId(), recipient.getEmail(), type, title, message, refId, "REQUEST");
+        com.mkwang.backend.common.utils.AfterCommit.run(() -> notificationPublisher.publish(event));
     }
 
     private void notifyAll(List<User> recipients, String type, String title, String message, Long refId) {

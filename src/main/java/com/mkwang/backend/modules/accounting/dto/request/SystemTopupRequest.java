@@ -14,6 +14,8 @@ public class SystemTopupRequest {
     private BigDecimal amount;
 
     /** Bank transfer reference number from the real bank transaction. */
+    @jakarta.validation.constraints.NotBlank(message = "Cần mã chứng từ/chuyển khoản ngân hàng")
+    @jakarta.validation.constraints.Size(max = 100)
     private String paymentRef;
 
     private String description;

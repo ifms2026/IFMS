@@ -16,6 +16,7 @@ public record PayrollPeriodDetailResponse(
         LocalDate startDate,
         LocalDate endDate,
         PayrollStatus status,
+        boolean nettingApplied,
         int employeeCount,
         BigDecimal totalNetPayroll,
         List<PayrollEntryResponse> entries,

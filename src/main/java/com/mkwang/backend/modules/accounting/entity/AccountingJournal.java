@@ -86,6 +86,33 @@ public class AccountingJournal {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    @Column(name = "business_date")
+    private LocalDate businessDate;
+
+    @Column(name = "department_id")
+    private Long departmentId;
+
+    @Column(name = "department_name", length = 200)
+    private String departmentName;
+
+    @Column(name = "phase_id")
+    private Long phaseId;
+
+    @Column(name = "phase_name", length = 200)
+    private String phaseName;
+
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    @Column(name = "category_name", length = 200)
+    private String categoryName;
+
+    @Column(name = "source_snapshot", columnDefinition = "TEXT")
+    private String sourceSnapshot;
+
+    @Column(name = "original_journal_id")
+    private Long originalJournalId;
+
     @OneToMany(mappedBy = "journal", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<AccountingJournalLine> lines = new ArrayList<>();

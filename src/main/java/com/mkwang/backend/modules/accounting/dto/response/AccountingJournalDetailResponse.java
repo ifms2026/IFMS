@@ -30,5 +30,8 @@ public record AccountingJournalDetailResponse(
         List<AccountingJournalLineResponse> lines,
         Long createdByUserId,
         String createdByName,
-        Instant createdAt
+        Instant createdAt,
+        LocalDate businessDate, Long departmentId, String departmentName,
+        Long phaseId, String phaseName, Long categoryId, String categoryName,
+        String sourceSnapshot, Long originalJournalId
 ) {}

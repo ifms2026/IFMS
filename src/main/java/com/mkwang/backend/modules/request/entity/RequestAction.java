@@ -9,5 +9,6 @@ public enum RequestAction {
   REJECT,   // Từ chối yêu cầu
   VERIFY,   // Kế toán xác nhận chứng từ hợp lệ
   PAYOUT,   // Accountant giải ngân (Luồng 1 only)
+  REVERSE,
   CANCEL    // Người tạo tự hủy (chỉ khi đang PENDING_APPROVAL)
 }

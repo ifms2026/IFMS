@@ -41,3 +41,7 @@ build/
 
 
 env
+
+# Isolated CLI verification output (avoids IDE incremental class writes)
+/target-verification/
+/financial-workflow-test.log

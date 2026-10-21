@@ -30,9 +30,11 @@ public class CompanyFundServiceImpl implements CompanyFundService {
     private final WalletService         walletService;
     private final WalletMapper          walletMapper;
     private final AccountingJournalService accountingJournalService;
+    private final com.mkwang.backend.modules.wallet.service.WalletFinancialEvidenceService financialEvidence;
+    private final BankEvidenceService bankEvidence;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public CompanyFundResponse getCompanyFund() {
         CompanyFund fund = loadDefault();
@@ -58,6 +60,11 @@ public class CompanyFundServiceImpl implements CompanyFundService {
     @PreAuthorize("hasAuthority('COMPANY_FUND_TOPUP')")
     public CompanyFundResponse updateBankStatement(UpdateBankStatementRequest request) {
         CompanyFund fund = loadDefault();
+        if (!fund.isBankScopeConfirmed()) throw new com.mkwang.backend.common.exception.BadRequestException("Cần xác nhận phạm vi tài khoản tiền vận hành công ty trước khi đối soát");
+        if(!request.getLastStatementDate().equals(request.getAsOf().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate()))
+            throw new com.mkwang.backend.common.exception.BadRequestException("Ngày sao kê phải khớp ngày tại thời điểm chốt số dư");
+        fund.setStatementAsOf(request.getAsOf());
+        fund.setStatementEvidenceRef(request.getEvidenceRef().trim());
         fund.setExternalBankBalance(request.getExternalBankBalance());
         fund.setLastStatementDate(request.getLastStatementDate());
         fund.setLastStatementUpdatedBy(currentUserId());
@@ -68,7 +75,7 @@ public class CompanyFundServiceImpl implements CompanyFundService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public ReconciliationReportResponse getReconciliationReport() {
         CompanyFund fund = loadDefault();
@@ -86,7 +93,10 @@ public class CompanyFundServiceImpl implements CompanyFundService {
 
         BigDecimal externalBankBalance  = fund.getExternalBankBalance() != null
                 ? fund.getExternalBankBalance() : BigDecimal.ZERO;
-        BigDecimal bankDiscrepancy      = companyFundBalance.subtract(externalBankBalance);
+        boolean comparable = fund.isBankScopeConfirmed() && fund.getStatementAsOf() != null && fund.getStatementEvidenceRef() != null;
+        BigDecimal corporate = comparable ? financialEvidence.corporateBalanceAt(fund.getStatementAsOf()) : null;
+        BigDecimal pending = comparable ? bankEvidence.pendingSigned(fund.getStatementAsOf()) : null;
+        BigDecimal bankDiscrepancy = comparable ? corporate.subtract(pending).subtract(externalBankBalance) : null;
 
         return ReconciliationReportResponse.builder()
                 .generatedAt(LocalDateTime.now())
@@ -104,6 +114,9 @@ public class CompanyFundServiceImpl implements CompanyFundService {
                 .externalBankBalance(externalBankBalance)
                 .lastStatementDate(fund.getLastStatementDate())
                 .bankDiscrepancy(bankDiscrepancy)
+                .bankComparisonStatus(comparable ? "VERIFIED_SCOPE" : "MISSING_EVIDENCE")
+                .corporateBalanceAtStatement(corporate).pendingCorporateAmount(pending)
+                .statementAsOf(fund.getStatementAsOf()).statementEvidenceRef(fund.getStatementEvidenceRef())
                 .build();
     }
 
@@ -124,13 +137,20 @@ public class CompanyFundServiceImpl implements CompanyFundService {
         BigDecimal externalBal    = fund.getExternalBankBalance() != null
                 ? fund.getExternalBankBalance() : BigDecimal.ZERO;
 
+        boolean comparable = fund.isBankScopeConfirmed() && fund.getStatementAsOf() != null && fund.getStatementEvidenceRef() != null;
+        BigDecimal corporate = comparable ? financialEvidence.corporateBalanceAt(fund.getStatementAsOf()) : null;
+        BigDecimal pending = comparable ? bankEvidence.pendingSigned(fund.getStatementAsOf()) : null;
         return CompanyFundResponse.builder()
                 .id(fund.getId())
                 .bankName(fund.getBankName())
                 .bankAccount(fund.getBankAccount())
                 .currentWalletBalance(walletBalance)
                 .externalBankBalance(externalBal)
-                .bankDiscrepancy(walletBalance.subtract(externalBal))
+                .bankDiscrepancy(comparable ? corporate.subtract(pending).subtract(externalBal) : null)
+                .bankComparisonStatus(comparable ? "VERIFIED_SCOPE" : "MISSING_EVIDENCE")
+                .corporateBalanceAtStatement(corporate).pendingCorporateAmount(pending)
+                .statementAsOf(fund.getStatementAsOf()).statementEvidenceRef(fund.getStatementEvidenceRef())
+                .bankScopeConfirmed(fund.isBankScopeConfirmed())
                 .lastStatementDate(fund.getLastStatementDate())
                 .lastStatementUpdatedBy(updatedBy)
                 .build();
@@ -138,6 +158,7 @@ public class CompanyFundServiceImpl implements CompanyFundService {
 
     private Long currentUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof com.mkwang.backend.modules.auth.security.UserDetailsAdapter adapter) return adapter.getUser().getId();
         if (principal instanceof com.mkwang.backend.modules.user.entity.User user) {
             return user.getId();
         }

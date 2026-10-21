@@ -87,6 +87,8 @@ public class Transaction {
 
   @Column(name = "description", columnDefinition = "TEXT")
   private String description;
+  @Column(name = "original_transaction_id")
+  private Long originalTransactionId;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -98,6 +100,11 @@ public class Transaction {
   private List<LedgerEntry> entries = new ArrayList<>();
 
   // ── Status transitions ───────────────────────────────────────────
+
+  public void linkOriginal(Long id) {
+    if (originalTransactionId != null) throw new com.mkwang.backend.common.exception.BadRequestException("Reversal source is immutable");
+    originalTransactionId = id;
+  }
 
   public void markSuccess() {
     assertPending();

@@ -15,7 +15,12 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, Long> {
+public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<AdvanceBalance> {
+  List<AdvanceBalance> findByUserIdOrderByIdAsc(Long userId, org.springframework.data.domain.Pageable pageable);
+
+  Optional<AdvanceBalance> findByAdvanceRequest_Id(Long requestId);
+
+  List<AdvanceBalance> findByAdvanceRequest_Project_IdAndStatusNot(Long projectId, AdvanceBalanceStatus status);
 
   /**
    * All outstanding/partially-settled advances for a user.

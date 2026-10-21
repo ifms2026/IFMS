@@ -11,6 +11,16 @@ public class RequestSpecification {
 
     private RequestSpecification() {}
 
+    public static Specification<Request> filterVerifiedCosts(Long projectId) {
+        return Specification.where(hasProjectId(projectId))
+                .and(hasTypeIn(List.of(RequestType.EXPENSE,RequestType.REIMBURSE)))
+                .and(hasStatusIn(List.of(RequestStatus.PAID,RequestStatus.ACCOUNTANT_VERIFIED)));
+    }
+    public static Specification<Request> filterHistorical(String search) {
+        return Specification.where(hasStatusIn(List.of(RequestStatus.PAID,RequestStatus.ACCOUNTANT_VERIFIED)))
+                .and((root,query,cb)->cb.like(cb.lower(root.get("requestCode")),"%"+search.toLowerCase(java.util.Locale.ROOT)+"%"));
+    }
+
     public static Specification<Request> hasRequester(Long userId) {
         return (root, query, cb) -> cb.equal(root.get("requester").get("id"), userId);
     }

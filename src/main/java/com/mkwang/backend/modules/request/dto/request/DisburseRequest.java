@@ -14,5 +14,7 @@ public class DisburseRequest {
     private String pin;
 
     private String note;
+    @jakarta.validation.Valid
+    private java.util.List<com.mkwang.backend.modules.accounting.dto.request.VerifyFinancialDocumentRequest> documents;
 }
 

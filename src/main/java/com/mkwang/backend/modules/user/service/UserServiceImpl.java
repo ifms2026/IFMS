@@ -49,6 +49,25 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+    @Override
+    @Transactional(readOnly = true)
+    public List<User> getPayrollReferenceUsers(int max) {
+        var page=userRepository.findPayrollReferenceUsers(PageRequest.of(0,max+1));
+        if(page.getTotalElements()>max) throw new BadRequestException("Danh sách nhân viên vượt giới hạn mẫu Excel; cần thu hẹp theo kỳ/phòng ban");
+        return page.getContent();
+    }
+    @Override
+    @Transactional
+    public void lockFinancialScope(Long userId) {
+        userRepository.findFinancialScopeForUpdate(userId).orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public User getUserByEmployeeCode(String employeeCode) {
+        return userRepository.findByProfile_EmployeeCode(employeeCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee", "code", employeeCode));
+    }
 
     private final UserRepository                 userRepository;
     private final RoleRepository                 roleRepository;
@@ -214,6 +233,9 @@ public class UserServiceImpl implements UserService {
             department = departmentRepository.findById(request.getDepartmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Department", "id", request.getDepartmentId()));
         }
+
+        if (java.util.Set.of("EMPLOYEE","TEAM_LEADER").contains(role.getName()) && department == null)
+            throw new com.mkwang.backend.common.exception.BadRequestException("Nhân viên và trưởng nhóm cần được gán phòng ban");
 
         String employeeCode = codeGenerator.generate(BusinessCodeType.EMPLOYEE);
         String tempPassword = generateTemporaryPassword();
@@ -388,7 +410,7 @@ public class UserServiceImpl implements UserService {
         ctx.setVariable("departmentName",    departmentName);
 
         String html = templateEngine.process("email/onboard-email", ctx);
-        mailPublisher.publish(MailType.ONBOARD, email, "Chào mừng bạn đến với IFMS — Thông tin tài khoản", html);
+        com.mkwang.backend.common.utils.AfterCommit.run(() -> mailPublisher.publish(MailType.ONBOARD, email, "Chào mừng bạn đến với IFMS — Thông tin tài khoản", html));
     }
 
     private void sendPasswordResetEmail(String email, String fullName, String temporaryPassword) {

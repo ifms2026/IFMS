@@ -50,6 +50,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ManagerProjectServiceImpl implements ManagerProjectService {
+    private final com.mkwang.backend.modules.wallet.service.WalletService walletService;
 
     private static final String DEFAULT_LEADER_POSITION = "Team Leader";
 
@@ -199,6 +200,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
                 .build();
 
         Project savedProject = projectRepository.save(project);
+        walletService.createWallet(WalletOwnerType.PROJECT, savedProject.getId());
 
         ProjectMember leaderMember = ProjectMember.builder()
                 .id(new ProjectMemberId(savedProject.getId(), teamLeader.getId()))
@@ -239,6 +241,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         }
 
         Project savedProject = projectRepository.save(project);
+        walletService.createWallet(WalletOwnerType.PROJECT, savedProject.getId());
         return buildProjectDetail(savedProject);
     }
 

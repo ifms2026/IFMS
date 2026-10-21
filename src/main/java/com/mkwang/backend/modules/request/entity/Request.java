@@ -164,7 +164,8 @@ public class Request extends BaseEntity {
   public boolean isPending() {
     return status != RequestStatus.PAID
         && status != RequestStatus.REJECTED
-        && status != RequestStatus.CANCELLED;
+        && status != RequestStatus.CANCELLED
+          && status != RequestStatus.REVERSED;
   }
 
   /**

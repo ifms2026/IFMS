@@ -23,6 +23,16 @@ public class FileStorageService {
     private final CloudinaryService cloudinaryService;
 
     public FileStorage save(FileStorageRequest request) {
+        var existing = fileStorageRepository.findByCloudinaryPublicId(request.getCloudinaryPublicId());
+        if (existing.isPresent()) {
+            var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null
+                    || !(authentication.getPrincipal() instanceof com.mkwang.backend.modules.auth.security.UserDetailsAdapter adapter)
+                    || !adapter.getUser().getId().equals(existing.get().getCreatedBy())) {
+                throw new com.mkwang.backend.common.exception.UnauthorizedException("Không sở hữu chứng từ này");
+            }
+            return existing.get();
+        }
         return fileStorageRepository.save(fileStorageMapper.toFileStorage(request));
     }
 
@@ -31,7 +41,7 @@ public class FileStorageService {
             return Collections.emptyList();
         }
         List<FileStorage> files = requests.stream()
-                .map(fileStorageMapper::toFileStorage)
+                .map(this::save)
                 .toList();
         return fileStorageRepository.saveAll(files);
     }
@@ -39,6 +49,25 @@ public class FileStorageService {
     public FileStorage getFile(Long id) {
         return fileStorageRepository.findById(id)
                 .orElseThrow( () -> new ResourceNotFoundException("File not found with id: " + id));
+    }
+
+    public FileStorage getOwned(Long id, Long ownerId) {
+        FileStorage file = getFile(id);
+        if (!ownerId.equals(file.getCreatedBy())) throw new com.mkwang.backend.common.exception.UnauthorizedException("Chứng từ không thuộc bạn");
+        return file;
+    }
+
+    @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('REQUEST_CREATE')")
+    public com.mkwang.backend.modules.file.dto.response.RegisteredDocumentResponse register(
+            com.mkwang.backend.modules.file.dto.request.RegisterDocumentRequest request) {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication.getPrincipal() instanceof com.mkwang.backend.modules.auth.security.UserDetailsAdapter adapter)) {
+            throw new com.mkwang.backend.common.exception.UnauthorizedException("Cần đăng nhập");
+        }
+        cloudinaryService.verifyDocumentRegistration(request, adapter.getUser().getId());
+        FileStorage file = save(request);
+        return new com.mkwang.backend.modules.file.dto.response.RegisteredDocumentResponse(file.getId(),file.getFileName(),file.getUrl());
     }
 
     public List<FileStorage> getMutipleFiles(List<Long> ids) {

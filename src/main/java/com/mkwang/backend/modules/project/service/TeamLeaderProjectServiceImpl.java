@@ -60,6 +60,7 @@ import java.util.Map;
 public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectFinancialGuard financialGuard;
     private final ProjectPhaseRepository projectPhaseRepository;
     private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
     private final ProjectMemberRepository projectMemberRepository;
@@ -185,6 +186,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     @Transactional
     @PreAuthorize("hasAuthority('PROJECT_MEMBER_MANAGE')")
     public ProjectMemberResponse addMember(User currentUser, Long projectId, AddProjectMemberRequest request) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         Project project = getProjectOrThrow(projectId);
         assertLeaderOf(currentUser.getId(), projectId);
 
@@ -228,6 +230,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     @Transactional
     @PreAuthorize("hasAuthority('PROJECT_MEMBER_MANAGE')")
     public ProjectMemberResponse updateMember(User currentUser, Long projectId, Long userId, UpdateProjectMemberRequest request) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         getProjectOrThrow(projectId);
         assertLeaderOf(currentUser.getId(), projectId);
 
@@ -247,6 +250,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     @Transactional
     @PreAuthorize("hasAuthority('PROJECT_MEMBER_MANAGE')")
     public void removeMember(User currentUser, Long projectId, Long userId) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         getProjectOrThrow(projectId);
         assertLeaderOf(currentUser.getId(), projectId);
 
@@ -313,6 +317,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     @Transactional
     @PreAuthorize("hasAuthority('PROJECT_PHASE_MANAGE')")
     public ProjectPhaseResponse createPhase(User currentUser, Long projectId, CreatePhaseRequest request) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         Project project = getProjectOrThrow(projectId);
         assertLeaderOf(currentUser.getId(), projectId);
 
@@ -323,10 +328,10 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal newTotal = existingPhaseBudgetTotal.add(request.budgetLimit());
-        if (newTotal.compareTo(project.getAvailableBudget()) > 0) {
+        if (newTotal.compareTo(project.getTotalBudget()) > 0) {
             throw new BadRequestException(
                     "Total phase budget (" + newTotal + ") would exceed project available budget ("
-                            + project.getAvailableBudget() + ")"
+                            + project.getTotalBudget() + ")"
             );
         }
 
@@ -361,6 +366,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     @Transactional
     @PreAuthorize("hasAuthority('PROJECT_PHASE_MANAGE')")
     public ProjectPhaseResponse updatePhase(User currentUser, Long projectId, Long phaseId, UpdatePhaseRequest request) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         Project project = getProjectOrThrow(projectId);
         assertLeaderOf(currentUser.getId(), projectId);
 
@@ -376,6 +382,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
         }
 
         if (request.budgetLimit() != null) {
+            financialGuard.assertLimit(projectId, phaseId, null, phase.getCurrentSpent(), request.budgetLimit());
             // Validate budget change
             if (request.budgetLimit().compareTo(phase.getCurrentSpent()) < 0) {
                 throw new BadRequestException(
@@ -387,9 +394,9 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
             // If increasing, check against project available_budget
             if (request.budgetLimit().compareTo(phase.getBudgetLimit()) > 0) {
                 BigDecimal increase = request.budgetLimit().subtract(phase.getBudgetLimit());
-                if (increase.compareTo(project.getAvailableBudget()) > 0) {
+                if (increase.compareTo(project.getTotalBudget()) > 0) {
                     throw new BadRequestException(
-                            "Insufficient project available budget (" + project.getAvailableBudget()
+                            "Insufficient project available budget (" + project.getTotalBudget()
                                     + ") to increase phase budget by " + increase
                     );
                 }
@@ -635,7 +642,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     }
 
     private BigDecimal resolveAvailableBudget(Project project, BigDecimal totalSpent) {
-        BigDecimal fundedBudget = coalesce(project.getAvailableBudget()).add(coalesce(project.getTotalSpent()));
+        BigDecimal fundedBudget = coalesce(project.getTotalBudget()).add(coalesce(project.getTotalSpent()));
         BigDecimal availableBudget = fundedBudget.subtract(coalesce(totalSpent));
         return availableBudget.max(BigDecimal.ZERO);
     }

@@ -46,6 +46,33 @@ public class ProjectQueryServiceImpl implements ProjectQueryService {
     private final ExpenseCategoryRepository expenseCategoryRepository;
 
     @Override
+    @Transactional
+    public Project lockFinancialProject(Long projectId) {
+        return projectRepository.findByIdForUpdate(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void validateFinancialScope(Long projectId, Long phaseId, Long categoryId, Long employeeId, boolean requireActive) {
+        Project project = getProjectEntityById(projectId);
+        ProjectPhase phase = getPhaseEntityById(phaseId);
+        if (!phase.getProject().getId().equals(projectId)) {
+            throw new BadRequestException("Giai đoạn không thuộc dự án của yêu cầu");
+        }
+        if (requireActive && !projectMemberRepository.existsByProject_IdAndUser_Id(projectId, employeeId)) {
+            throw new BadRequestException("Nhân viên không thuộc dự án");
+        }
+        if (requireActive && (!project.isRequestable() || !phase.isRequestable())) {
+            throw new BadRequestException("Dự án và giai đoạn phải đang hoạt động");
+        }
+        if (!phaseCategoryBudgetRepository.existsById(
+                new com.mkwang.backend.modules.project.entity.PhaseCategoryBudgetId(phaseId, categoryId))) {
+            throw new BadRequestException("Danh mục chưa có hạn mức trong giai đoạn này");
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<ProjectOptionResponse> getProjects(User currentUser, ProjectStatus status) {
         String roleName = getRoleName(currentUser);

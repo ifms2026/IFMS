@@ -37,6 +37,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public interface RequestService {
+    void lockEmployeeFinancialScope(Long userId);
+    void validateImportRequest(com.mkwang.backend.modules.request.dto.request.CreateRequestRequest request,Long actorId);
 
     PageResponse<RequestSummaryResponse> getMyRequests(
             Long userId, RequestType type, RequestStatus status, String search, int page, int limit);

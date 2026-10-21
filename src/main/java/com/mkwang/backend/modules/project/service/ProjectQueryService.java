@@ -35,6 +35,10 @@ public interface ProjectQueryService {
     ExpenseCategory getCategoryEntityById(Long categoryId);
 
     List<Long> getLeaderProjectIds(Long leaderId);
+
+    Project lockFinancialProject(Long projectId);
+
+    void validateFinancialScope(Long projectId, Long phaseId, Long categoryId, Long employeeId, boolean requireActive);
 }
 
 

@@ -58,4 +58,22 @@ public class AccountingJournalLine {
 
     @Column(name = "project_id")
     private Long projectId;
+    @Column(name = "department_id")
+    private Long departmentId;
+
+    @Column(name = "phase_id")
+    private Long phaseId;
+
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    @Column(name = "project_name", length = 200)
+    private String projectName;
+
+    @Column(name = "phase_name", length = 200)
+    private String phaseName;
+
+    @Column(name = "category_name", length = 200)
+    private String categoryName;
+
 }

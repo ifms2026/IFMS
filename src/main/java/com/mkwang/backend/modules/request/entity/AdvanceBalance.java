@@ -154,6 +154,32 @@ public class AdvanceBalance {
   public boolean isSettled() {
     return this.status == AdvanceBalanceStatus.SETTLED;
   }
+  public void reopenReimbursement(BigDecimal amount) {
+    if (amount.signum() <= 0 || reimbursedAmount.compareTo(amount) < 0) throw new InvalidSettlementAmountException("Không đủ chứng từ đã quyết toán để đảo");
+    reimbursedAmount = reimbursedAmount.subtract(amount);
+    reopen(amount);
+  }
+  public void reopenCashReturn(BigDecimal amount) {
+    if (amount.signum() <= 0 || cashReturnedAmount.compareTo(amount) < 0) throw new InvalidSettlementAmountException("Không đủ tiền hoàn để đảo");
+    cashReturnedAmount = cashReturnedAmount.subtract(amount);
+    reopen(amount);
+  }
+  public void reopenPayrollOffset(BigDecimal amount) {
+    if (amount.signum() <= 0 || payrollOffsetAmount.compareTo(amount) < 0) throw new InvalidSettlementAmountException("Không đủ khấu trừ lương để đảo");
+    payrollOffsetAmount = payrollOffsetAmount.subtract(amount);
+    reopen(amount);
+  }
+  public void classifyLegacyPayroll(BigDecimal amount) {
+    if(amount.signum()<=0||legacyUnclassifiedAmount.compareTo(amount)<0) throw new InvalidSettlementAmountException("Không đủ lịch sử chưa phân loại để xác nhận khấu trừ lương");
+    legacyUnclassifiedAmount=legacyUnclassifiedAmount.subtract(amount);
+    payrollOffsetAmount=payrollOffsetAmount.add(amount);
+  }
+  private void reopen(BigDecimal amount) {
+    remainingAmount = remainingAmount.add(amount);
+    if (remainingAmount.compareTo(originalAmount) > 0) throw new InvalidSettlementAmountException("Dư tạm ứng vượt khoản gốc");
+    settledAt = null;
+    status = remainingAmount.compareTo(originalAmount) == 0 ? AdvanceBalanceStatus.OUTSTANDING : AdvanceBalanceStatus.PARTIALLY_SETTLED;
+  }
 
   public boolean hasOutstanding() {
     return this.remainingAmount.compareTo(BigDecimal.ZERO) > 0;

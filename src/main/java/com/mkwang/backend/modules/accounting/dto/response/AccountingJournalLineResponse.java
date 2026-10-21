@@ -12,5 +12,6 @@ public record AccountingJournalLineResponse(
         Long advanceBalanceId,
         Long requestId,
         Long employeeId,
-        Long projectId
+        Long projectId,
+        Long departmentId, Long phaseId, Long categoryId, String projectName, String phaseName, String categoryName
 ) {}

@@ -20,6 +20,9 @@ public interface UserService {
     OnboardUserResponse onboardUser(OnboardUserRequest request);
 
     User getUserById(Long userId);
+    User getUserByEmployeeCode(String employeeCode);
+    List<User> getPayrollReferenceUsers(int max);
+    void lockFinancialScope(Long userId);
 
     Page<User> getDepartmentMembers(Long departmentId, Long excludedUserId, String roleName, String search, Pageable pageable);
 

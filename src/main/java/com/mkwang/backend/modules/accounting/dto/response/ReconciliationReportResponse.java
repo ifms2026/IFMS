@@ -24,6 +24,11 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class ReconciliationReportResponse {
+    private String bankComparisonStatus;
+    private BigDecimal corporateBalanceAtStatement;
+    private BigDecimal pendingCorporateAmount;
+    private java.time.Instant statementAsOf;
+    private String statementEvidenceRef;
 
     private LocalDateTime generatedAt;
 

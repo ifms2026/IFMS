@@ -17,6 +17,13 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
     Optional<User> findByEmail(String email);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id=:id")
+    Optional<User> findFinancialScopeForUpdate(@Param("id")Long id);
+    Optional<User> findByProfile_EmployeeCode(String employeeCode);
+    @Query(value="select u from User u join fetch u.profile p where u.status='ACTIVE' and p.employeeCode is not null order by p.employeeCode",
+           countQuery="select count(u) from User u join u.profile p where u.status='ACTIVE' and p.employeeCode is not null")
+    Page<User> findPayrollReferenceUsers(Pageable pageable);
 
     boolean existsByEmail(String email);
 

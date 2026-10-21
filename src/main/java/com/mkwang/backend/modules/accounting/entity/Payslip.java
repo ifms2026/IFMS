@@ -27,6 +27,8 @@ public class Payslip extends BaseEntity {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
+  @Column(name="replaces_payslip_id")
+  private Long replacesPayslipId;
 
   /**
    * Human-readable individual payslip code. Used as document reference when exporting PDF.
@@ -80,7 +82,7 @@ public class Payslip extends BaseEntity {
    * Calculate gross salary (before debt deduction)
    */
   public BigDecimal getGrossSalary() {
-    return baseSalary.add(bonus).subtract(deduction);
+    return baseSalary.add(bonus).add(allowance).subtract(deduction);
   }
 
   /**
@@ -92,16 +94,8 @@ public class Payslip extends BaseEntity {
   public BigDecimal calculateNetSalary(BigDecimal currentDebt) {
     BigDecimal gross = getGrossSalary();
 
-    if (currentDebt.compareTo(gross) >= 0) {
-      // Debt is greater than or equal to gross salary
-      this.advanceDeduct = gross;
-      this.finalNetSalary = BigDecimal.ZERO;
-      return currentDebt.subtract(gross); // Remaining debt
-    } else {
-      // Debt is less than gross salary
-      this.advanceDeduct = currentDebt;
-      this.finalNetSalary = gross.subtract(currentDebt);
-      return BigDecimal.ZERO; // No remaining debt
-    }
+    this.advanceDeduct = currentDebt.min(gross.multiply(new BigDecimal("0.5")).setScale(2, java.math.RoundingMode.HALF_UP));
+    this.finalNetSalary = gross.subtract(advanceDeduct);
+    return currentDebt.subtract(advanceDeduct);
   }
 }

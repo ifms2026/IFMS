@@ -14,8 +14,20 @@ import java.util.Optional;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long>, JpaSpecificationExecutor<Transaction> {
+    @Query("select t from Transaction t where t.status='SUCCESS' and t.type in ('SYSTEM_TOPUP','ADVANCE_RETURN') and lower(t.transactionCode) like lower(concat('%',:code,'%')) order by t.id desc")
+    org.springframework.data.domain.Page<Transaction> findHistoricalAccountingSources(@Param("code") String code, org.springframework.data.domain.Pageable page);
+    java.util.Optional<com.mkwang.backend.modules.wallet.entity.Transaction> findByOriginalTransactionId(Long id);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from Transaction t where t.id=:id")
+    java.util.Optional<com.mkwang.backend.modules.wallet.entity.Transaction> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
+    java.util.Optional<com.mkwang.backend.modules.wallet.entity.Transaction> findFirstByTypeAndPaymentRef(
+            com.mkwang.backend.modules.wallet.entity.TransactionType type, String paymentRef);
+
 
   Optional<Transaction> findByTransactionCode(String transactionCode);
+  @Query("select t from Transaction t where t.status='SUCCESS' and t.amount=:amount order by t.createdAt desc,t.id desc")
+  List<Transaction> findReconciliationCandidates(@Param("amount")java.math.BigDecimal amount,org.springframework.data.domain.Pageable page);
 
   boolean existsByTransactionCode(String transactionCode);
 

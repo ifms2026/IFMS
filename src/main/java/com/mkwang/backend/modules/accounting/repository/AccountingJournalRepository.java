@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AccountingJournalRepository extends JpaRepository<AccountingJournal, Long>, JpaSpecificationExecutor<AccountingJournal> {
+    Optional<AccountingJournal> findByOriginalJournalId(Long id);
     @EntityGraph(attributePaths = "lines")
     @Query("select j from AccountingJournal j where j.id = :id")
     Optional<AccountingJournal> findDetailById(@Param("id") Long id);

@@ -17,6 +17,11 @@ import java.util.Optional;
 
 @Repository
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>, JpaSpecificationExecutor<LedgerEntry> {
+    @Query("""
+            SELECT COALESCE(SUM(CASE WHEN e.direction='CREDIT' THEN e.amount ELSE -e.amount END),0)
+            FROM LedgerEntry e WHERE e.wallet.ownerType IN ('COMPANY_FUND','DEPARTMENT','PROJECT') AND e.createdAt>:asOf
+            """)
+    java.math.BigDecimal sumCorporateMovementAfter(@Param("asOf") LocalDateTime asOf);
 
   @EntityGraph(attributePaths = {"transaction", "wallet"})
   Page<LedgerEntry> findAll(Specification<LedgerEntry> spec, Pageable pageable);

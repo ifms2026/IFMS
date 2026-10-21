@@ -9,6 +9,12 @@ import java.time.LocalDate;
 @Data
 @Builder
 public class CompanyFundResponse {
+    private String bankComparisonStatus;
+    private BigDecimal corporateBalanceAtStatement;
+    private BigDecimal pendingCorporateAmount;
+    private java.time.Instant statementAsOf;
+    private String statementEvidenceRef;
+    private boolean bankScopeConfirmed;
 
     private Long id;
     private String bankName;

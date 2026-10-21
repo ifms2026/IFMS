@@ -62,6 +62,12 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     private static final String ACCOUNT_PROJECT_WALLET = "PROJECT_WALLET";
 
     private final AccountingJournalRepository journalRepository;
+    private final com.mkwang.backend.modules.accounting.repository.PayslipRepository payslipRepository;
+    private final com.mkwang.backend.modules.wallet.service.WalletFinancialEvidenceService walletEvidence;
+    private final com.mkwang.backend.modules.accounting.mapper.AccountingJournalMapper journalMapper;
+    private final com.mkwang.backend.modules.request.service.RequestAccountingContextService contextService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.mkwang.backend.modules.wallet.service.WalletService walletService;
     private final AdvanceBalanceRepository advanceBalanceRepository;
     private final RequestRepository requestRepository;
     private final ProjectRepository projectRepository;
@@ -255,7 +261,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
         Page<AccountingJournal> result = journalRepository.findAll(
                 AccountingJournalSpecification.filter(event, from, to, employeeId, projectId, requestId),
                 PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "postingDate").and(Sort.by(Sort.Direction.DESC, "id"))));
-        List<AccountingJournalItemResponse> items = result.getContent().stream().map(this::toItem).toList();
+        List<AccountingJournalItemResponse> items = result.getContent().stream().map(journalMapper::toItem).toList();
         return PageResponse.<AccountingJournalItemResponse>builder().items(items).total(result.getTotalElements())
                 .page(page).size(limit).totalPages(result.getTotalPages()).build();
     }
@@ -266,22 +272,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     public AccountingJournalDetailResponse getJournalDetail(Long journalId) {
         AccountingJournal journal = journalRepository.findDetailById(journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("AccountingJournal", "id", journalId));
-        BigDecimal debit = journal.getLines().stream().map(AccountingJournalLine::getDebitAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal credit = journal.getLines().stream().map(AccountingJournalLine::getCreditAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<AccountingJournalLineResponse> lines = journal.getLines().stream()
-                .sorted(Comparator.comparing(AccountingJournalLine::getLineNumber))
-                .map(line -> new AccountingJournalLineResponse(line.getId(), line.getAccountCode(), line.getAccountName(),
-                        line.getDebitAmount(), line.getCreditAmount(), line.getEffectDescription(),
-                        line.getAdvanceBalanceId(), line.getRequestId(), line.getEmployeeId(), line.getProjectId()))
-                .toList();
-        return new AccountingJournalDetailResponse(journal.getId(), journal.getJournalCode(), journal.getEventType(),
-                journal.getPostingDate(), journal.getPostingPeriod(), journal.getDescription(), journal.getSourceType(),
-                journal.getSourceId(), journal.getRequestId(), journal.getAdvanceBalanceId(), journal.getEmployeeId(),
-                journal.getEmployeeName(), journal.getProjectId(), journal.getProjectName(), journal.getWalletTransactionId(),
-                journal.getTotalAmount(), debit.compareTo(credit) == 0, debit, credit, lines,
-                journal.getCreatedByUserId(), journal.getCreatedByName(), journal.getCreatedAt());
+        return journalMapper.toDetail(journal);
     }
 
     @Override
@@ -367,7 +358,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                         nz(phase.getCurrentSpent()), phaseLocked, phaseAdvances, categories));
             }
             result.add(new LedgerProjectBudgetResponse(projectId, project.getProjectCode(), project.getName(),
-                    nz(project.getTotalBudget()), nz(project.getAvailableBudget()), nz(project.getTotalSpent()),
+                    nz(project.getTotalBudget()), walletService.getWallet(com.mkwang.backend.modules.wallet.entity.WalletOwnerType.PROJECT, projectId).getBalance(), nz(project.getTotalSpent()),
                     projectLocked, projectAdvances, phases));
         }
         return result;
@@ -412,14 +403,6 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 .map(line -> line.getDebitAmount().max(line.getCreditAmount())).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private AccountingJournalItemResponse toItem(AccountingJournal journal) {
-        return new AccountingJournalItemResponse(journal.getId(), journal.getJournalCode(), journal.getEventType(),
-                journal.getPostingDate(), journal.getPostingPeriod(), journal.getDescription(), journal.getSourceType(),
-                journal.getSourceId(), journal.getRequestId(), journal.getAdvanceBalanceId(), journal.getEmployeeId(),
-                journal.getEmployeeName(), journal.getProjectId(), journal.getProjectName(), journal.getWalletTransactionId(),
-                journal.getTotalAmount(), true, journal.getCreatedByUserId(), journal.getCreatedByName(), journal.getCreatedAt());
-    }
-
     private AccountingJournal saveJournal(AccountingJournalEvent event, String sourceType, Long uniqueSourceId,
             Long requestId, Long advanceBalanceId, Long employeeId, String employeeName, Long projectId,
             String projectName, Long walletTransactionId, BigDecimal totalAmount, String description, List<LineDraft> drafts) {
@@ -429,10 +412,34 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
 
         BigDecimal debit = drafts.stream().map(LineDraft::debit).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal credit = drafts.stream().map(LineDraft::credit).reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (debit.compareTo(credit) != 0) throw new BadRequestException("Refusing to save an unbalanced accounting journal");
         if (totalAmount == null || totalAmount.signum() <= 0) throw new BadRequestException("Journal amount must be positive");
+        if (drafts.size()<2 || debit.compareTo(totalAmount)!=0 || debit.compareTo(credit) != 0) throw new BadRequestException("Refusing to save an unbalanced accounting journal");
 
-        LocalDate postingDate = LocalDate.now();
+        var historical = AccountingPostingContext.current();
+        LocalDate postingDate = historical == null ? LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")) : historical.postingDate();
+        var context = requestId != null ? contextService.forRequest(requestId)
+                : advanceBalanceId != null ? contextService.forAdvance(advanceBalanceId) : null;
+        String snapshot;
+        Object sourceSnapshot = context;
+        if ("PAYSLIP".equals(sourceType)) {
+            var payslip = payslipRepository.findById(uniqueSourceId).orElseThrow(() -> new ResourceNotFoundException("Payslip not found"));
+            var values = new LinkedHashMap<String,Object>();
+            values.put("payslipId",payslip.getId()); values.put("payslipCode",payslip.getPayslipCode());
+            values.put("periodId",payslip.getPeriod().getId()); values.put("periodCode",payslip.getPeriod().getPeriodCode());
+            values.put("employeeId",payslip.getUser().getId()); values.put("employeeName",payslip.getUser().getFullName());
+            values.put("baseSalary",payslip.getBaseSalary()); values.put("bonus",payslip.getBonus());
+            values.put("allowance",payslip.getAllowance()); values.put("deduction",payslip.getDeduction());
+            values.put("advanceDeduct",payslip.getAdvanceDeduct()); values.put("finalNetSalary",payslip.getFinalNetSalary());
+            values.put("replacesPayslipId",payslip.getReplacesPayslipId());sourceSnapshot=values;
+        } else if (sourceSnapshot==null && walletTransactionId!=null) sourceSnapshot=walletEvidence.get(walletTransactionId);
+        if (historical != null) {
+            var evidence = new LinkedHashMap<String,Object>();evidence.put("source",sourceSnapshot);
+            evidence.put("backfillEvidenceRef",historical.evidenceRef());evidence.put("backfilledAt",Instant.now());sourceSnapshot=evidence;
+        }
+        try { snapshot = sourceSnapshot==null?null:objectMapper.writeValueAsString(sourceSnapshot); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+            throw new com.mkwang.backend.common.exception.InternalSystemException("Unable to snapshot accounting source");
+        }
         ActorSnapshot actor = currentActor();
         AccountingJournal journal = AccountingJournal.builder()
                 .journalCode("JRN-" + postingDate.toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
@@ -441,14 +448,26 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 .advanceBalanceId(advanceBalanceId).employeeId(employeeId).employeeName(employeeName)
                 .projectId(projectId).projectName(projectName).walletTransactionId(walletTransactionId)
                 .totalAmount(totalAmount).createdByUserId(actor.userId()).createdByName(actor.name())
-                .createdAt(Instant.now()).build();
+                .createdAt(Instant.now()).businessDate(historical==null?postingDate:historical.businessDate())
+                .departmentId(context == null ? null : context.departmentId())
+                .departmentName(context == null ? null : context.departmentName())
+                .phaseId(context == null ? null : context.phaseId()).phaseName(context == null ? null : context.phaseName())
+                .categoryId(context == null ? null : context.categoryId()).categoryName(context == null ? null : context.categoryName())
+                .sourceSnapshot(snapshot).build();
         for (int i = 0; i < drafts.size(); i++) {
             LineDraft draft = drafts.get(i);
+            var lineContext = draft.advanceBalanceId() != null ? contextService.forAdvance(draft.advanceBalanceId()) : context;
             journal.getLines().add(AccountingJournalLine.builder().journal(journal).lineNumber(i + 1)
                     .accountCode(draft.accountCode()).accountName(draft.accountName())
                     .debitAmount(draft.debit()).creditAmount(draft.credit()).effectDescription(draft.effect())
                     .advanceBalanceId(draft.advanceBalanceId()).requestId(draft.requestId())
-                    .employeeId(draft.employeeId()).projectId(draft.projectId()).build());
+                    .employeeId(draft.employeeId()).projectId(lineContext == null ? draft.projectId() : lineContext.projectId())
+                    .departmentId(lineContext == null ? null : lineContext.departmentId())
+                    .phaseId(lineContext == null ? null : lineContext.phaseId())
+                    .categoryId(lineContext == null ? null : lineContext.categoryId())
+                    .projectName(lineContext == null ? null : lineContext.projectName())
+                    .phaseName(lineContext == null ? null : lineContext.phaseName())
+                    .categoryName(lineContext == null ? null : lineContext.categoryName()).build());
         }
         return journalRepository.save(journal);
     }
@@ -474,6 +493,10 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) return new ActorSnapshot(null, "system");
         Object principal = authentication.getPrincipal();
+        if (principal instanceof com.mkwang.backend.modules.auth.security.UserDetailsAdapter adapter) {
+            User user = adapter.getUser();
+            return new ActorSnapshot(user.getId(), user.getFullName());
+        }
         if (principal instanceof User user) return new ActorSnapshot(user.getId(), user.getFullName());
         String name = authentication.getName();
         return new ActorSnapshot(null, name == null || name.isBlank() || "anonymousUser".equals(name) ? "system" : name);

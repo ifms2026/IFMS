@@ -24,7 +24,14 @@ public class CloudinaryService {
         long timestamp = Instant.now().getEpochSecond();
 
         Map<String, Object> params = new TreeMap<>();
-        params.put("folder", folder.getPath());
+        String path = folder.getPath();
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (folder == UploadFolder.REQUEST
+                && authentication != null
+                && authentication.getPrincipal() instanceof com.mkwang.backend.modules.auth.security.UserDetailsAdapter adapter) {
+            path += "/" + adapter.getUser().getId();
+        }
+        params.put("folder", path);
         params.put("timestamp", timestamp);
 
         String signature = cloudinary.apiSignRequest(params, cloudinaryConfig.getApiSecret());
@@ -34,7 +41,7 @@ public class CloudinaryService {
                 .timestamp(timestamp)
                 .apiKey(cloudinaryConfig.getApiKey())
                 .cloudName(cloudinaryConfig.getCloudName())
-                .folder(folder.getPath())
+                .folder(path)
                 .build();
     }
 
@@ -55,6 +62,26 @@ public class CloudinaryService {
             throw ex;
         } catch (Exception ex) {
             throw new InternalSystemException("Failed to delete file from Cloudinary");
+        }
+    }
+
+    public void verifyDocumentRegistration(com.mkwang.backend.modules.file.dto.request.RegisterDocumentRequest request, Long actorId) {
+        String prefix = UploadFolder.REQUEST.getPath() + "/" + actorId + "/";
+        if (!request.getCloudinaryPublicId().startsWith(prefix)) throw new BadRequestException("Chứng từ không thuộc thư mục upload của bạn");
+        String signed = cloudinary.apiSignRequest(Map.of("public_id", request.getCloudinaryPublicId(),
+                "version", request.getUploadVersion()), cloudinaryConfig.getApiSecret());
+        if (!java.security.MessageDigest.isEqual(signed.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                request.getUploadSignature().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            throw new BadRequestException("Chữ ký upload chứng từ không hợp lệ");
+        }
+        String decoded;
+        try { decoded=java.net.URLDecoder.decode(request.getUrl(),java.nio.charset.StandardCharsets.UTF_8); }
+        catch(IllegalArgumentException e){throw new BadRequestException("URL chứng từ không hợp lệ");}
+        String root="https://res.cloudinary.com/"+cloudinaryConfig.getCloudName();
+        String asset="/v"+request.getUploadVersion()+"/"+request.getCloudinaryPublicId();
+        String pattern=java.util.regex.Pattern.quote(root)+"/(image|raw)/upload"+java.util.regex.Pattern.quote(asset)+"(\\.[A-Za-z0-9]+)?";
+        if (!decoded.matches(pattern)) {
+            throw new BadRequestException("URL chứng từ không thuộc kho lưu trữ được cấu hình");
         }
     }
 }

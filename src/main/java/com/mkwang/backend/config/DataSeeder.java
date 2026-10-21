@@ -57,6 +57,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
+@org.springframework.context.annotation.Profile("demo")
 @Order(2)
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {

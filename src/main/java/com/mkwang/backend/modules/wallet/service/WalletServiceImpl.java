@@ -131,9 +131,12 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public Transaction reversal(Long originalTransactionId, String reason) {
-        Transaction original = transactionRepository.findById(originalTransactionId)
+        Transaction original = transactionRepository.findByIdForUpdate(originalTransactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", originalTransactionId));
 
+        var existingReversal = transactionRepository.findByOriginalTransactionId(originalTransactionId);
+        if (existingReversal.isPresent()) return existingReversal.get();
+        if (original.getType() == TransactionType.REVERSAL) throw new BadRequestException("Không đảo lại giao dịch đảo");
         if (original.getStatus() != TransactionStatus.SUCCESS) {
             throw new BadRequestException("Only SUCCESS transactions can be reversed");
         }
@@ -169,7 +172,8 @@ public class WalletServiceImpl implements WalletService {
             }
 
             walletRepository.save(wallet);
-            Transaction saved = transactionRepository.save(reversalTxn);
+            reversalTxn.linkOriginal(originalTransactionId);
+        Transaction saved = transactionRepository.save(reversalTxn);
 
             // FLOAT_MAIN: reverse the boundary effect
             boolean wasInflow = entry.getDirection() == TransactionDirection.CREDIT;
@@ -211,6 +215,7 @@ public class WalletServiceImpl implements WalletService {
 
         walletRepository.save(originalSource);
         walletRepository.save(originalDest);
+        reversalTxn.linkOriginal(originalTransactionId);
         Transaction saved = transactionRepository.save(reversalTxn);
         pushWalletUpdate(originalSource.getOwnerType(), originalSource.getOwnerId());
         pushWalletUpdate(originalDest.getOwnerType(), originalDest.getOwnerId());
@@ -395,7 +400,14 @@ public class WalletServiceImpl implements WalletService {
     public Transaction systemTopup(BigDecimal amount, String paymentRef, String description) {
         validateAmount(amount);
 
+        if (paymentRef == null || paymentRef.isBlank()) throw new com.mkwang.backend.common.exception.BadRequestException("Cần mã chứng từ ngân hàng");
+        paymentRef = paymentRef.trim().toUpperCase(java.util.Locale.ROOT);
         Wallet companyFund = getWalletForUpdate(WalletOwnerType.COMPANY_FUND, 1L);
+        var previous = transactionRepository.findFirstByTypeAndPaymentRef(TransactionType.SYSTEM_TOPUP, paymentRef);
+        if (previous.isPresent()) {
+            if (previous.get().getAmount().compareTo(amount) != 0) throw new com.mkwang.backend.common.exception.ConflictException("Chứng từ đã dùng cho số tiền khác");
+            return previous.get();
+        }
         companyFund.credit(amount);
 
         Transaction txn = Transaction.builder()
@@ -533,9 +545,9 @@ public class WalletServiceImpl implements WalletService {
                         .data(walletMapper.toWalletResponse(wallet))
                         .build();
                 if (ownerType == WalletOwnerType.USER) {
-                    sseService.sendToUser(ownerId, event);
+                    com.mkwang.backend.common.utils.AfterCommit.run(() -> sseService.sendToUser(ownerId, event));
                 } else {
-                    sseService.sendToWalletSubscribers(walletKey(ownerType, ownerId), event);
+                    com.mkwang.backend.common.utils.AfterCommit.run(() -> sseService.sendToWalletSubscribers(walletKey(ownerType, ownerId), event));
                 }
             });
         } catch (Exception e) {
@@ -572,9 +584,9 @@ public class WalletServiceImpl implements WalletService {
                     .data(walletMapper.toLedgerEntryResponse(ownerEntry))
                     .build();
             if (ownerType == WalletOwnerType.USER) {
-                sseService.sendToUser(ownerId, event);
+                com.mkwang.backend.common.utils.AfterCommit.run(() -> sseService.sendToUser(ownerId, event));
             } else {
-                sseService.sendToWalletSubscribers(walletKey(ownerType, ownerId), event);
+                com.mkwang.backend.common.utils.AfterCommit.run(() -> sseService.sendToWalletSubscribers(walletKey(ownerType, ownerId), event));
             }
         } catch (Exception e) {
             log.warn("[WalletService] SSE transaction push failed for {}:{}: {}", ownerType, ownerId, e.getMessage());

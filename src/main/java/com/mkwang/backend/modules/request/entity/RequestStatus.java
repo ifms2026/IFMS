@@ -49,6 +49,7 @@ public enum RequestStatus {
   REJECTED,
   // Bị từ chối bởi approver (TL/Manager/CFO) hoặc Accountant (Flow 1 only)
 
+  REVERSED,
   CANCELLED
   // Người tạo request tự hủy (chỉ được phép khi PENDING hoặc chưa lock funds)
 }

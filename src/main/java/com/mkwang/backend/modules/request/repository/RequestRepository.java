@@ -19,6 +19,14 @@ import java.util.Optional;
 @Repository
 public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpecificationExecutor<Request> {
 
+    // Lock only the root row: PostgreSQL cannot FOR UPDATE nullable fetch joins.
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Request r where r.id = :id")
+    Optional<Request> findByIdForUpdate(@Param("id") Long id);
+
+    List<Request> findByProject_IdAndStatusIn(Long projectId, java.util.Collection<RequestStatus> statuses);
+    boolean existsByAttachments_File_Id(Long fileId);
+
     @Query("""
             SELECT r.project.id, r.phase.id, r.category.id, COALESCE(SUM(r.reservedAmount), 0)
             FROM Request r

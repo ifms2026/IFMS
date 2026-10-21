@@ -9,6 +9,11 @@ import java.time.LocalDate;
 
 @Data
 public class UpdateBankStatementRequest {
+    @jakarta.validation.constraints.NotBlank
+    private String evidenceRef;
+    @NotNull
+    @jakarta.validation.constraints.PastOrPresent
+    private java.time.Instant asOf;
 
     @NotNull(message = "External bank balance is required")
     @DecimalMin(value = "0.00", message = "External bank balance cannot be negative")

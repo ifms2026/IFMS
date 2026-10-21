@@ -74,6 +74,9 @@ public class DataInitializer implements CommandLineRunner {
     private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
     private final UserSecuritySettingsRepository userSecuritySettingsRepository;
     private final PasswordEncoder               passwordEncoder;
+    private final org.springframework.core.env.Environment environment;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     private static final String DEFAULT_PASSWORD     = "Ifms@2026";
     private static final String DEFAULT_TRANSACTION_PIN = "27055";
@@ -105,13 +108,19 @@ public class DataInitializer implements CommandLineRunner {
             new DemoPayrollAccount("emp.fin1@ifms.vn", new BigDecimal("12000000"))
     );
 
-    @Value("${app.demo.reset-accounts-on-startup:true}")
+    @Value("${app.demo.reset-accounts-on-startup:false}")
     private boolean resetDemoAccountsOnStartup;
+    @Value("${app.bootstrap.admin-email:}")
+    private String bootstrapAdminEmail;
+    @Value("${app.bootstrap.admin-password:}")
+    private String bootstrapAdminPassword;
+    @Value("${app.bootstrap.admin-name:}")
+    private String bootstrapAdminName;
 
-    @Value("${app.demo.reset-payroll-wallets-on-startup:true}")
+    @Value("${app.demo.reset-payroll-wallets-on-startup:false}")
     private boolean resetDemoPayrollWalletsOnStartup;
 
-    @Value("${app.demo.keep-active-phase:true}")
+    @Value("${app.demo.keep-active-phase:false}")
     private boolean keepActiveDemoPhase;
 
     @Value("${app.demo.active-phase-days-ahead:90}")
@@ -130,6 +139,14 @@ public class DataInitializer implements CommandLineRunner {
         log.info("╚══════════════════════════════════════════╝");
 
         initRoles();
+        if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("demo"))) {
+            initConfiguredAdmin();
+            initSystemConfigs();
+            initExpenseCategories();
+            initEmptyCompanyFund();
+            log.info("Reference bootstrap completed; demo users, funds and payroll are disabled.");
+            return;
+        }
         initDepartments();
         initUsers();
         resetDemoAccountsForFirstLoginIfEnabled();
@@ -150,6 +167,46 @@ public class DataInitializer implements CommandLineRunner {
     // =========================================================
     // 1. ROLES & PERMISSIONS
     // =========================================================
+    private void initEmptyCompanyFund() {
+        if (!companyFundRepository.existsById(1L)) {
+            // Corporate wallet operations use ownerId=1. An auto-generated id
+            // can point elsewhere if an older fund row was removed.
+            entityManager.createNativeQuery("""
+                    INSERT INTO company_funds(id,created_at,updated_at,external_bank_balance,bank_scope_confirmed)
+                    VALUES (1,now(),now(),0,false) ON CONFLICT (id) DO NOTHING
+                    """).executeUpdate();
+            entityManager.createNativeQuery("""
+                    SELECT setval(pg_get_serial_sequence('company_funds','id'),
+                        GREATEST((SELECT MAX(id) FROM company_funds),1))
+                    """).getSingleResult();
+        }
+        for (WalletOwnerType type : List.of(WalletOwnerType.COMPANY_FUND, WalletOwnerType.FLOAT_MAIN)) {
+            Long ownerId = type == WalletOwnerType.FLOAT_MAIN ? 0L : 1L;
+            if (walletRepository.findByOwnerTypeAndOwnerId(type, ownerId).isEmpty()) {
+                walletRepository.save(Wallet.builder().ownerType(type).ownerId(ownerId).build());
+            }
+        }
+    }
+
+    private void initConfiguredAdmin() {
+        if (userRepository.count() != 0) return;
+        if (bootstrapAdminEmail.isBlank() && bootstrapAdminPassword.isBlank()) {
+            log.warn("No users exist. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD for first deployment.");
+            return;
+        }
+        if (!bootstrapAdminEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$") || bootstrapAdminPassword.length() < 12)
+            throw new IllegalStateException("Bootstrap admin requires a valid email and password of at least 12 characters");
+        var role=roleRepository.findByName("ADMIN").orElseThrow();
+        var admin=userRepository.save(User.builder().email(bootstrapAdminEmail.trim().toLowerCase(java.util.Locale.ROOT))
+                .password(passwordEncoder.encode(bootstrapAdminPassword))
+                .fullName(bootstrapAdminName.isBlank()?bootstrapAdminEmail.trim():bootstrapAdminName.trim())
+                .role(role).status(UserStatus.ACTIVE).isFirstLogin(false).build());
+        entityManager.persist(UserProfile.builder().user(admin).jobTitle("Quản trị hệ thống").build());
+        entityManager.persist(UserSecuritySettings.builder().user(admin).build());
+        walletRepository.save(Wallet.builder().ownerType(WalletOwnerType.USER).ownerId(admin.getId()).build());
+        log.info("Created the configured first administrator for an empty installation");
+    }
+
     private void initRoles() {
         log.info("── [1/6] Seeding Roles ...");
 

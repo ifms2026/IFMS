@@ -5,5 +5,6 @@ package com.mkwang.backend.modules.accounting.entity;
  */
 public enum PayslipStatus {
   DRAFT, // Chưa chi trả
-  PAID // Đã chi trả vào ví
+  PAID, // Đã chi trả vào ví
+  REVERSED
 }

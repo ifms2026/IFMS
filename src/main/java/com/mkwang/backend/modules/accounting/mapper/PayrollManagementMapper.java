@@ -50,6 +50,7 @@ public class PayrollManagementMapper {
                 period.getStartDate(),
                 period.getEndDate(),
                 period.getStatus(),
+                period.isNettingApplied(),
                 employeeCount,
                 safe(totalNetPayroll),
                 entries,

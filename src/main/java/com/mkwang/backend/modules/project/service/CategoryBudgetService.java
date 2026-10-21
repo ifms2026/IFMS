@@ -25,5 +25,7 @@ public interface CategoryBudgetService {
     ExpenseCategoryResponse createProjectCategory(Long projectId, CreateExpenseCategoryRequest request, User currentUser);
 
     void incrementSpent(Long phaseId, Long categoryId, BigDecimal amount);
+
+    BigDecimal getRemainingBudget(Long phaseId, Long categoryId);
 }
 

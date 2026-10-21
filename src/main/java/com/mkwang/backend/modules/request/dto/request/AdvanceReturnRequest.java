@@ -8,5 +8,6 @@ import java.math.BigDecimal;
 
 public record AdvanceReturnRequest(
         @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
-        @Size(max = 500) String note
+        @Size(max = 500) String note,
+        @jakarta.validation.constraints.NotBlank @Size(max=80) String idempotencyKey
 ) {}

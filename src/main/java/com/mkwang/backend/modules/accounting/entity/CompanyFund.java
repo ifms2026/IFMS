@@ -29,6 +29,15 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CompanyFund extends BaseEntity {
+    @Column(name="bank_scope_confirmed",nullable=false)
+    @Builder.Default
+    private boolean bankScopeConfirmed = false;
+    @Column(name="bank_scope_evidence",columnDefinition="TEXT")
+    private String bankScopeEvidence;
+    @Column(name="statement_evidence_ref",columnDefinition="TEXT")
+    private String statementEvidenceRef;
+    @Column(name="statement_as_of")
+    private java.time.Instant statementAsOf;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

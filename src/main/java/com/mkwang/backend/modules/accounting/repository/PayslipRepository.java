@@ -14,7 +14,10 @@ import java.util.Optional;
 import java.util.List;
 
 @Repository
-public interface PayslipRepository extends JpaRepository<Payslip, Long> {
+public interface PayslipRepository extends JpaRepository<Payslip, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Payslip> {
+    @Query("select p from Payslip p where p.status='PAID' and lower(p.payslipCode) like lower(concat('%',:code,'%')) order by p.id desc")
+    Page<Payslip> findHistoricalAccountingSources(@Param("code") String code, Pageable page);
+    Optional<Payslip> findByReplacesPayslipId(Long originalId);
 
     @Query(
             value = """
@@ -67,7 +70,7 @@ public interface PayslipRepository extends JpaRepository<Payslip, Long> {
     @Query("""
             select p.period.id, count(p.id), coalesce(sum(p.finalNetSalary), 0)
             from Payslip p
-            where p.period.id in :periodIds
+            where p.period.id in :periodIds and p.status <> 'REVERSED'
             group by p.period.id
             """)
     List<Object[]> aggregateByPeriodIds(@Param("periodIds") List<Long> periodIds);

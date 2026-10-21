@@ -81,6 +81,8 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     private final AccountingJournalService accountingJournalService;
     private final WalletService walletService;
     private final NotificationPublisher notificationPublisher;
+    private final PayrollExcelDataset payrollExcelDataset;
+    private final com.mkwang.backend.modules.spreadsheet.service.ExcelWorkbookService excelWorkbooks;
 
     // ─────────────────────────────────────────────────────────────────
     // GET /accountant/payroll
@@ -139,12 +141,12 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
                 .map(payrollManagementMapper::toEntryResponse)
                 .toList();
 
-        BigDecimal totalNetPayroll = period.getPayslips().stream()
+        BigDecimal totalNetPayroll = period.getPayslips().stream().filter(p -> p.getStatus() != PayslipStatus.REVERSED)
                 .map(Payslip::getFinalNetSalary)
                 .map(this::safe)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return payrollManagementMapper.toDetailResponse(period, entries.size(), totalNetPayroll, entries);
+        return payrollManagementMapper.toDetailResponse(period, (int)period.getPayslips().stream().filter(p -> p.getStatus() != PayslipStatus.REVERSED).count(), totalNetPayroll, entries);
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -188,54 +190,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Override
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public byte[] downloadTemplate() {
-        try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Payroll");
-
-            // Header row
-            String[] headers = {"employeeCode", "employeeName", "baseSalary", "bonus", "allowance", "deduction"};
-            Row headerRow = sheet.createRow(0);
-
-            Font boldFont = workbook.createFont();
-            boldFont.setBold(true);
-            CellStyle headerStyle = workbook.createCellStyle();
-            headerStyle.setFont(boldFont);
-
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(headerStyle);
-                sheet.setColumnWidth(i, 5000);
-            }
-
-            List<PayrollTemplateRow> demoRows = List.of(
-                    new PayrollTemplateRow("MK010", "Nguyen Van Minh", 50000000, 0, 0, 0),
-                    new PayrollTemplateRow("MK001", "Le Van Cuong", 20000000, 0, 0, 0),
-                    new PayrollTemplateRow("MK002", "Tran Thi Bich", 35000000, 0, 0, 0),
-                    new PayrollTemplateRow("MK008", "Hoang Minh Tuan", 28000000, 0, 0, 0),
-                    new PayrollTemplateRow("MK004", "Do Quoc Bao", 18500000, 0, 0, 0),
-                    new PayrollTemplateRow("MK005", "Vu Thi Lan", 16000000, 0, 0, 0),
-                    new PayrollTemplateRow("MK006", "Pham Van Duc", 15000000, 0, 0, 0),
-                    new PayrollTemplateRow("MK007", "Nguyen Thi Minh", 12000000, 0, 0, 0)
-            );
-
-            for (int rowIndex = 0; rowIndex < demoRows.size(); rowIndex++) {
-                PayrollTemplateRow rowData = demoRows.get(rowIndex);
-                Row row = sheet.createRow(rowIndex + 1);
-                row.createCell(0).setCellValue(rowData.employeeCode());
-                row.createCell(1).setCellValue(rowData.employeeName());
-                row.createCell(2).setCellValue(rowData.baseSalary());
-                row.createCell(3).setCellValue(rowData.bonus());
-                row.createCell(4).setCellValue(rowData.allowance());
-                row.createCell(5).setCellValue(rowData.deduction());
-            }
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new com.mkwang.backend.common.exception.InternalSystemException(
-                    "Failed to generate payroll template: " + e.getMessage());
-        }
+        return excelWorkbooks.template(payrollExcelDataset, payrollExcelDataset.references(null, null));
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -246,165 +201,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Transactional
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public PayrollImportResultResponse importPayroll(Long periodId, MultipartFile file) {
-        // 1. Validate file
-        validateImportFile(file);
-
-        // 2. Load period
-        PayrollPeriod period = payrollPeriodRepository.findById(periodId)
-                .orElseThrow(() -> new ResourceNotFoundException("PayrollPeriod", "id", periodId));
-
-        // 3. Reject if period already has payslips
-        if (!period.getPayslips().isEmpty()) {
-            throw new ConflictException(
-                    "Period already has " + period.getPayslips().size() + " payslip(s). " +
-                    "Call POST /accountant/payroll/" + periodId + "/confirm-overwrite to replace them.");
-        }
-
-        // 4. Parse Excel rows
-        List<PayrollImportEntryResponse> entries = new ArrayList<>();
-        List<PayrollImportErrorResponse> errors = new ArrayList<>();
-        List<Payslip> toSave = new ArrayList<>();
-        BigDecimal totalNetPayroll = BigDecimal.ZERO;
-
-        try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
-            Sheet sheet = workbook.getSheetAt(0);
-            int totalRows = 0;
-
-            // Row 0 = header, data starts at row 1
-            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
-                Row row = sheet.getRow(rowIndex);
-                if (row == null) continue;
-
-                totalRows++;
-                int humanRowNum = rowIndex + 1; // 1-based for error messages
-
-                // Read cells
-                String employeeCode = stringCell(row, 0);
-                String employeeName  = stringCell(row, 1);
-                BigDecimal baseSalary = decimalCell(row, 2);
-                BigDecimal bonus      = decimalCell(row, 3);
-                BigDecimal allowance  = decimalCell(row, 4);
-                BigDecimal deduction  = decimalCell(row, 5);
-
-
-                // Field-level validation
-                List<PayrollImportErrorResponse> rowErrors = new ArrayList<>();
-
-                if (employeeCode == null || employeeCode.isBlank()) {
-                    rowErrors.add(new PayrollImportErrorResponse(humanRowNum, "employeeCode", "employeeCode is required"));
-                }
-                if (baseSalary == null || baseSalary.compareTo(BigDecimal.ZERO) <= 0) {
-                    rowErrors.add(new PayrollImportErrorResponse(humanRowNum, "baseSalary", "baseSalary must be a positive number"));
-                }
-
-
-                if (!rowErrors.isEmpty()) {
-                    errors.addAll(rowErrors);
-                    entries.add(errorEntry(employeeName, employeeCode, baseSalary, bonus, allowance, deduction,
-                            rowErrors.get(0).message()));
-                    continue;
-                }
-
-                // Look up user by employeeCode
-                Optional<UserProfile> profileOpt = userProfileRepository.findByEmployeeCode(employeeCode);
-                if (profileOpt.isEmpty()) {
-                    String msg = "Employee not found in system (row " + humanRowNum + ")";
-                    errors.add(new PayrollImportErrorResponse(humanRowNum, "employeeCode", "Employee not found in system"));
-                    entries.add(errorEntry(employeeName, employeeCode, baseSalary, bonus, allowance, deduction, msg));
-                    continue;
-                }
-
-                UserProfile profile = profileOpt.get();
-                User user = profile.getUser();
-
-                // Generate payslip code: PSL-{EMP_CODE}-{MMYY}
-                String payslipCode = String.format("PSL-%s-%02d%02d",
-                        employeeCode, period.getMonth(), period.getYear() % 100);
-
-                BigDecimal safeBonus     = bonus     != null ? bonus     : BigDecimal.ZERO;
-                BigDecimal safeAllowance = allowance != null ? allowance : BigDecimal.ZERO;
-                BigDecimal safeDeduction = deduction != null ? deduction : BigDecimal.ZERO;
-
-                // finalNetSalary = baseSalary + bonus + allowance - deduction (advanceDeduct applied later by auto-netting)
-                BigDecimal finalNet = baseSalary.add(safeBonus).add(safeAllowance).subtract(safeDeduction);
-
-                if(finalNet.compareTo(BigDecimal.ZERO) < 0) {
-                    String msg = "Final net salary cannot be negative (row " + humanRowNum + ")";
-                    errors.add(new PayrollImportErrorResponse(humanRowNum, "deduction", "Deductions exceed total earnings"));
-                    entries.add(errorEntry(employeeName, employeeCode, baseSalary, bonus, allowance, deduction, msg));
-                    continue;
-
-                }
-
-                Payslip payslip = Payslip.builder()
-                        .payslipCode(payslipCode)
-                        .period(period)
-                        .user(user)
-                        .baseSalary(baseSalary)
-                        .bonus(safeBonus)
-                        .allowance(safeAllowance)
-                        .deduction(safeDeduction)
-                        .advanceDeduct(BigDecimal.ZERO)
-                        .finalNetSalary(finalNet)
-                        .status(PayslipStatus.DRAFT)
-                        .build();
-
-                toSave.add(payslip);
-                totalNetPayroll = totalNetPayroll.add(finalNet);
-
-                entries.add(new PayrollImportEntryResponse(
-                        null,          // id — set after save below
-                        payslipCode,
-                        user.getId(),
-                        user.getFullName(),
-                        employeeCode,
-                        baseSalary,
-                        safeBonus,
-                        safeAllowance,
-                        safeDeduction,
-                        BigDecimal.ZERO,
-                        finalNet,
-                        PayslipStatus.DRAFT.name(),
-                        "ok",
-                        null
-                ));
-            }
-
-            // 5. Persist successful payslips
-            List<Payslip> saved = payslipRepository.saveAll(toSave);
-
-            // Back-fill ids into ok entries
-            int savedIdx = 0;
-            for (int i = 0; i < entries.size(); i++) {
-                PayrollImportEntryResponse e = entries.get(i);
-                if ("ok".equals(e.importStatus())) {
-                    Payslip s = saved.get(savedIdx++);
-                    entries.set(i, new PayrollImportEntryResponse(
-                            s.getId(), e.payslipCode(), e.userId(), e.fullName(), e.employeeCode(),
-                            e.baseSalary(), e.bonus(), e.allowance(), e.deduction(),
-                            e.advanceDeduct(), e.finalNetSalary(), e.status(), "ok", null
-                    ));
-                }
-            }
-
-            int successCount = toSave.size();
-            int errorCount   = errors.size();
-
-            return new PayrollImportResultResponse(
-                    period.getId(),
-                    period.getPeriodCode(),
-                    period.getStatus().name(),
-                    successCount + errorCount,
-                    successCount,
-                    errorCount,
-                    entries,
-                    errors,
-                    totalNetPayroll
-            );
-
-        } catch (IOException e) {
-            throw new BadRequestException("Failed to read Excel file: " + e.getMessage());
-        }
+        throw new BadRequestException("Sử dụng Nhập/xuất Excel: xem trước /spreadsheets/payroll/preview rồi xác nhận /spreadsheets/batches/{id}/commit");
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -415,10 +212,14 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Transactional
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public String confirmOverwrite(Long periodId) {
-        if (!payrollPeriodRepository.existsById(periodId)) {
-            throw new ResourceNotFoundException("PayrollPeriod", "id", periodId);
+        PayrollPeriod period = payrollPeriodRepository.findByIdForUpdate(periodId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollPeriod", "id", periodId));
+        assertDraft(period);
+        if (period.getPayslips().stream().anyMatch(p -> p.getStatus() == PayslipStatus.PAID)) {
+            throw new BadRequestException("Cannot remove payslips that have been paid");
         }
         payslipRepository.deleteAllByPeriodId(periodId);
+        period.setNettingApplied(false);
         return "Previous payroll data cleared. Ready for re-import.";
     }
 
@@ -430,7 +231,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Transactional
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public AutoNettingResponse autoNetting(Long periodId) {
-        PayrollPeriod period = payrollPeriodRepository.findDetailById(periodId)
+        PayrollPeriod period = payrollPeriodRepository.findByIdForUpdate(periodId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollPeriod", "id", periodId));
 
         if (!period.isEditable()) {
@@ -440,7 +241,8 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
         List<AutoNettingSummaryEntryResponse> summary = new ArrayList<>();
         BigDecimal totalAdvanceDeducted = BigDecimal.ZERO;
 
-        for (Payslip payslip : period.getPayslips()) {
+        for (Payslip payslip : period.getPayslips().stream()
+                .sorted(java.util.Comparator.comparing(p -> p.getUser().getId())).toList()) {
             Long userId = payslip.getUser().getId();
             BigDecimal outstandingDebt = requestService.getTotalOutstandingDebt(userId);
 
@@ -496,7 +298,8 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Transactional
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public PayrollRunResponse runPayroll(Long periodId) {
-        PayrollPeriod period = payrollPeriodRepository.findDetailById(periodId)
+        payrollPeriodRepository.lockPayrollRun();
+        PayrollPeriod period = payrollPeriodRepository.findByIdForUpdate(periodId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollPeriod", "id", periodId));
 
         if (!period.isEditable()) {
@@ -511,11 +314,30 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
                     "Call POST /accountant/payroll/" + periodId + "/auto-netting first.");
         }
 
+        period.getPayslips().stream().map(p -> p.getUser().getId()).distinct().sorted().forEach(requestService::lockEmployeeFinancialScope);
         BigDecimal totalNetPayroll = BigDecimal.ZERO;
 
-        for (Payslip payslip : period.getPayslips()) {
+        for (Payslip payslip : period.getPayslips().stream()
+                .sorted(java.util.Comparator.comparing(p -> p.getUser().getId())).toList()) {
+            if (payslip.getStatus() != PayslipStatus.DRAFT) throw new BadRequestException("Period contains a non-draft payslip");
+            BigDecimal earnings = safe(payslip.getBaseSalary()).add(safe(payslip.getBonus()))
+                    .add(safe(payslip.getAllowance())).subtract(safe(payslip.getDeduction()));
+            BigDecimal offset = safe(payslip.getAdvanceDeduct());
+            BigDecimal expectedOffset = requestService.getTotalOutstandingDebt(payslip.getUser().getId())
+                    .min(earnings.multiply(new BigDecimal("0.5")).setScale(2,RoundingMode.HALF_UP));
+            if (offset.compareTo(expectedOffset) != 0 || earnings.signum() < 0 || offset.signum() < 0 || offset.compareTo(earnings.multiply(new BigDecimal("0.5")).setScale(2,RoundingMode.HALF_UP)) > 0
+                    || offset.compareTo(requestService.getTotalOutstandingDebt(payslip.getUser().getId())) > 0
+                    || earnings.subtract(offset).compareTo(safe(payslip.getFinalNetSalary())) != 0) {
+                throw new BadRequestException("Payroll figures or advance balances changed; apply auto-netting again");
+            }
             BigDecimal finalNet = safe(payslip.getFinalNetSalary());
             Transaction payrollTransaction = null;
+
+            BigDecimal advanceDeduct = safe(payslip.getAdvanceDeduct());
+            List<com.mkwang.backend.modules.request.dto.response.AdvanceSettlementAllocationResponse> advanceAllocations = List.of();
+            if (advanceDeduct.compareTo(BigDecimal.ZERO) > 0) {
+                advanceAllocations = requestService.applyPayrollDeduction(payslip.getUser().getId(), advanceDeduct);
+            }
 
             if (finalNet.compareTo(BigDecimal.ZERO) > 0) {
                 payrollTransaction = walletService.transfer(
@@ -528,12 +350,6 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
                 );
             }
 
-            BigDecimal advanceDeduct = safe(payslip.getAdvanceDeduct());
-            List<com.mkwang.backend.modules.request.dto.response.AdvanceSettlementAllocationResponse> advanceAllocations = List.of();
-            if (advanceDeduct.compareTo(BigDecimal.ZERO) > 0) {
-                advanceAllocations = requestService.applyPayrollDeduction(payslip.getUser().getId(), advanceDeduct);
-            }
-
             accountingJournalService.recordPayrollSettlement(payslip, payrollTransaction, advanceAllocations);
 
             payslip.setStatus(PayslipStatus.PAID);
@@ -543,7 +359,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
             // Notify employee: lương đã được chi trả
             try {
                 User employee = payslip.getUser();
-                notificationPublisher.publish(new NotificationEvent(
+                com.mkwang.backend.common.utils.AfterCommit.run(() -> notificationPublisher.publish(new NotificationEvent(
                         employee.getId(),
                         employee.getEmail(),
                         "SALARY_PAID",
@@ -553,7 +369,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
                                 + String.format("%,.0f", finalNet) + " ₫",
                         payslip.getId(),
                         "PAYSLIP"
-                ));
+                )));
             } catch (Exception e) {
                 // Notification failure must never break the payroll transaction
             }
@@ -578,7 +394,7 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Transactional
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public PayrollEntryResponse updatePayslipEntry(Long periodId, Long payslipId, UpdatePayslipEntryRequest request) {
-        PayrollPeriod period = payrollPeriodRepository.findById(periodId)
+        PayrollPeriod period = payrollPeriodRepository.findByIdForUpdate(periodId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollPeriod", "id", periodId));
 
         if (!period.isEditable()) {
@@ -588,6 +404,9 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
         Payslip payslip = payslipRepository.findByIdAndPeriodId(payslipId, periodId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payslip", "id", payslipId));
 
+        for (BigDecimal value : new BigDecimal[]{request.baseSalary(),request.bonus(),request.allowance(),request.deduction(),request.advanceDeduct()}) {
+            if (value != null && (value.signum() < 0 || value.scale() > 2)) throw new BadRequestException("Các khoản lương phải không âm, tối đa 2 số lẻ");
+        }
         if (request.baseSalary()    != null) payslip.setBaseSalary(request.baseSalary());
         if (request.bonus()         != null) payslip.setBonus(request.bonus());
         if (request.allowance()     != null) payslip.setAllowance(request.allowance());
@@ -599,7 +418,10 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
                 .add(safe(payslip.getAllowance()))
                 .subtract(safe(payslip.getDeduction()))
                 .subtract(safe(payslip.getAdvanceDeduct()));
+        if (finalNet.signum() < 0) throw new BadRequestException("Final net salary cannot be negative");
+        if (payslip.getStatus() != PayslipStatus.DRAFT) throw new BadRequestException("Paid payslips cannot be edited");
         payslip.setFinalNetSalary(finalNet);
+        period.setNettingApplied(false);
 
         return payrollManagementMapper.toEntryResponse(payslip);
     }
@@ -613,6 +435,10 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     // ─────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────
+
+    private void assertDraft(PayrollPeriod period) {
+        if (!period.isEditable()) throw new BadRequestException("Only DRAFT payroll periods can be changed");
+    }
 
     private void validateImportFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {

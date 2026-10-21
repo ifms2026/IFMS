@@ -12,6 +12,13 @@ import java.util.Optional;
 @Repository
 public interface PayrollPeriodRepository extends JpaRepository<PayrollPeriod, Long>, JpaSpecificationExecutor<PayrollPeriod> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from PayrollPeriod p where p.id = :id")
+    Optional<PayrollPeriod> findByIdForUpdate(@Param("id") Long id);
+
+    @Query(value = "select pg_advisory_xact_lock(89654321)", nativeQuery = true)
+    Object lockPayrollRun();
+
     boolean existsByMonthAndYear(Integer month, Integer year);
 
     Optional<PayrollPeriod> findByPeriodCode(String periodCode);

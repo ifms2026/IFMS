@@ -19,6 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class FileStorageController {
 
     private final CloudinaryService cloudinaryService;
+    private final com.mkwang.backend.modules.file.service.FileStorageService fileStorageService;
+
+    @org.springframework.web.bind.annotation.PostMapping("/documents")
+    public ResponseEntity<ApiResponse<com.mkwang.backend.modules.file.dto.response.RegisteredDocumentResponse>> register(
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody com.mkwang.backend.modules.file.dto.request.RegisterDocumentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(fileStorageService.register(request)));
+    }
 
     @GetMapping("/signature")
     @SecurityRequirement(name = "bearerAuth")

@@ -35,6 +35,7 @@ import java.util.List;
 public class CategoryBudgetServiceImpl implements CategoryBudgetService {
 
     private final ProjectRepository projectRepository;
+    private final ProjectFinancialGuard financialGuard;
     private final ProjectPhaseRepository projectPhaseRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
@@ -61,6 +62,7 @@ public class CategoryBudgetServiceImpl implements CategoryBudgetService {
     @Transactional
     @PreAuthorize("hasAnyAuthority('PROJECT_BUDGET_ALLOCATE','PROJECT_CATEGORY_MANAGE')")
     public PhaseCategoryBudgetResponse updatePhaseCategoryBudgets(Long projectId, SetCategoryBudgetsRequest request, User currentUser) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         getProjectOrThrow(projectId);
         assertTlLeaderOf(currentUser.getId(), projectId);
         ProjectPhase phase = getPhaseOrThrow(request.phaseId());
@@ -68,8 +70,18 @@ public class CategoryBudgetServiceImpl implements CategoryBudgetService {
 
         PhaseCategoryBudgetId budgetId = new PhaseCategoryBudgetId(request.phaseId(), request.categoryId());
         PhaseCategoryBudget targetBudget = phaseCategoryBudgetRepository.findById(budgetId)
-                .orElseThrow(() -> new ResourceNotFoundException("PhaseCategoryBudget", "id", budgetId));
+                .orElseGet(() -> {
+                    ExpenseCategory category = expenseCategoryRepository.findById(request.categoryId())
+                            .orElseThrow(() -> new ResourceNotFoundException("ExpenseCategory", "id", request.categoryId()));
+                    if (!Boolean.TRUE.equals(category.getIsSystemDefault())
+                            && (category.getProject() == null || !category.getProject().getId().equals(projectId))) {
+                        throw new BadRequestException("Danh mục không thuộc dự án");
+                    }
+                    return PhaseCategoryBudget.builder().id(budgetId).phase(phase).category(category)
+                            .budgetLimit(BigDecimal.ZERO).currentSpent(BigDecimal.ZERO).build();
+                });
 
+        financialGuard.assertLimit(projectId, request.phaseId(), request.categoryId(), targetBudget.getCurrentSpent(), request.budgetLimit());
         if (request.budgetLimit().compareTo(targetBudget.getCurrentSpent()) < 0) {
             throw new BadRequestException(
                     "budgetLimit moi cua categoryId=" + request.categoryId() +
@@ -99,6 +111,7 @@ public class CategoryBudgetServiceImpl implements CategoryBudgetService {
     @Transactional
     @PreAuthorize("hasAnyAuthority('PROJECT_BUDGET_ALLOCATE','PROJECT_CATEGORY_MANAGE')")
     public PhaseCategoryBudgetResponse removePhaseCategoryBudgets(Long projectId, RemovePhaseCategoryBudgetsRequest request, User currentUser) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         getProjectOrThrow(projectId);
         assertTlLeaderOf(currentUser.getId(), projectId);
         ProjectPhase phase = getPhaseOrThrow(request.phaseId());
@@ -108,6 +121,7 @@ public class CategoryBudgetServiceImpl implements CategoryBudgetService {
         PhaseCategoryBudget budgetToRemove = phaseCategoryBudgetRepository.findById(budgetId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhaseCategoryBudget", "id", budgetId));
 
+        financialGuard.assertLimit(projectId, request.phaseId(), request.categoryId(), budgetToRemove.getCurrentSpent(), BigDecimal.ZERO);
         if (budgetToRemove.getCurrentSpent().compareTo(BigDecimal.ZERO) != 0) {
             throw new BadRequestException(
                     "Chi duoc remove categoryId=" + request.categoryId() + " khi currentSpent = 0"
@@ -131,6 +145,7 @@ public class CategoryBudgetServiceImpl implements CategoryBudgetService {
     @Transactional
     @PreAuthorize("hasAuthority('PROJECT_CATEGORY_MANAGE')")
     public ExpenseCategoryResponse createProjectCategory(Long projectId, CreateExpenseCategoryRequest request, User currentUser) {
+        projectRepository.findByIdForUpdate(projectId).orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
         Project project = getProjectOrThrow(projectId);
         assertTlLeaderOf(currentUser.getId(), projectId);
         ProjectPhase phase = getPhaseOrThrow(request.phaseId());
@@ -178,10 +193,20 @@ public class CategoryBudgetServiceImpl implements CategoryBudgetService {
     @Transactional
     public void incrementSpent(Long phaseId, Long categoryId, BigDecimal amount) {
         PhaseCategoryBudgetId budgetId = new PhaseCategoryBudgetId(phaseId, categoryId);
-        phaseCategoryBudgetRepository.findById(budgetId).ifPresent(budget -> {
-            budget.setCurrentSpent(budget.getCurrentSpent().add(amount));
-            phaseCategoryBudgetRepository.save(budget);
-        });
+        PhaseCategoryBudget budget = phaseCategoryBudgetRepository.findById(budgetId)
+                .orElseThrow(() -> new BadRequestException("Danh mục chưa được cấp hạn mức"));
+        if (amount == null || amount.signum() <= 0 || !budget.hasSufficientBalance(amount)) {
+            throw new BadRequestException("Chi phí vượt hạn mức còn lại của danh mục");
+        }
+        budget.addSpent(amount);
+        phaseCategoryBudgetRepository.save(budget);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal getRemainingBudget(Long phaseId, Long categoryId) {
+        return phaseCategoryBudgetRepository.findById(new PhaseCategoryBudgetId(phaseId, categoryId))
+                .orElseThrow(() -> new BadRequestException("Danh mục chưa được cấp hạn mức")).getAvailableBalance();
     }
 
     private Project getProjectOrThrow(Long projectId) {

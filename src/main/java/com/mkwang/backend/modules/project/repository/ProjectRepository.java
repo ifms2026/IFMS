@@ -13,6 +13,10 @@ import java.util.List;
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpecificationExecutor<Project> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Project p where p.id = :id")
+    java.util.Optional<Project> findByIdForUpdate(@Param("id") Long id);
+
     java.util.Optional<Project> findByIdAndDepartment_Id(Long projectId, Long departmentId);
 
     List<Project> findByDepartment_IdOrderByCreatedAtDesc(Long departmentId);
