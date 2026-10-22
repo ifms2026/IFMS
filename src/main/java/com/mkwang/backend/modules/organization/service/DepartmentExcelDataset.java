@@ -2,6 +2,7 @@ package com.mkwang.backend.modules.organization.service;
 import com.mkwang.backend.common.exception.*;
 import com.mkwang.backend.modules.user.entity.User;
 import com.mkwang.backend.modules.user.service.UserService;
+import com.mkwang.backend.modules.user.repository.UserRepository;
 import com.mkwang.backend.modules.organization.repository.DepartmentRepository;
 import com.mkwang.backend.modules.organization.dto.request.CreateDepartmentRequest;
 import com.mkwang.backend.modules.spreadsheet.service.*;
@@ -14,11 +15,15 @@ import java.util.*;
 import static com.mkwang.backend.modules.spreadsheet.service.ExcelValues.*;
 @Component @RequiredArgsConstructor
 public class DepartmentExcelDataset implements ExcelDataset {
-    private final DepartmentRepository departments;private final DepartmentService service;private final UserService users;
+    private final DepartmentRepository departments;private final DepartmentService service;private final UserService users;private final UserRepository userRepository;
     public String code(){return "departments";}public String label(){return "Phòng ban · tạo mới";}
     public Set<String> roles(){return Set.of("ADMIN");}
     public List<ExcelColumnResponse> columns(){return List.of(column("code","Mã phòng ban","TEXT",true),column("name","Tên phòng ban","TEXT",true),column("managerId","Quản lý","TEXT",false),column("totalProjectQuota","Hạn mức dự kiến","MONEY",false));}
     public void authorize(User actor,Long scope){if(scope!=null) throw new BadRequestException("Không dùng scope cho phòng ban");}
+    public List<Map<String,Object>> references(User actor,Long scope){
+        return userRepository.findAvailableDepartmentManagers().stream()
+                .map(user->values("kind","MANAGER","id",user.getId(),"name",user.getFullName(),"email",user.getEmail())).toList();
+    }
     public List<ExcelRowErrorResponse> validate(List<ExcelRowResponse> rows,User actor,Long scope){
         var errors=new ArrayList<>(ExcelValidation.rows(rows,row->row.values().get("code").toUpperCase(Locale.ROOT),row->{
             var v=row.values();String code=v.get("code").toUpperCase(Locale.ROOT);

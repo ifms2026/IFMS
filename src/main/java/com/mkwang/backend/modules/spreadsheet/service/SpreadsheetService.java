@@ -7,6 +7,8 @@ import com.mkwang.backend.modules.auth.security.UserDetailsAdapter;
 import com.mkwang.backend.modules.spreadsheet.dto.response.*;
 import com.mkwang.backend.modules.spreadsheet.entity.ExcelImportBatch;
 import com.mkwang.backend.modules.spreadsheet.repository.ExcelImportBatchRepository;
+import com.mkwang.backend.modules.spreadsheet.repository.ExcelExportLogRepository;
+import com.mkwang.backend.modules.spreadsheet.entity.ExcelExportLog;
 import com.mkwang.backend.modules.user.entity.User;
 import jakarta.persistence.*;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class SpreadsheetService {
     private final List<ExcelDataset> datasets;
     private final ExcelWorkbookService workbooks;
     private final ExcelImportBatchRepository batches;
+    private final ExcelExportLogRepository exportLogs;
     private final ObjectMapper json;
     @PersistenceContext private EntityManager em;
     @Value("${app.excel.preview-ttl-minutes:30}") private long ttlMinutes;
@@ -104,7 +107,7 @@ public class SpreadsheetService {
         return workbooks.export("Lỗi nhập "+dataset.label(),columns,preview.errors().stream()
                 .map(e->ExcelValues.values("row",e.row(),"column",e.column(),"message",e.message())).toList(),actor().getFullName());
     }
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    @Transactional(isolation=Isolation.REPEATABLE_READ)
     @PreAuthorize("isAuthenticated()")
     public byte[] export(String code,Long scope,Map<String,String> filters) {
         var dataset=dataset(code,scope);
@@ -112,7 +115,25 @@ public class SpreadsheetService {
             throw new BadRequestException("Bộ dữ liệu này xuất trạng thái hiện tại, không hỗ trợ lọc theo ngày");
         var rows=dataset.export(actor(),scope,filters,maxExportRows);
         if(rows.size()>maxExportRows) throw new BadRequestException("Báo cáo vượt "+maxExportRows+" dòng; hãy thu hẹp bộ lọc");
-        return workbooks.export(dataset.label()+" · bộ lọc "+filters,dataset.exportColumns(),rows,actor().getFullName());
+        User user=actor();
+        byte[] file=workbooks.export(dataset.label()+" · bộ lọc "+filters,dataset.exportColumns(),rows,user.getFullName());
+        try {
+            String checksum=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file));
+            exportLogs.save(ExcelExportLog.builder().actorId(user.getId()).datasetCode(code)
+                    .scopeKey(scope==null?"GLOBAL":scope.toString()).filterSnapshot(write(filters))
+                    .rowCount(rows.size()).fileSha256(checksum).createdAt(Instant.now()).build());
+        } catch(NoSuchAlgorithmException impossible) {
+            throw new InternalSystemException("Không tạo được mã kiểm tra file xuất Excel");
+        }
+        return file;
+    }
+
+    @Transactional(readOnly=true)
+    @PreAuthorize("isAuthenticated()")
+    public List<ExcelExportLogResponse> exportHistory() {
+        return exportLogs.findTop50ByActorIdOrderByCreatedAtDesc(actor().getId()).stream()
+                .map(log->new ExcelExportLogResponse(log.getId(),log.getDatasetCode(),log.getScopeKey(),
+                        log.getFilterSnapshot(),log.getRowCount(),log.getFileSha256(),log.getCreatedAt())).toList();
     }
     private ExcelPreviewResponse validate(ExcelImportBatch batch,ExcelDataset dataset,Long scope) {
         var payload=read(batch.getPayload(),Payload.class);

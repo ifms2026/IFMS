@@ -5,6 +5,8 @@ import com.mkwang.backend.modules.request.entity.*;
 import com.mkwang.backend.modules.request.repository.*;
 import com.mkwang.backend.modules.request.mapper.RequestExcelMapper;
 import com.mkwang.backend.modules.project.service.ProjectQueryService;
+import com.mkwang.backend.modules.project.repository.ProjectPhaseRepository;
+import com.mkwang.backend.modules.project.repository.PhaseCategoryBudgetRepository;
 import com.mkwang.backend.modules.file.service.FileStorageService;
 import com.mkwang.backend.modules.file.entity.FileStorage;
 import com.mkwang.backend.modules.spreadsheet.service.*;
@@ -18,7 +20,8 @@ import static com.mkwang.backend.modules.spreadsheet.service.ExcelValues.*;
 public class EmployeeRequestExcelDataset implements ExcelDataset {
     private final RequestRepository requests;private final AdvanceBalanceRepository advances;
     private final RequestService service;private final RequestExcelMapper mapper;private final FileStorageService files;
-    private final ProjectQueryService projects;private final jakarta.validation.Validator validator;
+    private final ProjectQueryService projects;private final ProjectPhaseRepository phases;
+    private final PhaseCategoryBudgetRepository categoryBudgets;private final jakarta.validation.Validator validator;
     public String code(){return "requests";}public String label(){return "Yêu cầu cá nhân · gửi mới chờ duyệt";}
     public Set<String> roles(){return Set.of("EMPLOYEE");}
     public List<ExcelColumnResponse> columns(){return List.of(column("type","Loại: ADVANCE/EXPENSE/REIMBURSE","TEXT",true),column("projectId","Dự án","TEXT",true),column("phaseId","Giai đoạn","TEXT",true),column("categoryId","Danh mục","TEXT",true),column("advanceBalanceId","Khoản tạm ứng gốc nếu quyết toán","TEXT",false),column("amount","Số tiền","MONEY",true),column("description","Nội dung","TEXT",true),column("documentIds","ID chứng từ đã upload, cách nhau bằng ;","TEXT",false));}
@@ -51,6 +54,13 @@ public class EmployeeRequestExcelDataset implements ExcelDataset {
         var result=new ArrayList<Map<String,Object>>();
         for(var p:projects.getProjects(actor,null)) {
             result.add(values("kind","PROJECT","id",p.id(),"name",p.name()));
+            for(var phase:phases.findByProject_IdOrderByCreatedAtAsc(p.id())) {
+                result.add(values("kind","PHASE","id",phase.getId(),"name",phase.getName(),"projectId",p.id()));
+                for(var budget:categoryBudgets.findByIdPhaseId(phase.getId())) {
+                    result.add(values("kind","CATEGORY","id",budget.getCategory().getId(),"name",budget.getCategory().getName(),
+                            "projectId",p.id(),"phaseId",phase.getId()));
+                }
+            }
         }
         for(var balance:advances.findByUserIdAndStatusNot(actor.getId(),AdvanceBalanceStatus.SETTLED)) {
             var req=balance.getAdvanceRequest();

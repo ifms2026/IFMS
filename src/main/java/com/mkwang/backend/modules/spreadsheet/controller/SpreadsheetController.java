@@ -16,6 +16,9 @@ public class SpreadsheetController {
     @GetMapping public ResponseEntity<ApiResponse<List<ExcelDatasetResponse>>> datasets() {
         return ResponseEntity.ok(ApiResponse.success(excel.list()));
     }
+    @GetMapping("/exports/history") public ResponseEntity<ApiResponse<List<ExcelExportLogResponse>>> exportHistory() {
+        return ResponseEntity.ok(ApiResponse.success(excel.exportHistory()));
+    }
     @GetMapping("/{dataset}/template") public ResponseEntity<byte[]> template(@PathVariable String dataset,@RequestParam(required=false)Long scope) {
         return file(excel.template(dataset,scope),dataset+"-template.xlsx");
     }

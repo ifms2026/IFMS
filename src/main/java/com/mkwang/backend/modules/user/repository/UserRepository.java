@@ -130,4 +130,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Query("SELECT u FROM User u WHERE u.role.name = :roleName AND u.status = 'ACTIVE'")
     List<User> findActiveUsersByRoleName(@Param("roleName") String roleName);
+
+    @Query("SELECT u FROM User u WHERE u.role.name = 'MANAGER' AND u.status = 'ACTIVE' AND u.department IS NULL ORDER BY u.fullName")
+    List<User> findAvailableDepartmentManagers();
 }
