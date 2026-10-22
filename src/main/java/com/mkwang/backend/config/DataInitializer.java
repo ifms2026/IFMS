@@ -200,7 +200,7 @@ public class DataInitializer implements CommandLineRunner {
         var admin=userRepository.save(User.builder().email(bootstrapAdminEmail.trim().toLowerCase(java.util.Locale.ROOT))
                 .password(passwordEncoder.encode(bootstrapAdminPassword))
                 .fullName(bootstrapAdminName.isBlank()?bootstrapAdminEmail.trim():bootstrapAdminName.trim())
-                .role(role).status(UserStatus.ACTIVE).isFirstLogin(false).build());
+                .role(role).status(UserStatus.ACTIVE).isFirstLogin(true).build());
         entityManager.persist(UserProfile.builder().user(admin).jobTitle("Quản trị hệ thống").build());
         entityManager.persist(UserSecuritySettings.builder().user(admin).build());
         walletRepository.save(Wallet.builder().ownerType(WalletOwnerType.USER).ownerId(admin.getId()).build());

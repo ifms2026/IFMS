@@ -13,10 +13,8 @@ public class SystemTopupRequest {
     @DecimalMin(value = "0.01", message = "Amount must be positive")
     private BigDecimal amount;
 
-    /** Bank transfer reference number from the real bank transaction. */
-    @jakarta.validation.constraints.NotBlank(message = "Cần mã chứng từ/chuyển khoản ngân hàng")
-    @jakarta.validation.constraints.Size(max = 100)
-    private String paymentRef;
+    @NotNull(message = "Cần chọn dòng sao kê ngân hàng đã ghi nhận")
+    private Long bankEvidenceId;
 
     private String description;
 }

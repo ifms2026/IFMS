@@ -174,7 +174,10 @@ public class ProfileServiceImpl implements ProfileService {
             throw new BadRequestException("newPin must be different from currentPin");
         }
 
-        UserSecuritySettings settings = getSecuritySettings(userId);
+        UserSecuritySettings settings = userSecuritySettingsRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserSecuritySettings", "userId", userId));
+        if (settings.getTransactionPin() == null || settings.getTransactionPin().isBlank())
+            throw new BadRequestException("Transaction PIN has not been set up yet");
         if (settings.isPinLocked()) {
             throw new LockedException("PIN is temporarily locked. Please try again later");
         }
@@ -193,13 +196,17 @@ public class ProfileServiceImpl implements ProfileService {
     }
 
     @Override
-    @Transactional(noRollbackFor = {UnauthorizedException.class, LockedException.class})
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW,
+            noRollbackFor = {UnauthorizedException.class, LockedException.class})
     public PinVerifyResponse verifyMyPin(Long userId, VerifyMyPinRequest request) {
         if (!pinValidator.isValidFormat(request.getPin())) {
             throw new UnauthorizedException("Invalid PIN");
         }
 
-        UserSecuritySettings settings = getSecuritySettings(userId);
+        UserSecuritySettings settings = userSecuritySettingsRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserSecuritySettings", "userId", userId));
+        if (settings.getTransactionPin() == null || settings.getTransactionPin().isBlank())
+            throw new BadRequestException("Transaction PIN has not been set up yet");
         if (settings.isPinLocked()) {
             throw new LockedException("PIN is temporarily locked. Please try again later");
         }

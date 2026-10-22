@@ -48,6 +48,7 @@ public class AccountingCorrectionService {
             if(journals.findByOriginalJournalId(verified.getId()).isPresent()) throw new BadRequestException("Chi phí gốc đã được đảo");
             originals.add(verified);
         }
+        validatePostingDate(input.postingDate(), originals);
         Long transactionId;
         if(original.getEventType()==AccountingJournalEvent.PAYROLL_SETTLEMENT) {
             var allocations=original.getLines().stream().filter(line->"ADVANCE_RECEIVABLE".equals(line.getAccountCode()) && line.getCreditAmount().signum()>0)
@@ -86,5 +87,26 @@ public class AccountingCorrectionService {
             result.add(mapper.toDetail(journals.save(reversal)));
         }
         return result;
+    }
+
+    private void validatePostingDate(LocalDate postingDate, List<AccountingJournal> originals) {
+        String targetPeriod = YearMonth.from(postingDate).toString();
+        if (isPeriodClosed(targetPeriod)) throw new BadRequestException("Kỳ ghi ngày đảo đã đóng");
+        for (AccountingJournal source : originals) {
+            if (postingDate.isBefore(source.getPostingDate())) {
+                throw new BadRequestException("Ngày đảo không được trước ngày ghi sổ của bút toán gốc " + source.getJournalCode());
+            }
+            if (isPeriodClosed(source.getPostingPeriod())) {
+                String currentPeriod = YearMonth.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString();
+                if (!targetPeriod.equals(currentPeriod)) {
+                    throw new BadRequestException("Bút toán gốc thuộc kỳ đã đóng; phải ghi đảo trong kỳ hiện tại đang mở " + currentPeriod);
+                }
+            }
+        }
+    }
+
+    private boolean isPeriodClosed(String period) {
+        return ((Number) em.createNativeQuery("SELECT COUNT(*) FROM accounting_periods WHERE period=:period AND closed")
+                .setParameter("period", period).getSingleResult()).longValue() > 0;
     }
 }

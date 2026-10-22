@@ -2,6 +2,7 @@ package com.mkwang.backend.modules.accounting.service;
 
 import com.mkwang.backend.common.exception.BadRequestException;
 import com.mkwang.backend.modules.accounting.dto.response.AccountingPeriodResponse;
+import com.mkwang.backend.modules.accounting.dto.response.AccountingPeriodClosePreviewResponse;
 import com.mkwang.backend.modules.auth.security.UserDetailsAdapter;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -32,23 +33,24 @@ public class AccountingPeriodService {
 
     @Transactional
     @PreAuthorize("hasAnyRole('ACCOUNTANT','CFO')")
-    public void close(String period, String reason) {
-        YearMonth month;
-        try { month = YearMonth.parse(period); }
-        catch (java.time.format.DateTimeParseException error) { throw new BadRequestException("Kỳ phải có dạng YYYY-MM"); }
-        if (month.atEndOfMonth().isAfter(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")))) {
-            throw new BadRequestException("Chỉ đóng kỳ đã kết thúc");
-        }
+    public AccountingPeriodClosePreviewResponse previewClose(String period) {
+        YearMonth month = parsePeriod(period);
+        return inspectClose(period, month);
+    }
+
+    @Transactional
+    @PreAuthorize("hasAnyRole('ACCOUNTANT','CFO')")
+    public void close(String period, String reason, boolean reviewAcknowledged) {
+        YearMonth month = parsePeriod(period);
+        if (!reviewAcknowledged) throw new BadRequestException("Cần xem và xác nhận kết quả kiểm tra trước khi đóng kỳ");
+        AccountingPeriodClosePreviewResponse preview = inspectClose(period, month);
+        if (!preview.eligible()) throw new BadRequestException(String.join("; ", preview.blockingIssues()));
         if (reason == null || reason.isBlank()) throw new BadRequestException("Cần lý do đóng kỳ");
         em.createNativeQuery("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))")
                 .setParameter("key","IFMS_ACCOUNTING_PERIOD:"+period).getSingleResult();
-        Number invalid = (Number) em.createNativeQuery("""
-                SELECT COUNT(*) FROM accounting_journals j
-                LEFT JOIN (SELECT journal_id, COUNT(*) AS n, SUM(debit_amount) AS d, SUM(credit_amount) AS c
-                           FROM accounting_journal_lines GROUP BY journal_id) s ON s.journal_id=j.id
-                WHERE j.posting_period=:period AND (COALESCE(s.n,0)<2 OR s.d<>s.c OR s.d<>j.total_amount)
-                """).setParameter("period",period).getSingleResult();
-        if (invalid.longValue() != 0) throw new BadRequestException("Kỳ có bút toán thiếu hoặc lệch, cần đối chiếu trước");
+        // Recheck after taking the same lock used by writers, so a preview cannot go stale before close.
+        preview = inspectClose(period, month);
+        if (!preview.eligible()) throw new BadRequestException(String.join("; ", preview.blockingIssues()));
         var principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long actor = principal instanceof UserDetailsAdapter adapter ? adapter.getUser().getId() : null;
         int changed = em.createNativeQuery("""
@@ -58,5 +60,50 @@ public class AccountingPeriodService {
                 WHERE NOT accounting_periods.closed
                 """).setParameter("period",period).setParameter("actor",actor).setParameter("reason",reason).executeUpdate();
         if (changed == 0) throw new BadRequestException("Kỳ đã đóng");
+    }
+
+    private YearMonth parsePeriod(String period) {
+        YearMonth month;
+        try { month = YearMonth.parse(period); }
+        catch (java.time.format.DateTimeParseException error) { throw new BadRequestException("Kỳ phải có dạng YYYY-MM"); }
+        return month;
+    }
+
+    private AccountingPeriodClosePreviewResponse inspectClose(String period, YearMonth month) {
+        java.util.ArrayList<String> blockers = new java.util.ArrayList<>();
+        if (!month.isBefore(YearMonth.now(ZoneId.of("Asia/Ho_Chi_Minh")))) {
+            blockers.add("Chỉ đóng kỳ đã kết thúc");
+        }
+        Number alreadyClosed = (Number) em.createNativeQuery("SELECT COUNT(*) FROM accounting_periods WHERE period=:period AND closed")
+                .setParameter("period",period).getSingleResult();
+        if (alreadyClosed.longValue() > 0) blockers.add("Kỳ đã được đóng trước đó");
+        Number journalCount = (Number) em.createNativeQuery("SELECT COUNT(*) FROM accounting_journals WHERE posting_period=:period")
+                .setParameter("period",period).getSingleResult();
+        Number invalid = (Number) em.createNativeQuery("""
+                SELECT COUNT(*) FROM accounting_journals j
+                LEFT JOIN (SELECT journal_id, COUNT(*) AS n, SUM(debit_amount) AS d, SUM(credit_amount) AS c
+                           FROM accounting_journal_lines GROUP BY journal_id) s ON s.journal_id=j.id
+                WHERE j.posting_period=:period AND (COALESCE(s.n,0)<2 OR s.d<>s.c OR s.d<>j.total_amount)
+                """).setParameter("period",period).getSingleResult();
+        if (invalid.longValue() != 0) blockers.add("Có bút toán thiếu dòng hoặc không cân bằng");
+        Number missingSources = (Number) em.createNativeQuery("""
+                SELECT COUNT(*) FROM accounting_journals
+                WHERE posting_period=:period AND (source_type IS NULL OR source_id IS NULL OR source_snapshot IS NULL)
+                """).setParameter("period",period).getSingleResult();
+        if (missingSources.longValue() != 0) blockers.add("Có journal thiếu mã nguồn hoặc bản chụp nguồn");
+        Number unmatchedTopups = (Number) em.createNativeQuery("""
+                SELECT COUNT(*) FROM accounting_journals j
+                WHERE j.posting_period=:period AND j.event_type='SYSTEM_TOPUP'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM bank_statement_matches m
+                    JOIN bank_statement_lines s ON s.id=m.statement_line_id
+                    LEFT JOIN bank_booking_confirmations c ON c.statement_line_id=s.id
+                    WHERE m.transaction_id=j.wallet_transaction_id
+                      AND s.direction='IN' AND (s.state='BOOKED' OR c.statement_line_id IS NOT NULL))
+                """).setParameter("period",period).getSingleResult();
+        if (unmatchedTopups.longValue() != 0) blockers.add("Có khoản nạp quỹ chưa khớp sao kê IN/BOOKED");
+        return new AccountingPeriodClosePreviewResponse(period,blockers.isEmpty(),journalCount.longValue(),
+                invalid.longValue(),missingSources.longValue(),unmatchedTopups.longValue(),List.copyOf(blockers),
+                List.of("Tạm ứng chưa quyết toán được chuyển tiếp để theo dõi ở kỳ sau; không tự động ghi thành chi phí."));
     }
 }

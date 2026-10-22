@@ -46,12 +46,15 @@ public class CompanyFundServiceImpl implements CompanyFundService {
     @Transactional
     @PreAuthorize("hasAuthority('COMPANY_FUND_TOPUP')")
     public TransactionResponse topup(SystemTopupRequest request) {
+        BankEvidenceService.TopupEvidence evidence = bankEvidence.requireBookedTopupEvidence(
+                request.getBankEvidenceId(), request.getAmount());
         Transaction txn = walletService.systemTopup(
                 request.getAmount(),
-                request.getPaymentRef(),
+                evidence.bankReference(),
                 request.getDescription()
         );
         accountingJournalService.recordSystemTopup(txn);
+        bankEvidence.match(evidence.id(), txn.getId(), currentUserId(), "Nạp quỹ theo dòng sao kê BOOKED " + evidence.bankReference());
         return walletMapper.toTransactionResponse(txn);
     }
 

@@ -15,6 +15,44 @@ import java.util.*;
 public class BankEvidenceService {
     private final CompanyFundRepository funds;private final WalletFinancialEvidenceService movements;
     @PersistenceContext private EntityManager em;
+
+    public record TopupEvidence(Long id, String bankReference, BigDecimal amount) {}
+
+    @Transactional(readOnly=true)
+    @PreAuthorize("hasAnyRole('CFO','ACCOUNTANT')")
+    public List<Map<String,Object>> topupCandidates() {
+        @SuppressWarnings("unchecked") List<Object[]> rows=em.createNativeQuery("""
+                SELECT s.id,s.bank_reference,s.booking_date,s.amount,s.description
+                FROM bank_statement_lines s
+                LEFT JOIN bank_booking_confirmations c ON c.statement_line_id=s.id
+                LEFT JOIN bank_statement_matches m ON m.statement_line_id=s.id
+                WHERE s.bank_account=:account AND s.direction='IN'
+                  AND (s.state='BOOKED' OR c.statement_line_id IS NOT NULL)
+                  AND m.id IS NULL
+                ORDER BY COALESCE(c.booking_date,s.booking_date) DESC,s.id DESC
+                """).setParameter("account",account()).setMaxResults(500).getResultList();
+        return rows.stream().map(row->ExcelValues.values("id",row[0],"bankReference",row[1],
+                "bookingDate",row[2].toString(),"amount",row[3],"description",row[4])).toList();
+    }
+
+    @Transactional
+    public TopupEvidence requireBookedTopupEvidence(Long lineId,BigDecimal amount) {
+        @SuppressWarnings("unchecked") List<Object[]> rows=em.createNativeQuery("""
+                SELECT s.bank_account,s.bank_reference,s.amount,s.direction,
+                       CASE WHEN c.statement_line_id IS NOT NULL THEN 'BOOKED' ELSE s.state END,m.id
+                FROM bank_statement_lines s
+                LEFT JOIN bank_booking_confirmations c ON c.statement_line_id=s.id
+                LEFT JOIN bank_statement_matches m ON m.statement_line_id=s.id
+                WHERE s.id=:id FOR UPDATE OF s
+                """).setParameter("id",lineId).getResultList();
+        if(rows.isEmpty()) throw new BadRequestException("Cần chọn dòng sao kê đã xác nhận");
+        Object[] row=rows.get(0);
+        if(!account().equals(row[0])||!"IN".equals(row[3])||!"BOOKED".equals(row[4])||row[5]!=null
+                ||((BigDecimal)row[2]).compareTo(amount)!=0) {
+            throw new BadRequestException("Chứng từ nạp phải là dòng IN/BOOKED chưa dùng, đúng tài khoản và đúng số tiền");
+        }
+        return new TopupEvidence(lineId,(String)row[1],(BigDecimal)row[2]);
+    }
     @Transactional(readOnly=true)
     public boolean hasBookedMatch(Long transactionId) {
         return ((Number)em.createNativeQuery("""

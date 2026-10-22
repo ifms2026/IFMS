@@ -329,8 +329,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private boolean requiresFirstLoginSetup(User user) {
-        String roleName = user.getRole() != null ? user.getRole().getName() : null;
-        return Boolean.TRUE.equals(user.getIsFirstLogin()) && !"ADMIN".equals(roleName);
+        return Boolean.TRUE.equals(user.getIsFirstLogin());
     }
 
     private UserInfoResponse buildUserInfo(User user) {

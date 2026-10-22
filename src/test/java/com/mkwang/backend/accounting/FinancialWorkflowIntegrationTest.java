@@ -56,6 +56,7 @@ class FinancialWorkflowIntegrationTest {
     @MockitoBean com.mkwang.backend.modules.audit.publisher.AuditPublisher audit;
     @Autowired EntityManager em; @Autowired PlatformTransactionManager tm; @Autowired PasswordEncoder passwords;
     @Autowired RequestService requests; @Autowired WalletService wallets; @Autowired CompanyFundService fund;
+    @Autowired com.mkwang.backend.modules.accounting.service.BankEvidenceService bankEvidence;
     @Autowired PayrollManagementService payroll; @Autowired AccountingCorrectionService corrections; @Autowired SpreadsheetService excel;
     @Autowired AccountingCostReconciliationService costReconciliation; @Autowired AccountingOpeningService opening;
     @Autowired AccountingBackfillService history;
@@ -80,7 +81,10 @@ class FinancialWorkflowIntegrationTest {
             ExpenseCategory cat=em.createQuery("select c from ExpenseCategory c where c.isSystemDefault=true",ExpenseCategory.class).setMaxResults(1).getSingleResult();categoryId=cat.getId();
             em.persist(PhaseCategoryBudget.builder().id(new PhaseCategoryBudgetId(phaseId,categoryId)).phase(phase).category(cat).budgetLimit(money("5000")).build());
         });
-        login("CFO");SystemTopupRequest topup=new SystemTopupRequest();topup.setAmount(money("10000"));topup.setPaymentRef("IT-"+suffix);fund.topup(topup);
+        login("CFO");
+        tx.executeWithoutResult(status -> em.createNativeQuery("UPDATE company_funds SET bank_account='IFMS-TEST' WHERE id=1").executeUpdate());
+        Long evidenceId=bankEvidence.importLine("IFMS-TEST","IT-"+suffix,LocalDate.now(),"IN",money("10000"),"BOOKED","integration fixture",actorId(),null);
+        SystemTopupRequest topup=new SystemTopupRequest();topup.setAmount(money("10000"));topup.setBankEvidenceId(evidenceId);fund.topup(topup);
         login("MANAGER");Long deptReq=create(RequestType.DEPARTMENT_TOPUP,"5000",null,false).getId();
         login("CFO");requests.approveCfoRequest(deptReq,actorId(),new ApproveRequestRequest("integration",null));
         login("TEAM_LEADER");Long prjReq=create(RequestType.PROJECT_TOPUP,"5000",null,false).getId();
