@@ -1,5 +1,33 @@
 # IFMS — triển khai sổ cái và theo dõi ngân sách/tạm ứng
 
+## Cập nhật sau sửa F20–F24 — 23/10/2026
+
+- `GET /accountant/ledger/bank-evidence/topup-candidates` và
+  `GET /accountant/ledger/bank-evidence/{id}/candidates` trả
+  `ApiResponse<PageResponse<BankCandidateResponse>>` thay mảng.
+- Tham số chung: `search` (mã sao kê/giao dịch), `from`, `to`, `page=1`,
+  `limit=20` (1–100); topup thêm `amount` dương, so khớp chính xác.
+  Matching tự lấy số tiền và chiều theo sao kê, kiểm đúng tài khoản hiện tại.
+  DTO có `id/label/referenceCode/date/amount`.
+- Dùng read model `@Subselect @Immutable`, repository và Specification riêng,
+  mapper DTO riêng. Điều kiện lọc/đúng chiều/chưa khớp áp dụng trước phân trang
+  và count; không cắt 500/1.000 dòng rồi lọc trong Java. Không thêm schema hay
+  migration mới. Không truyền ngày thì tìm toàn lịch sử. Quyền CFO/ACCOUNTANT.
+- Khi ghi nạp quỹ/khớp, các kiểm tra chứng cứ và khóa nguồn vẫn được thực hiện
+  lại; kết quả tìm kiếm không phải xác nhận chuyển tiền.
+- Frontend đã sửa xác nhận/PIN theo dự án, lỗi tải/404, lỗi ngân hàng, nhãn
+  cân bằng phạm vi và chọn ứng viên. Hai repo phải dùng cùng contract mới.
+- Kiểm chứng: **15 FinancialWorkflowIntegrationTest + 5 JournalDatabaseIntegrationTest
+  qua**, PostgreSQL 16 mới áp dụng 34 migration; 12 browser test và frontend
+  production build qua. Gồm 501 chứng từ, tìm trang 26, lọc đúng tài khoản/ngày/
+  số tiền, loại PENDING/chứng từ đã dùng, quyền và matching theo tiền ròng.
+- Toàn plan còn G0.1/G3.1/G4.2/V1; 19/23 gói có triển khai và kiểm chứng đại diện.
+  Chưa kiểm migration trên bản sao DB đang dùng hoặc UAT trực tiếp UI/API sáu role.
+
+Các ghi chú bên dưới là các mốc triển khai trước khi sửa F20–F24.
+
+---
+
 > **Cập nhật 23/10/2026:** F16–F18 và các phần thiếu sau review đã được triển
 > khai: `event` đi xuyên suốt API/export sổ tài khoản; journal export nhận
 > `requestId`; audit lọc `actor`/ngày/hành động giống nhau giữa list và XLSX
