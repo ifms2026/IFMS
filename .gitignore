@@ -45,3 +45,8 @@ env
 # Isolated CLI verification output (avoids IDE incremental class writes)
 /target-verification/
 /financial-workflow-test.log
+
+# Temporary ledger review builds and local API logs
+/target-review-*/
+/ledger-ui-api.err.log
+/ledger-ui-api.out.log
