@@ -1,5 +1,19 @@
 # IFMS — triển khai sổ cái và theo dõi ngân sách/tạm ứng
 
+> **Cập nhật 23/10/2026:** F16–F18 và các phần thiếu sau review đã được triển
+> khai: `event` đi xuyên suốt API/export sổ tài khoản; journal export nhận
+> `requestId`; audit lọc `actor`/ngày/hành động giống nhau giữa list và XLSX
+> toàn bộ kết quả; tạm ứng/ngân sách trả `PageResponse` với `search/page/limit`;
+> bộ chọn `GET /spreadsheets/lookups/{kind}` có phân quyền, phân trang và tham
+> chiếu cha; bốn báo cáo `department-employees`, `department-budgets`,
+> `project-cost-details`, `bank-reconciliation-summary` theo vai trò.
+> PostgreSQL thử nghiệm chạy đủ V34; 18 integration test và 5 browser test
+> đại diện qua, frontend production build qua. Chưa migrate/đối chiếu bản sao
+> dữ liệu triển khai thật, chưa nghiệm thu sáu vai trò trực tiếp với backend.
+> [Báo cáo tuần](<../../../../DA1/financial-wallet-frontend/docs/bao-cao-chi-tiet-tuan-vua-roi.md>)
+> ghi căn cứ, ma trận và bốn gói còn chưa hoàn tất. Các cập nhật 21–22/10 ở
+> dưới là trạng thái lịch sử trước đợt này.
+
 > **Cập nhật 22/10/2026:** các lỗi scope export, cú pháp SQL matching, fixture nạp quỹ,
 > đóng tháng hiện tại và đếm PIN đồng thời đã được sửa ở code. Backend test-compile
 > từ build mới và frontend production build đã qua trong lượt sửa gần nhất; chưa chạy
