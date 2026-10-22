@@ -60,6 +60,12 @@ class FinancialWorkflowIntegrationTest {
     @Autowired PayrollManagementService payroll; @Autowired AccountingCorrectionService corrections; @Autowired SpreadsheetService excel;
     @Autowired AccountingCostReconciliationService costReconciliation; @Autowired AccountingOpeningService opening;
     @Autowired AccountingBackfillService history;
+    @Autowired com.mkwang.backend.modules.spreadsheet.service.FinancialLookupService lookups;
+    @Autowired AccountingJournalService journalService;
+    @Autowired AccountingReportService reports;
+    @Autowired com.mkwang.backend.modules.audit.service.AuditLogService audits;
+    @Autowired com.mkwang.backend.modules.profile.service.ProfileService profiles;
+    @Autowired AccountingPeriodService periods;
     TransactionTemplate tx; Map<String,User> actors; Long projectId,phaseId,categoryId; String suffix;
     static final String PIN="27055";
     static BigDecimal money(String n){return new BigDecimal(n);}
@@ -202,4 +208,59 @@ class FinancialWorkflowIntegrationTest {
                 "Idempotent legacy balance confirmation",PIN,true)).id());
         assertThrows(BaseException.class,()->history.preview(new BackfillJournalBatchRequest(List.of(),true)));
     }
+    int exportedRows(byte[] bytes) throws Exception {try(var b=new XSSFWorkbook(new ByteArrayInputStream(bytes))){return Integer.parseInt(b.getSheet("ThongTin").getRow(3).getCell(0).getStringCellValue().replace("Số dòng: ",""));}}
+    @Test void accountEventAndJournalRequestFiltersMatchExport() throws Exception {
+        Long id=approved(RequestType.EXPENSE,"100",null,true);login("ACCOUNTANT");requests.disburse(id,actorId(),new DisburseRequest(PIN,"Verified",documents(id,"100")));
+        Long ar=approved(RequestType.ADVANCE,"400",null,false);login("ACCOUNTANT");requests.disburse(ar,actorId(),new DisburseRequest(PIN,"Advance",List.of()));
+        var filtered=reports.getLedger(null,null,null,null,projectId,null,null,null,1,20,AccountingJournalEvent.EXPENSE_VERIFIED);
+        assertEquals(0,filtered.totalDebit().compareTo(money("100")));
+        var filter=Map.of("account","PROJECT_EXPENSE","projectId",projectId.toString(),"event","EXPENSE_VERIFIED");
+        try(var b=new XSSFWorkbook(new ByteArrayInputStream(excel.export("account-balances",null,filter)))){assertEquals(100.0,b.getSheet("Data").getRow(1).getCell(3).getNumericCellValue());}
+        assertEquals(2,exportedRows(excel.export("journals",null,Map.of("requestId",id.toString(),"event","EXPENSE_VERIFIED"))));
+        assertEquals(0,journalService.getBudgetPage(suffix,1,1).getItems().getFirst().recognizedExpense().compareTo(money("100")));
+        assertEquals(1,journalService.getOutstandingPage(actors.get("EMPLOYEE").getFullName(),1,1).getTotal());
+        login("MANAGER");
+        try(var b=new XSSFWorkbook(new ByteArrayInputStream(excel.export("project-cost-details",null,Map.of("projectId",projectId.toString()))))){assertEquals(100.0,b.getSheet("Data").getRow(1).getCell(4).getNumericCellValue());assertEquals(100.0,b.getSheet("Data").getRow(1).getCell(5).getNumericCellValue());}
+        assertEquals(1,exportedRows(excel.export("department-budgets",null,Map.of())));
+        assertTrue(exportedRows(excel.export("department-employees",null,Map.of()))>0);
+        Long ownFunding=tx.execute(status->em.createQuery("select r.id from Request r where r.type='DEPARTMENT_TOPUP' and r.requester.id=:id",Long.class).setParameter("id",actors.get("MANAGER").getId()).getSingleResult());
+        assertEquals(1,lookups.find("request",null,ownFunding,null,1,20).getTotal());
+        try(var b=new XSSFWorkbook(new ByteArrayInputStream(excel.export("managed-requests",null,Map.of())))){boolean found=false;for(var row:b.getSheet("Data"))if(row.getRowNum()>0&&row.getCell(1)!=null&&"DEPARTMENT_TOPUP".equals(row.getCell(1).toString()))found=true;assertTrue(found);}
+        login("ACCOUNTANT");
+        tx.executeWithoutResult(status->{for(int n=0;n<2;n++){var p=Project.builder().projectCode("PG"+suffix+n).name("Paging "+suffix).department(em.find(Department.class,actors.get("MANAGER").getDepartment().getId())).manager(em.find(User.class,actors.get("MANAGER").getId())).build();em.persist(p);wallets.createWallet(WalletOwnerType.PROJECT,p.getId());}});
+        var first=journalService.getBudgetPage("Paging "+suffix,1,1);var second=journalService.getBudgetPage("Paging "+suffix,2,1);assertEquals(2,first.getTotal());assertNotEquals(first.getItems().getFirst().projectId(),second.getItems().getFirst().projectId());
+        login("CFO");assertEquals(1,exportedRows(excel.export("bank-reconciliation-summary",null,Map.of())));
+    }
+    @Test void scopedLookupsAndExportsCannotWidenEmployeeManagerOrLeaderScope() throws Exception {
+        User self=actors.get("EMPLOYEE");
+        User other=tx.execute(status->{var u=User.builder().email("other."+suffix+"@integration.invalid").fullName("Other "+suffix).password(passwords.encode("FixtureOnly!2026")).role(em.find(Role.class,self.getRole().getId())).department(em.find(Department.class,self.getDepartment().getId())).status(UserStatus.ACTIVE).isFirstLogin(false).build();u.setProfile(UserProfile.builder().user(u).employeeCode("OT"+suffix).build());u.setSecuritySettings(UserSecuritySettings.builder().user(u).transactionPin(passwords.encode(PIN)).build());em.persist(u);wallets.createWallet(WalletOwnerType.USER,u.getId());em.persist(ProjectMember.builder().id(new ProjectMemberId(projectId,u.getId())).project(em.find(Project.class,projectId)).user(u).projectRole(ProjectRole.MEMBER).build());return u;});
+        actors.put("EMPLOYEE",other);Long request=approved(RequestType.ADVANCE,"200",null,false);login("ACCOUNTANT");requests.disburse(request,actorId(),new DisburseRequest(PIN,"Other employee advance",List.of()));actors.put("EMPLOYEE",self);
+        login("EMPLOYEE");assertEquals(0,exportedRows(excel.export("advance-balances",null,Map.of("employeeId",other.getId().toString()))));assertEquals(0,lookups.find("employee",null,other.getId(),null,1,20).getTotal());
+        Long[] foreign=tx.execute(status->{var d=Department.builder().code("F"+suffix).name("Foreign "+suffix).build();em.persist(d);var p=Project.builder().projectCode("FP"+suffix).name("Foreign project "+suffix).department(d).manager(em.find(User.class,actors.get("MANAGER").getId())).build();em.persist(p);em.find(Request.class,request).setProject(p);em.find(User.class,other.getId()).setDepartment(d);return new Long[]{d.getId(),p.getId()};});
+        login("MANAGER");assertEquals(0,exportedRows(excel.export("advance-balances",null,Map.of("departmentId",foreign[0].toString()))));assertEquals(0,exportedRows(excel.export("department-employees",null,Map.of("departmentId",foreign[0].toString()))));assertEquals(0,lookups.find("project",null,foreign[1],null,1,20).getTotal());
+        login("TEAM_LEADER");assertEquals(0,exportedRows(excel.export("advance-balances",null,Map.of("projectId",foreign[1].toString()))));assertEquals(0,lookups.find("project",null,foreign[1],null,1,20).getTotal());assertTrue(lookups.find("employee",self.getFullName(),null,null,1,20).getItems().stream().anyMatch(o->o.id().equals(self.getId())));
+        login("CFO");assertEquals(1,exportedRows(excel.export("advance-balances",null,Map.of("projectId",foreign[1].toString()))));
+        assertEquals(1,lookups.find("phase",null,phaseId,projectId,1,20).getTotal());assertEquals(1,lookups.find("category",null,categoryId,phaseId,1,20).getTotal());
+    }
+    @Test void auditExportUsesSameActorActionAndDateFiltersAcrossAllPages() throws Exception {
+        tx.executeWithoutResult(status->{for(int n=0;n<25;n++)em.persist(com.mkwang.backend.modules.audit.entity.AuditLog.builder().actor(em.find(User.class,actors.get("EMPLOYEE").getId())).traceId(UUID.randomUUID().toString()).action(com.mkwang.backend.modules.audit.entity.AuditAction.UPDATE).entityName("ReviewFixture").entityId(suffix+"-"+n).build());});
+        login("ADMIN");String actor=actors.get("EMPLOYEE").getFullName();
+        var page=audits.getAuditLogs(null,actor,com.mkwang.backend.modules.audit.entity.AuditAction.UPDATE,null,LocalDate.now(),LocalDate.now(),1,10);
+        assertEquals(25,page.getTotal());assertEquals(10,page.getItems().size());
+        assertEquals(25,exportedRows(excel.export("audit-history",null,Map.of("actor",actor,"action","UPDATE","from",LocalDate.now().toString(),"to",LocalDate.now().toString()))));
+        assertEquals(0,exportedRows(excel.export("audit-history",null,Map.of("actor",actor,"action","DELETE"))));assertFalse(excel.exportHistory().isEmpty());
+    }
+    @Test void reconciliationCandidatesExecuteOnPostgresAndFindUnmatchedMovement(){
+        login("CFO");var transfer=wallets.systemTopup(money("123"),"UNMATCH-"+suffix,"Isolated fixture");
+        Long line=bankEvidence.importLine("IFMS-TEST","CAND-"+suffix,LocalDate.now(),"IN",money("123"),"BOOKED","fixture",actorId(),null);
+        assertTrue(bankEvidence.candidates(line).stream().anyMatch(row->row.id().equals(transfer.getId())));
+    }
+    @Test void concurrentFailedPinsAreCountedWithoutLostUpdates() throws Exception {
+        login("ACCOUNTANT");Long user=actorId();ExecutorService executor=Executors.newFixedThreadPool(5);CountDownLatch gate=new CountDownLatch(1);var futures=new ArrayList<Future<?>>();
+        for(int n=0;n<5;n++)futures.add(executor.submit(()->{login("ACCOUNTANT");try{gate.await();profiles.verifyMyPin(user,new com.mkwang.backend.modules.profile.dto.request.VerifyMyPinRequest("99999"));}catch(com.mkwang.backend.common.exception.LockedException expected){}catch(InterruptedException e){Thread.currentThread().interrupt();}finally{SecurityContextHolder.clearContext();}}));
+        gate.countDown();try{for(var f:futures)f.get(30,TimeUnit.SECONDS);}finally{executor.shutdownNow();}
+        assertEquals(Integer.valueOf(5),tx.<Integer>execute(status->em.find(UserSecuritySettings.class,user).getRetryCount()));assertTrue(Boolean.TRUE.equals(tx.<Boolean>execute(status->em.find(UserSecuritySettings.class,user).isPinLocked())));
+    }
+    @Test void currentAccountingMonthCannotClose(){login("ACCOUNTANT");String month=YearMonth.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString();assertFalse(periods.previewClose(month).eligible());assertThrows(BaseException.class,()->periods.close(month,"Current month cannot close",true));}
+
 }

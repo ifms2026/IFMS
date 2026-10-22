@@ -285,6 +285,17 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
         List<AdvanceBalance> openBalances = advanceBalanceRepository.findByStatusNotOrderByCreatedAtAscIdAsc(
                         com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)
                 .stream().filter(balance -> balance.getRemainingAmount().signum() > 0).toList();
+        return advanceSummaries(openBalances);
+    }
+    @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public PageResponse<AdvanceEmployeeSummaryResponse> getOutstandingPage(String search,int page,int limit) {
+        checkPage(page,limit);
+        var users=advanceBalanceRepository.findOutstandingEmployeeIds("%"+(search==null?"":search.trim().toLowerCase(java.util.Locale.ROOT))+"%",org.springframework.data.domain.PageRequest.of(page-1,limit));
+        var balances=users.isEmpty()?List.<AdvanceBalance>of():advanceBalanceRepository.findByUser_IdInAndRemainingAmountGreaterThanAndStatusNotOrderByCreatedAtAscIdAsc(users.getContent(),BigDecimal.ZERO,com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED);
+        return PageResponse.<AdvanceEmployeeSummaryResponse>builder().items(advanceSummaries(balances)).total(users.getTotalElements()).page(page).size(limit).totalPages(users.getTotalPages()).build();
+    }
+    private void checkPage(int page,int limit){if(page<1||limit<1||limit>100)throw new BadRequestException("Phân trang không hợp lệ");}
+    private List<AdvanceEmployeeSummaryResponse> advanceSummaries(List<AdvanceBalance> openBalances) {
         Map<Long, List<AccountingJournal>> activityByAdvance = new HashMap<>();
         if (!openBalances.isEmpty()) {
             List<Long> advanceIds = openBalances.stream().map(AdvanceBalance::getId).toList();
@@ -319,8 +330,20 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public List<LedgerProjectBudgetResponse> getBudgetExposure() {
+        return budgetDetails(projectRepository.findAllByOrderByCreatedAtDesc());
+    }
+    @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    public PageResponse<LedgerProjectBudgetResponse> getBudgetPage(String search,int page,int limit) {
+        checkPage(page,limit);
+        var spec=com.mkwang.backend.modules.accounting.repository.AccountingProjectSpecification.filter(search);
+        var projects=projectRepository.findAll(spec,org.springframework.data.domain.PageRequest.of(page-1,limit,org.springframework.data.domain.Sort.by("createdAt").descending().and(org.springframework.data.domain.Sort.by("id"))));
+        return PageResponse.<LedgerProjectBudgetResponse>builder().items(budgetDetails(projects.getContent())).total(projects.getTotalElements()).page(page).size(limit).totalPages(projects.getTotalPages()).build();
+    }
+    private List<LedgerProjectBudgetResponse> budgetDetails(List<Project> projectList) {
+        if (projectList.isEmpty()) return List.of();
+        List<Long> projectIds = projectList.stream().map(Project::getId).toList();
         Map<ScopeKey, BigDecimal> lockedByScope = new LinkedHashMap<>();
-        for (Object[] row : requestRepository.sumActiveReservationsForLedger()) {
+        for (Object[] row : requestRepository.sumActiveReservationsForLedgerProjects(projectIds)) {
             ScopeKey key = new ScopeKey(((Number) row[0]).longValue(),
                     row[1] == null ? null : ((Number) row[1]).longValue(),
                     row[2] == null ? null : ((Number) row[2]).longValue());
@@ -328,15 +351,13 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
         }
 
         Map<ScopeKey, BigDecimal> advancesByScope = new LinkedHashMap<>();
-        for (Object[] row : advanceBalanceRepository.sumOutstandingByProjectPhaseCategory()) {
+        for (Object[] row : advanceBalanceRepository.sumOutstandingByProjectPhaseCategoryForProjects(projectIds)) {
             ScopeKey key = new ScopeKey(((Number)row[0]).longValue(),
                     row[1]==null?null:((Number)row[1]).longValue(),
                     row[2]==null?null:((Number)row[2]).longValue());
             advancesByScope.put(key,nz((BigDecimal)row[3]));
         }
 
-        List<Project> projectList=projectRepository.findAllByOrderByCreatedAtDesc();
-        List<Long> projectIds=projectList.stream().map(Project::getId).toList();
         List<ProjectPhase> allPhases=projectIds.isEmpty()?List.of():projectPhaseRepository.findByProject_IdInOrderByProject_IdAscCreatedAtAsc(projectIds);
         Map<Long,List<ProjectPhase>> phasesByProject=new LinkedHashMap<>();
         allPhases.forEach(phase->phasesByProject.computeIfAbsent(phase.getProject().getId(),ignored->new ArrayList<>()).add(phase));

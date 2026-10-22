@@ -16,6 +16,11 @@ import java.util.Optional;
 
 @Repository
 public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<AdvanceBalance> {
+  @Query(value="select a.user.id from AdvanceBalance a where a.status<>'SETTLED' and a.remainingAmount>0 and lower(a.user.fullName) like :search group by a.user.id order by sum(a.remainingAmount) desc,a.user.id",
+      countQuery="select count(distinct a.user.id) from AdvanceBalance a where a.status<>'SETTLED' and a.remainingAmount>0 and lower(a.user.fullName) like :search")
+  org.springframework.data.domain.Page<Long> findOutstandingEmployeeIds(@Param("search") String search, org.springframework.data.domain.Pageable page);
+  @EntityGraph(attributePaths={"user","user.department","advanceRequest","advanceRequest.project","advanceRequest.phase","advanceRequest.category"})
+  List<AdvanceBalance> findByUser_IdInAndRemainingAmountGreaterThanAndStatusNotOrderByCreatedAtAscIdAsc(List<Long> ids,BigDecimal amount,AdvanceBalanceStatus status);
   List<AdvanceBalance> findByUserIdOrderByIdAsc(Long userId, org.springframework.data.domain.Pageable pageable);
 
   Optional<AdvanceBalance> findByAdvanceRequest_Id(Long requestId);
@@ -68,6 +73,16 @@ public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, 
       GROUP BY ab.advanceRequest.project.id, ab.advanceRequest.phase.id, ab.advanceRequest.category.id
       """)
   List<Object[]> sumOutstandingByProjectPhaseCategory();
+
+  @Query("""
+      SELECT ab.advanceRequest.project.id, ab.advanceRequest.phase.id, ab.advanceRequest.category.id,
+             COALESCE(SUM(ab.remainingAmount), 0)
+      FROM AdvanceBalance ab
+      WHERE ab.status <> 'SETTLED' AND ab.remainingAmount > 0
+        AND ab.advanceRequest.project.id IN :projectIds
+      GROUP BY ab.advanceRequest.project.id, ab.advanceRequest.phase.id, ab.advanceRequest.category.id
+      """)
+  List<Object[]> sumOutstandingByProjectPhaseCategoryForProjects(@Param("projectIds") List<Long> projectIds);
 
   /**
    * All unsettled advances for a user — pessimistic lock for payroll deduction.

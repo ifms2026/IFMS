@@ -26,7 +26,7 @@ public class AccountingExcelConfiguration {
             if(filters.get("event")!=null&&!filters.get("event").isBlank()) try { event=AccountingJournalEvent.valueOf(filters.get("event")); }
             catch(IllegalArgumentException error) { throw new com.mkwang.backend.common.exception.BadRequestException("Loại nghiệp vụ kế toán không hợp lệ"); }
             var spec=AccountingJournalLineSpecification.filter(account,date(filters,"from"),date(filters,"to"),id(filters,"employeeId"),
-                    id(filters,"projectId"),id(filters,"departmentId"),id(filters,"phaseId"),id(filters,"categoryId"),event);
+                    id(filters,"projectId"),id(filters,"departmentId"),id(filters,"phaseId"),id(filters,"categoryId"),event,id(filters,"requestId"));
             return lines.findAll(spec,PageRequest.of(0,max+1,Sort.by("journal.postingDate").and(Sort.by("journal.id")).and(Sort.by("lineNumber")))).stream()
                     .map(l->values("journal",l.getJournal().getJournalCode(),"date",l.getJournal().getPostingDate(),"event",l.getJournal().getEventType(),
                             "source",l.getJournal().getSourceType()+":"+l.getJournal().getSourceId(),"employeeId",l.getEmployeeId(),"project",l.getProjectName(),
@@ -42,7 +42,7 @@ public class AccountingExcelConfiguration {
             if(filters.get("event")!=null&&!filters.get("event").isBlank()) try { event=AccountingJournalEvent.valueOf(filters.get("event")); }
             catch(IllegalArgumentException error) { throw new com.mkwang.backend.common.exception.BadRequestException("Loại nghiệp vụ kế toán không hợp lệ"); }
             var report=reports.getLedger(filters.get("account"),date(filters,"from"),date(filters,"to"),id(filters,"employeeId"),id(filters,"projectId"),
-                    id(filters,"departmentId"),id(filters,"phaseId"),id(filters,"categoryId"),1,1);
+                    id(filters,"departmentId"),id(filters,"phaseId"),id(filters,"categoryId"),1,1,event);
             return report.accounts().stream().map(a->values("account",a.accountCode(),"name",a.accountName(),"opening",a.openingBalance(),"debit",a.debitAmount(),"credit",a.creditAmount(),"closing",a.closingBalance())).toList();
         });
     }

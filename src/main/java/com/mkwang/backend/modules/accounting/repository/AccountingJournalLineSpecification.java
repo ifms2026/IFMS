@@ -37,6 +37,11 @@ public final class AccountingJournalLineSpecification {
     public static Specification<AccountingJournalLine> filter(String account, LocalDate from, LocalDate to,
             Long employeeId, Long projectId, Long departmentId, Long phaseId, Long categoryId,
             AccountingJournalEvent eventType) {
+        return filter(account,from,to,employeeId,projectId,departmentId,phaseId,categoryId,eventType,null);
+    }
+    public static Specification<AccountingJournalLine> filter(String account, LocalDate from, LocalDate to,
+            Long employeeId, Long projectId, Long departmentId, Long phaseId, Long categoryId,
+            AccountingJournalEvent eventType, Long requestId) {
         Specification<AccountingJournalLine> spec = Specification.where(null);
         if (account != null) spec = spec.and(account(account));
         if (from != null) spec = spec.and(from(from));
@@ -47,6 +52,7 @@ public final class AccountingJournalLineSpecification {
         if (phaseId != null) spec = spec.and(dimension("phaseId", phaseId));
         if (categoryId != null) spec = spec.and(dimension("categoryId", categoryId));
         if (eventType != null) spec = spec.and(event(eventType));
+        if (requestId != null) spec = spec.and(dimension("requestId",requestId));
         return spec;
     }
 }

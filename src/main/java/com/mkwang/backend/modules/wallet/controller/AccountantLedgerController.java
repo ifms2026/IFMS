@@ -38,6 +38,7 @@ import java.util.List;
 public class AccountantLedgerController {
 
     private final AccountantLedgerService accountantLedgerService;
+    private final com.mkwang.backend.modules.accounting.service.AccountingJournalService accounting;
 
     @GetMapping("/wallet-transactions")
     @Operation(summary = "List wallet transactions grouped by transaction")
@@ -76,14 +77,14 @@ public class AccountantLedgerController {
 
     @GetMapping("/advances/outstanding")
     @Operation(summary = "List unsettled advances grouped by employee")
-    public ResponseEntity<ApiResponse<List<AdvanceEmployeeSummaryResponse>>> getOutstandingAdvances() {
-        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getOutstandingAdvancesByEmployee()));
+    public ResponseEntity<ApiResponse<PageResponse<AdvanceEmployeeSummaryResponse>>> getOutstandingAdvances(@RequestParam(required=false)String search,@RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int limit) {
+        return ResponseEntity.ok(ApiResponse.success(accounting.getOutstandingPage(search,page,limit)));
     }
 
     @GetMapping("/budget-exposure")
     @Operation(summary = "Get project budget exposure by project, phase, and expense category")
-    public ResponseEntity<ApiResponse<List<LedgerProjectBudgetResponse>>> getBudgetExposure() {
-        return ResponseEntity.ok(ApiResponse.success(accountantLedgerService.getBudgetExposure()));
+    public ResponseEntity<ApiResponse<PageResponse<LedgerProjectBudgetResponse>>> getBudgetExposure(@RequestParam(required=false)String search,@RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int limit) {
+        return ResponseEntity.ok(ApiResponse.success(accounting.getBudgetPage(search,page,limit)));
     }
 
     @GetMapping

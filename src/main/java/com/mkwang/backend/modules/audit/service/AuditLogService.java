@@ -8,8 +8,10 @@ import java.time.LocalDate;
 
 public interface AuditLogService {
 
+    default PageResponse<AuditLogResponse> getAuditLogs(Long actorId,AuditAction action,String entityName,LocalDate from,LocalDate to,int page,int size){return getAuditLogs(actorId,null,action,entityName,from,to,page,size);}
+
     PageResponse<AuditLogResponse> getAuditLogs(
-            Long actorId,
+            Long actorId, String actor,
             AuditAction action,
             String entityName,
             LocalDate from,

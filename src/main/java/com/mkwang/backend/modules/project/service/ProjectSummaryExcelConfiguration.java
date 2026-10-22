@@ -22,10 +22,8 @@ public class ProjectSummaryExcelConfiguration {
                 column("held","Tiền đang giữ trong ví","MONEY",false),column("cost","Chi phí đã xác nhận","MONEY",false),
                 column("commitment","Cam kết chưa ghi chi phí","MONEY",false),column("openAdvance","Tạm ứng còn mở","MONEY",false));
         return new ExportExcelDataset("project-financial-summary","Số dư hiện tại theo dự án phụ trách",Set.of("MANAGER","TEAM_LEADER","CFO","ACCOUNTANT"),columns,(actor,filters,max)->{
-            Map<String,Object> scope=new HashMap<>();
-            if("MANAGER".equals(actor.getRole().getName()))scope.put("department.id",actor.getDepartment().getId());
-            if("TEAM_LEADER".equals(actor.getRole().getName()))scope.put("id",members.findProjectIdsByLeader(actor.getId()));
-            var spec=ExcelExportSpecification.<Project>filter(Map.of(),scope);
+            var spec=com.mkwang.backend.modules.spreadsheet.repository.ScopedLookupSpecification.<Project>filter("project",actor,filters.get("search"),id(filters,"projectId"),null);
+            if(id(filters,"departmentId")!=null)spec=spec.and(ExcelExportSpecification.dimension("department.id",id(filters,"departmentId")));
             return projects.findAll(spec,PageRequest.of(0,max+1,Sort.by("id"))).stream().map(p->{
                 var wallet=wallets.getWallet(WalletOwnerType.PROJECT,p.getId());var open=exposure.get(p.getId());
                 return values("code",p.getProjectCode(),"name",p.getName(),"department",p.getDepartment().getName(),"status",p.getStatus(),

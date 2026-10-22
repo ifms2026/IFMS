@@ -120,7 +120,7 @@ public class SpreadsheetService {
         try {
             String checksum=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file));
             exportLogs.save(ExcelExportLog.builder().actorId(user.getId()).datasetCode(code)
-                    .scopeKey(scope==null?"GLOBAL":scope.toString()).filterSnapshot(write(filters))
+                    .scopeKey(effectiveExportScope(user,scope)).filterSnapshot(write(filters))
                     .rowCount(rows.size()).fileSha256(checksum).createdAt(Instant.now()).build());
         } catch(NoSuchAlgorithmException impossible) {
             throw new InternalSystemException("Không tạo được mã kiểm tra file xuất Excel");
@@ -145,6 +145,15 @@ public class SpreadsheetService {
     }
     private ExcelImportBatch owned(String id) {
         return batches.findLocked(id,actor().getId()).orElseThrow(()->new ResourceNotFoundException("Excel batch not found"));
+    }
+    private String effectiveExportScope(User user,Long scope){
+        if(scope!=null)return "SELECTED:"+scope;
+        return switch(user.getRole().getName()){
+            case "MANAGER" -> "DEPARTMENT:"+(user.getDepartment()==null?"NONE":user.getDepartment().getId());
+            case "TEAM_LEADER" -> "MANAGED_PROJECTS:"+user.getId();
+            case "EMPLOYEE" -> "SELF:"+user.getId();
+            default -> "ROLE:"+user.getRole().getName();
+        };
     }
     private Long scope(ExcelImportBatch batch) { return "GLOBAL".equals(batch.getScopeKey())?null:Long.valueOf(batch.getScopeKey()); }
     private ExcelDataset dataset(String code,Long scope) {

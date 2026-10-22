@@ -29,14 +29,15 @@ public class AuditLogServiceImpl implements AuditLogService {
     @PreAuthorize("hasAuthority('AUDIT_LOG_VIEW')")
     @Transactional(readOnly = true)
     public PageResponse<AuditLogResponse> getAuditLogs(
-            Long actorId, AuditAction action, String entityName,
+            Long actorId, String actor, AuditAction action, String entityName,
             LocalDate from, LocalDate to, int page, int size) {
 
         LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
-        LocalDateTime toDt = to != null ? to.atTime(23, 59, 59) : null;
+        LocalDateTime toDt = to != null ? to.atTime(java.time.LocalTime.MAX) : null;
 
+        if(page<1||size<1||size>100||(from!=null&&to!=null&&from.isAfter(to))) throw new com.mkwang.backend.common.exception.BadRequestException("Phân trang hoặc khoảng ngày không hợp lệ");
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
-        Specification<AuditLog> spec = AuditLogSpecification.filter(actorId, action, entityName, fromDt, toDt);
+        Specification<AuditLog> spec = AuditLogSpecification.filtered(actorId, actor, action, entityName, fromDt, toDt);
 
         Page<AuditLog> auditPage = auditLogRepository.findAll(spec, pageable);
 

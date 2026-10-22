@@ -25,6 +25,7 @@ public class AdminAuditController {
     @GetMapping("/audit")
     public ResponseEntity<ApiResponse<PageResponse<AuditLogResponse>>> getAuditLogs(
             @RequestParam(required = false) Long actorId,
+            @RequestParam(required = false) String actor,
             @RequestParam(required = false) AuditAction action,
             @RequestParam(required = false) String entityName,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -32,7 +33,7 @@ public class AdminAuditController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int limit) {
         PageResponse<AuditLogResponse> result =
-                auditLogService.getAuditLogs(actorId, action, entityName, from, to, page, limit);
+                auditLogService.getAuditLogs(actorId, actor, action, entityName, from, to, page, limit);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

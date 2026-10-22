@@ -5,6 +5,7 @@ import com.mkwang.backend.common.exception.BadRequestException;
 import com.mkwang.backend.modules.accounting.dto.response.AccountLedgerResponse;
 import com.mkwang.backend.modules.accounting.dto.response.AccountLedgerResponse.*;
 import com.mkwang.backend.modules.accounting.entity.InternalAccount;
+import com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent;
 import com.mkwang.backend.modules.accounting.mapper.AccountingReportMapper;
 import com.mkwang.backend.modules.accounting.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -29,15 +30,22 @@ public class AccountingReportService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AccountLedgerResponse getLedger(String account, LocalDate from, LocalDate to, Long employeeId,
             Long projectId, Long departmentId, Long phaseId, Long categoryId, int page, int limit) {
+        return getLedger(account,from,to,employeeId,projectId,departmentId,phaseId,categoryId,page,limit,null);
+    }
+
+    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public AccountLedgerResponse getLedger(String account, LocalDate from, LocalDate to, Long employeeId,
+            Long projectId, Long departmentId, Long phaseId, Long categoryId, int page, int limit, AccountingJournalEvent event) {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
         from = from == null ? today.withDayOfMonth(1) : from;
         to = to == null ? today : to;
         if (from.isAfter(to) || page < 1 || limit < 1 || limit > 100) throw new BadRequestException("Khoảng ngày hoặc phân trang không hợp lệ");
         if (account != null) InternalAccount.require(account);
         var openingSpec = AccountingJournalLineSpecification.filter(account, null, from.minusDays(1), employeeId,
-                projectId, departmentId, phaseId, categoryId);
+                projectId, departmentId, phaseId, categoryId,event);
         var movementSpec = AccountingJournalLineSpecification.filter(account, from, to, employeeId,
-                projectId, departmentId, phaseId, categoryId);
+                projectId, departmentId, phaseId, categoryId,event);
         Map<String, BigDecimal[]> opening = sums(aggregates.aggregate(openingSpec));
         Map<String, BigDecimal[]> movement = sums(aggregates.aggregate(movementSpec));
         List<AccountBalanceResponse> balances = new ArrayList<>();

@@ -17,11 +17,9 @@ public class RequestExcelConfiguration {
     private List<ExcelColumnResponse> requestColumns(){return List.of(column("code","Mã yêu cầu","TEXT",false),column("type","Nghiệp vụ","TEXT",false),column("status","Trạng thái","TEXT",false),column("employee","Nhân viên","TEXT",false),column("project","Dự án","TEXT",false),column("phase","Giai đoạn","TEXT",false),column("category","Danh mục","TEXT",false),column("amount","Đề nghị","MONEY_INFO",false),column("approvedAmount","Đã duyệt","MONEY_INFO",false),column("reservedAmount","Còn giữ cho yêu cầu","MONEY",false),column("createdAt","Ngày tạo","TEXT",false));}
     private ExcelDataset requestExport(String code,String label,Set<String> roles,boolean personal){
         return new ExportExcelDataset(code,label,roles,requestColumns(),(actor,filters,max)->{
-            Map<String,Object> dims=new HashMap<>();
-            if(personal)dims.put("requester.id",actor.getId());
-            else if("TEAM_LEADER".equals(actor.getRole().getName()))dims.put("project.id",projects.getLeaderProjectIds(actor.getId()));
-            else if("MANAGER".equals(actor.getRole().getName()))dims.put("project.department.id",actor.getDepartment().getId());
-            var spec=ExcelExportSpecification.<Request>filter(filters,dims);
+            var spec=ExcelExportSpecification.<Request>filter(filters);
+            if(personal)spec=spec.and(ExcelExportSpecification.dimension("requester.id",actor.getId()));
+            else spec=spec.and(com.mkwang.backend.modules.spreadsheet.repository.ScopedLookupSpecification.scope("request",actor));
             return requests.findAll(spec,PageRequest.of(0,max+1,Sort.by("id"))).stream().map(r->values("code",r.getRequestCode(),"type",r.getType(),"status",r.getStatus(),
                     "employee",r.getRequester().getFullName(),"project",r.getProject()==null?null:r.getProject().getName(),"phase",r.getPhase()==null?null:r.getPhase().getName(),
                     "category",r.getCategory()==null?null:r.getCategory().getName(),"amount",r.getAmount(),"approvedAmount",r.getApprovedAmount(),"reservedAmount",r.getReservedAmount(),"createdAt",r.getCreatedAt())).toList();

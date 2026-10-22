@@ -20,6 +20,7 @@ public class AccountingReportController {
     @GetMapping("/accounts")
     public ResponseEntity<ApiResponse<AccountLedgerResponse>> accounts(
             @RequestParam(required = false) String account,
+            @RequestParam(required = false) com.mkwang.backend.modules.accounting.entity.AccountingJournalEvent event,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long employeeId, @RequestParam(required = false) Long projectId,
@@ -27,7 +28,7 @@ public class AccountingReportController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(ApiResponse.success(reports.getLedger(account, from, to, employeeId, projectId,
-                departmentId, phaseId, categoryId, page, limit)));
+                departmentId, phaseId, categoryId, page, limit,event)));
     }
     @GetMapping("/sources/requests/{id}")
     public ResponseEntity<ApiResponse<RequestAccountingContextResponse>> source(@PathVariable Long id) {
