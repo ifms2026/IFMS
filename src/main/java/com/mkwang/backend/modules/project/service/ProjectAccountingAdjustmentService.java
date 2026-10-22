@@ -14,17 +14,21 @@ public class ProjectAccountingAdjustmentService {
     private final ProjectRepository projects;private final ProjectPhaseRepository phases;
     private final PhaseCategoryBudgetRepository categories;private final ProjectFinancialGuard guard;
     public record CostCounterResponse(Long projectId,String projectCode,BigDecimal projectCost,BigDecimal availableBudget,
-        BigDecimal plannedBudget,Map<Long,BigDecimal> phaseCosts,Map<String,BigDecimal> categoryCosts) {}
+        BigDecimal plannedBudget,Map<Long,BigDecimal> phaseCosts,Map<String,BigDecimal> categoryCosts,Map<String,String> scopeLabels) {}
     @Transactional(readOnly=true)
     public CostCounterResponse costCounters(Long projectId) {
         var project=projects.findById(projectId).orElseThrow(()->new ResourceNotFoundException("Project not found"));
         Map<Long,BigDecimal> phaseCosts=new LinkedHashMap<>();Map<String,BigDecimal> categoryCosts=new LinkedHashMap<>();
+        Map<String,String> scopeLabels=new LinkedHashMap<>();
         for(ProjectPhase phase:phases.findByProject_IdOrderByCreatedAtAsc(projectId)) {
             phaseCosts.put(phase.getId(),phase.getCurrentSpent());
-            for(PhaseCategoryBudget category:categories.findByIdPhaseId(phase.getId()))
+            scopeLabels.put("phase:"+phase.getId(),phase.getName());
+            for(PhaseCategoryBudget category:categories.findByIdPhaseId(phase.getId())) {
                 categoryCosts.put(phase.getId()+":"+category.getCategory().getId(),category.getCurrentSpent());
+                scopeLabels.put("category:"+phase.getId()+":"+category.getCategory().getId(),phase.getName()+" · "+category.getCategory().getName());
+            }
         }
-        return new CostCounterResponse(projectId,project.getProjectCode(),project.getTotalSpent(),project.getAvailableBudget(),project.getTotalBudget(),phaseCosts,categoryCosts);
+        return new CostCounterResponse(projectId,project.getProjectCode(),project.getTotalSpent(),project.getAvailableBudget(),project.getTotalBudget(),phaseCosts,categoryCosts,scopeLabels);
     }
     @Transactional
     public CostCounterResponse reconcileCosts(Long projectId,BigDecimal expectedProject,Map<Long,BigDecimal> expectedPhases,Map<String,BigDecimal> expectedCategories,

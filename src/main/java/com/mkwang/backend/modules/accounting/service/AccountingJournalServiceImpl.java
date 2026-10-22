@@ -39,11 +39,13 @@ import java.time.LocalDate;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import com.mkwang.backend.modules.user.entity.User;
@@ -74,6 +76,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     private final ProjectPhaseRepository projectPhaseRepository;
     private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
     private final ExpenseCategoryRepository expenseCategoryRepository;
+    private final com.mkwang.backend.modules.wallet.repository.WalletRepository walletRepository;
 
     @Override
     @Transactional
@@ -279,15 +282,29 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee() {
-        Map<Long, List<AdvanceBalance>> byEmployee = new LinkedHashMap<>();
-        advanceBalanceRepository.findByStatusNotOrderByCreatedAtAscIdAsc(
+        List<AdvanceBalance> openBalances = advanceBalanceRepository.findByStatusNotOrderByCreatedAtAscIdAsc(
                         com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)
-                .stream().filter(balance -> balance.getRemainingAmount().signum() > 0)
-                .forEach(balance -> byEmployee.computeIfAbsent(balance.getUser().getId(), ignored -> new ArrayList<>()).add(balance));
+                .stream().filter(balance -> balance.getRemainingAmount().signum() > 0).toList();
+        Map<Long, List<AccountingJournal>> activityByAdvance = new HashMap<>();
+        if (!openBalances.isEmpty()) {
+            List<Long> advanceIds = openBalances.stream().map(AdvanceBalance::getId).toList();
+            for (AccountingJournal journal : journalRepository.findActivitiesForAdvances(advanceIds)) {
+                Set<Long> affected = new LinkedHashSet<>();
+                if (journal.getAdvanceBalanceId() != null) affected.add(journal.getAdvanceBalanceId());
+                journal.getLines().stream().map(AccountingJournalLine::getAdvanceBalanceId)
+                        .filter(Objects::nonNull).forEach(affected::add);
+                for (Long advanceId : affected) if (advanceIds.contains(advanceId)) {
+                    activityByAdvance.computeIfAbsent(advanceId, ignored -> new ArrayList<>()).add(journal);
+                }
+            }
+        }
+        Map<Long, List<AdvanceBalance>> byEmployee = new LinkedHashMap<>();
+        openBalances.forEach(balance -> byEmployee.computeIfAbsent(balance.getUser().getId(), ignored -> new ArrayList<>()).add(balance));
 
         return byEmployee.values().stream().map(balances -> {
             var user = balances.get(0).getUser();
-            List<AdvanceBalanceDetailResponse> details = balances.stream().map(this::toAdvanceDetail).toList();
+            List<AdvanceBalanceDetailResponse> details = balances.stream()
+                    .map(balance -> toAdvanceDetail(balance, activityByAdvance.getOrDefault(balance.getId(), List.of()))).toList();
             BigDecimal totalDisbursed = balances.stream().map(AdvanceBalance::getOriginalAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal totalRemaining = balances.stream().map(AdvanceBalance::getRemainingAmount)
@@ -311,40 +328,50 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
         }
 
         Map<ScopeKey, BigDecimal> advancesByScope = new LinkedHashMap<>();
-        for (AdvanceBalance balance : advanceBalanceRepository.findByStatusNotOrderByCreatedAtAscIdAsc(
-                com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)) {
-            if (balance.getRemainingAmount() == null || balance.getRemainingAmount().signum() <= 0) continue;
-            Request request = balance.getAdvanceRequest();
-            if (request.getProject() == null) continue;
-            ScopeKey key = new ScopeKey(request.getProject().getId(),
-                    request.getPhase() == null ? null : request.getPhase().getId(),
-                    request.getCategory() == null ? null : request.getCategory().getId());
-            advancesByScope.merge(key, balance.getRemainingAmount(), BigDecimal::add);
+        for (Object[] row : advanceBalanceRepository.sumOutstandingByProjectPhaseCategory()) {
+            ScopeKey key = new ScopeKey(((Number)row[0]).longValue(),
+                    row[1]==null?null:((Number)row[1]).longValue(),
+                    row[2]==null?null:((Number)row[2]).longValue());
+            advancesByScope.put(key,nz((BigDecimal)row[3]));
         }
 
+        List<Project> projectList=projectRepository.findAllByOrderByCreatedAtDesc();
+        List<Long> projectIds=projectList.stream().map(Project::getId).toList();
+        List<ProjectPhase> allPhases=projectIds.isEmpty()?List.of():projectPhaseRepository.findByProject_IdInOrderByProject_IdAscCreatedAtAsc(projectIds);
+        Map<Long,List<ProjectPhase>> phasesByProject=new LinkedHashMap<>();
+        allPhases.forEach(phase->phasesByProject.computeIfAbsent(phase.getProject().getId(),ignored->new ArrayList<>()).add(phase));
+        List<PhaseCategoryBudget> allBudgets=projectIds.isEmpty()?List.of():phaseCategoryBudgetRepository.findByPhase_Project_IdIn(projectIds);
+        Map<Long,Map<Long,PhaseCategoryBudget>> budgetsByPhase=new LinkedHashMap<>();
+        Set<Long> allCategoryIds=new LinkedHashSet<>();
+        allBudgets.forEach(budget->{budgetsByPhase.computeIfAbsent(budget.getPhase().getId(),ignored->new LinkedHashMap<>())
+                .put(budget.getCategory().getId(),budget);allCategoryIds.add(budget.getCategory().getId());});
+        lockedByScope.keySet().stream().map(ScopeKey::categoryId).filter(Objects::nonNull).forEach(allCategoryIds::add);
+        advancesByScope.keySet().stream().map(ScopeKey::categoryId).filter(Objects::nonNull).forEach(allCategoryIds::add);
+        Map<Long,ExpenseCategory> categoriesById=new LinkedHashMap<>();
+        if(!allCategoryIds.isEmpty())expenseCategoryRepository.findAllById(allCategoryIds)
+                .forEach(category->categoriesById.put(category.getId(),category));
+        Map<Long,BigDecimal> walletBalances=new HashMap<>();
+        if(!projectIds.isEmpty())walletRepository.findBalancesByOwnerTypeAndOwnerIds(
+                com.mkwang.backend.modules.wallet.entity.WalletOwnerType.PROJECT,projectIds)
+                .forEach(row->walletBalances.put(((Number)row[0]).longValue(),nz((BigDecimal)row[1])));
+
         List<LedgerProjectBudgetResponse> result = new ArrayList<>();
-        for (Project project : projectRepository.findAllByOrderByCreatedAtDesc()) {
+        for (Project project : projectList) {
             Long projectId = project.getId();
             BigDecimal projectLocked = sumForProject(lockedByScope, projectId);
             BigDecimal projectAdvances = sumForProject(advancesByScope, projectId);
             List<LedgerPhaseBudgetResponse> phases = new ArrayList<>();
-            for (ProjectPhase phase : projectPhaseRepository.findByProject_IdOrderByCreatedAtAsc(projectId)) {
+            for (ProjectPhase phase : phasesByProject.getOrDefault(projectId,List.of())) {
                 Long phaseId = phase.getId();
                 List<LedgerCategoryBudgetResponse> categories = new ArrayList<>();
-                Map<Long, PhaseCategoryBudget> categoryBudgets = new LinkedHashMap<>();
-                for (PhaseCategoryBudget categoryBudget : phaseCategoryBudgetRepository.findByIdPhaseId(phaseId)) {
-                    categoryBudgets.put(categoryBudget.getCategory().getId(), categoryBudget);
-                }
+                Map<Long, PhaseCategoryBudget> categoryBudgets = budgetsByPhase.getOrDefault(phaseId,Map.of());
                 Set<Long> categoryIds = new LinkedHashSet<>(categoryBudgets.keySet());
                 addCategoryIds(categoryIds, lockedByScope, projectId, phaseId);
                 addCategoryIds(categoryIds, advancesByScope, projectId, phaseId);
-                Map<Long, ExpenseCategory> expenseCategories = new LinkedHashMap<>();
-                expenseCategoryRepository.findAllById(categoryIds)
-                        .forEach(category -> expenseCategories.put(category.getId(), category));
                 for (Long categoryId : categoryIds) {
                     ScopeKey scope = new ScopeKey(projectId, phaseId, categoryId);
                     PhaseCategoryBudget categoryBudget = categoryBudgets.get(categoryId);
-                    ExpenseCategory category = expenseCategories.get(categoryId);
+                    ExpenseCategory category = categoriesById.get(categoryId);
                     if (category == null) continue;
                     categories.add(new LedgerCategoryBudgetResponse(categoryId, category.getName(),
                             categoryBudget == null ? BigDecimal.ZERO : nz(categoryBudget.getBudgetLimit()),
@@ -358,7 +385,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                         nz(phase.getCurrentSpent()), phaseLocked, phaseAdvances, categories));
             }
             result.add(new LedgerProjectBudgetResponse(projectId, project.getProjectCode(), project.getName(),
-                    nz(project.getTotalBudget()), walletService.getWallet(com.mkwang.backend.modules.wallet.entity.WalletOwnerType.PROJECT, projectId).getBalance(), nz(project.getTotalSpent()),
+                    nz(project.getTotalBudget()), walletBalances.getOrDefault(projectId,BigDecimal.ZERO), nz(project.getTotalSpent()),
                     projectLocked, projectAdvances, phases));
         }
         return result;
@@ -381,10 +408,10 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 .map(ScopeKey::categoryId).forEach(categoryIds::add);
     }
 
-    private AdvanceBalanceDetailResponse toAdvanceDetail(AdvanceBalance balance) {
+    private AdvanceBalanceDetailResponse toAdvanceDetail(AdvanceBalance balance, List<AccountingJournal> journals) {
         Request request = balance.getAdvanceRequest();
         var project = request.getProject();
-        List<AdvanceActivityResponse> activities = journalRepository.findActivitiesForAdvance(balance.getId()).stream()
+        List<AdvanceActivityResponse> activities = journals.stream()
                 .map(journal -> new AdvanceActivityResponse(journal.getId(), journal.getJournalCode(), journal.getEventType(),
                         journal.getPostingDate(), journal.getDescription(), activityAmount(journal, balance.getId())))
                 .toList();

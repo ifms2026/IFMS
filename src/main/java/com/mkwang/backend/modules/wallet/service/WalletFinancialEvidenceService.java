@@ -54,8 +54,8 @@ public class WalletFinancialEvidenceService {
     public Transaction transaction(Long id){return transactions.findById(id).orElseThrow(()->new ResourceNotFoundException("Transaction not found"));}
     @Transactional(readOnly=true)
     public List<CorporateMovementResponse> candidates(BigDecimal amount,String direction) {
-        return transactions.findReconciliationCandidates(amount,org.springframework.data.domain.PageRequest.of(0,100)).stream()
-                .map(transaction->get(transaction.getId())).filter(row->row.signedAmount().signum()!=0
+        return transactions.findReconciliationCandidateIds(amount,org.springframework.data.domain.PageRequest.of(0,1000)).stream()
+                .map(this::get).filter(row->row.signedAmount().signum()!=0
                         && ("IN".equals(direction)==(row.signedAmount().signum()>0))).toList();
     }
     @Transactional(readOnly=true)

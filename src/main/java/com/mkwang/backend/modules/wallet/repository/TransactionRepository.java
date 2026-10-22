@@ -26,8 +26,17 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 
 
   Optional<Transaction> findByTransactionCode(String transactionCode);
-  @Query("select t from Transaction t where t.status='SUCCESS' and t.amount=:amount order by t.createdAt desc,t.id desc")
-  List<Transaction> findReconciliationCandidates(@Param("amount")java.math.BigDecimal amount,org.springframework.data.domain.Pageable page);
+  @Query(value="""
+      SELECT t.id FROM transactions t
+      JOIN ledger_entries e ON e.transaction_id=t.id
+      JOIN wallets w ON w.id=e.wallet_id
+      WHERE t.status='SUCCESS' AND t.amount=:amount
+        AND w.owner_type IN ('COMPANY_FUND','DEPARTMENT','PROJECT')
+        AND NOT EXISTS (SELECT 1 FROM bank_statement_matches m WHERE m.transaction_id=t.id)
+      GROUP BY t.id,t.created_at
+      ORDER BY t.created_at DESC,t.id DESC
+      """,nativeQuery=true)
+  List<Long> findReconciliationCandidateIds(@Param("amount")java.math.BigDecimal amount,org.springframework.data.domain.Pageable page);
 
   boolean existsByTransactionCode(String transactionCode);
 

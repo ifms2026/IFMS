@@ -35,10 +35,9 @@ import com.mkwang.backend.modules.project.repository.ProjectRepository;
 import com.mkwang.backend.modules.profile.entity.UserProfile;
 import com.mkwang.backend.modules.request.entity.Request;
 import com.mkwang.backend.modules.request.repository.RequestRepository;
+import com.mkwang.backend.modules.request.repository.AdvanceBalanceRepository;
 import com.mkwang.backend.modules.user.entity.User;
 import com.mkwang.backend.modules.user.repository.UserRepository;
-import com.mkwang.backend.modules.wallet.entity.WalletOwnerType;
-import com.mkwang.backend.modules.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
@@ -67,7 +66,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     private final UserRepository userRepository;
     private final BusinessCodeGenerator businessCodeGenerator;
     private final RequestRepository requestRepository;
-    private final WalletRepository walletRepository;
+    private final AdvanceBalanceRepository advanceBalanceRepository;
 
     // ─────────────────────────────────────────────────────────────────
     // GET /team-leader/projects
@@ -391,15 +390,24 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 );
             }
 
-            // If increasing, check against project available_budget
-            if (request.budgetLimit().compareTo(phase.getBudgetLimit()) > 0) {
-                BigDecimal increase = request.budgetLimit().subtract(phase.getBudgetLimit());
-                if (increase.compareTo(project.getTotalBudget()) > 0) {
-                    throw new BadRequestException(
-                            "Insufficient project available budget (" + project.getTotalBudget()
-                                    + ") to increase phase budget by " + increase
-                    );
-                }
+            BigDecimal currentProjectPhaseLimits = projectPhaseRepository
+                    .findByProject_IdOrderByCreatedAtAsc(projectId).stream()
+                    .map(ProjectPhase::getBudgetLimit)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal projectedProjectPhaseLimits = currentProjectPhaseLimits
+                    .subtract(phase.getBudgetLimit()).add(request.budgetLimit());
+            if (projectedProjectPhaseLimits.compareTo(project.getTotalBudget()) > 0) {
+                throw new BadRequestException(
+                        "Tổng hạn mức các giai đoạn sau cập nhật (" + projectedProjectPhaseLimits
+                                + ") vượt ngân sách kế hoạch của dự án (" + project.getTotalBudget() + ")"
+                );
+            }
+
+            BigDecimal categoryLimitTotal = phaseCategoryBudgetRepository.sumBudgetLimitByPhaseId(phaseId);
+            if (categoryLimitTotal.compareTo(request.budgetLimit()) > 0) {
+                throw new BadRequestException(
+                        "Hạn mức giai đoạn không thể thấp hơn tổng hạn mức danh mục (" + categoryLimitTotal + ")"
+                );
             }
 
             phase.setBudgetLimit(request.budgetLimit());
@@ -480,6 +488,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
 
         // 7. Determine scope for pending-count query (narrow if projectId filter applied)
         List<Long> pendingScope = (projectId != null) ? List.of(projectId) : leaderProjectIds;
+        Map<Long, BigDecimal> debtBalanceByUserId = loadDebtBalances(pageUserIds, pendingScope);
 
         // 8. Enrich each user: load profile data (already in session from spec query),
         //    fetch wallet lockedBalance, and count pending requests
@@ -490,10 +499,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                     User u = memberships.get(0).getUser();
                     UserProfile up = u.getProfile();
 
-                    BigDecimal debtBalance = walletRepository
-                            .findByOwnerTypeAndOwnerId(WalletOwnerType.USER, uid)
-                            .map(w -> w.getLockedBalance())
-                            .orElse(BigDecimal.ZERO);
+                    BigDecimal debtBalance = debtBalanceByUserId.getOrDefault(uid, BigDecimal.ZERO);
 
                     int pendingCount = requestRepository
                             .countPendingForMemberInProjects(uid, pendingScope);
@@ -551,10 +557,8 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         UserProfile profile = member.getProfile();
 
-        BigDecimal debtBalance = walletRepository
-                .findByOwnerTypeAndOwnerId(WalletOwnerType.USER, userId)
-                .map(w -> w.getLockedBalance())
-                .orElse(BigDecimal.ZERO);
+        BigDecimal debtBalance = loadDebtBalances(List.of(userId), memberProjectIds)
+                .getOrDefault(userId, BigDecimal.ZERO);
 
         int pendingCount = requestRepository.countPendingForMemberInProjects(userId, leaderProjectIds);
 
@@ -642,9 +646,18 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
     }
 
     private BigDecimal resolveAvailableBudget(Project project, BigDecimal totalSpent) {
-        BigDecimal fundedBudget = coalesce(project.getTotalBudget()).add(coalesce(project.getTotalSpent()));
+        BigDecimal fundedBudget = coalesce(project.getAvailableBudget()).add(coalesce(project.getTotalSpent()));
         BigDecimal availableBudget = fundedBudget.subtract(coalesce(totalSpent));
         return availableBudget.max(BigDecimal.ZERO);
+    }
+
+    private Map<Long, BigDecimal> loadDebtBalances(List<Long> userIds, List<Long> projectIds) {
+        if (userIds.isEmpty() || projectIds.isEmpty()) return Map.of();
+        Map<Long, BigDecimal> result = new HashMap<>();
+        for (Object[] row : advanceBalanceRepository.sumRemainingByUserIdsAndProjectIds(userIds, projectIds)) {
+            result.put(((Number) row[0]).longValue(), (BigDecimal) row[1]);
+        }
+        return result;
     }
 
     private BigDecimal coalesce(BigDecimal value) {

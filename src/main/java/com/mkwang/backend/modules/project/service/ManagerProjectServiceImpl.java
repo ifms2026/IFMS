@@ -27,6 +27,7 @@ import com.mkwang.backend.modules.project.repository.ProjectPhaseRepository;
 import com.mkwang.backend.modules.project.repository.ProjectRepository;
 import com.mkwang.backend.modules.project.repository.ProjectSpecification;
 import com.mkwang.backend.modules.request.repository.RequestRepository;
+import com.mkwang.backend.modules.request.repository.AdvanceBalanceRepository;
 import com.mkwang.backend.modules.user.entity.User;
 import com.mkwang.backend.modules.user.service.UserService;
 import com.mkwang.backend.modules.wallet.entity.WalletOwnerType;
@@ -60,6 +61,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     private final PhaseCategoryBudgetRepository phaseCategoryBudgetRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final RequestRepository requestRepository;
+    private final AdvanceBalanceRepository advanceBalanceRepository;
     private final WalletRepository walletRepository;
     private final BusinessCodeGenerator businessCodeGenerator;
     private final ManagerProjectMapper managerProjectMapper;
@@ -111,9 +113,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         Long departmentId = manager.getDepartment().getId();
 
         User member = userService.getDepartmentUserById(departmentId, memberId);
-        BigDecimal debtBalance = walletRepository.findByOwnerTypeAndOwnerId(WalletOwnerType.USER, memberId)
-                .map(wallet -> wallet.getLockedBalance())
-                .orElse(BigDecimal.ZERO);
+        BigDecimal debtBalance = advanceBalanceRepository.sumRemainingByUserId(memberId);
 
         int pendingCount = requestRepository.countPendingForRequester(memberId);
 
@@ -241,7 +241,6 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         }
 
         Project savedProject = projectRepository.save(project);
-        walletService.createWallet(WalletOwnerType.PROJECT, savedProject.getId());
         return buildProjectDetail(savedProject);
     }
 
@@ -480,7 +479,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         }
 
         Map<Long, BigDecimal> result = new HashMap<>();
-        for (Object[] row : walletRepository.findLockedBalancesForUsers(userIds)) {
+        for (Object[] row : advanceBalanceRepository.sumRemainingByUserIds(userIds)) {
             Long userId = ((Number) row[0]).longValue();
             BigDecimal balance = row[1] instanceof BigDecimal ? (BigDecimal) row[1] : BigDecimal.ZERO;
             result.put(userId, balance);

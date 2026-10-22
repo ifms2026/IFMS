@@ -36,6 +36,39 @@ public interface AdvanceBalanceRepository extends JpaRepository<AdvanceBalance, 
          "WHERE ab.user.id = :userId AND ab.status <> 'SETTLED'")
   BigDecimal sumRemainingByUserId(@Param("userId") Long userId);
 
+  /** Outstanding advance balance grouped by employee, restricted to the supplied employees. */
+  @Query("""
+      SELECT ab.user.id, COALESCE(SUM(ab.remainingAmount), 0)
+      FROM AdvanceBalance ab
+      WHERE ab.status <> 'SETTLED' AND ab.remainingAmount > 0
+        AND ab.user.id IN :userIds
+      GROUP BY ab.user.id
+      """)
+  List<Object[]> sumRemainingByUserIds(@Param("userIds") List<Long> userIds);
+
+  /** Outstanding advance balance grouped by employee, limited to projects managed by a team leader. */
+  @Query("""
+      SELECT ab.user.id, COALESCE(SUM(ab.remainingAmount), 0)
+      FROM AdvanceBalance ab
+      WHERE ab.status <> 'SETTLED' AND ab.remainingAmount > 0
+        AND ab.user.id IN :userIds
+        AND ab.advanceRequest.project.id IN :projectIds
+      GROUP BY ab.user.id
+      """)
+  List<Object[]> sumRemainingByUserIdsAndProjectIds(
+      @Param("userIds") List<Long> userIds,
+      @Param("projectIds") List<Long> projectIds);
+
+  @Query("""
+      SELECT ab.advanceRequest.project.id, ab.advanceRequest.phase.id, ab.advanceRequest.category.id,
+             COALESCE(SUM(ab.remainingAmount), 0)
+      FROM AdvanceBalance ab
+      WHERE ab.status <> 'SETTLED' AND ab.remainingAmount > 0
+        AND ab.advanceRequest.project IS NOT NULL
+      GROUP BY ab.advanceRequest.project.id, ab.advanceRequest.phase.id, ab.advanceRequest.category.id
+      """)
+  List<Object[]> sumOutstandingByProjectPhaseCategory();
+
   /**
    * All unsettled advances for a user — pessimistic lock for payroll deduction.
    * Locks all rows to prevent concurrent REIMBURSE while payroll is running.

@@ -12,6 +12,8 @@ public interface ProjectPhaseRepository extends JpaRepository<ProjectPhase, Long
 
     List<ProjectPhase> findByProject_IdOrderByCreatedAtAsc(Long projectId);
 
+    List<ProjectPhase> findByProject_IdInOrderByProject_IdAscCreatedAtAsc(List<Long> projectIds);
+
     List<ProjectPhase> findByProject_IdAndStatusOrderByCreatedAtAsc(Long projectId, PhaseStatus status);
 }
 

@@ -52,4 +52,8 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
         AND w.ownerId IN :userIds
       """)
   java.util.List<Object[]> findLockedBalancesForUsers(@Param("userIds") java.util.List<Long> userIds);
+
+  @Query("SELECT w.ownerId, COALESCE(w.balance, 0) FROM Wallet w WHERE w.ownerType = :ownerType AND w.ownerId IN :ownerIds")
+  java.util.List<Object[]> findBalancesByOwnerTypeAndOwnerIds(@Param("ownerType") WalletOwnerType ownerType,
+      @Param("ownerIds") java.util.List<Long> ownerIds);
 }

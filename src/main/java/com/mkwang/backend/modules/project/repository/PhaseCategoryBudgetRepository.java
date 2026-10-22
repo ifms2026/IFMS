@@ -16,6 +16,11 @@ public interface PhaseCategoryBudgetRepository extends JpaRepository<PhaseCatego
 
     List<PhaseCategoryBudget> findByIdPhaseId(Long phaseId);
 
+    List<PhaseCategoryBudget> findByPhase_Project_IdIn(List<Long> projectIds);
+
+    @Query("SELECT COALESCE(SUM(pcb.budgetLimit), 0) FROM PhaseCategoryBudget pcb WHERE pcb.id.phaseId = :phaseId")
+    BigDecimal sumBudgetLimitByPhaseId(@Param("phaseId") Long phaseId);
+
     List<PhaseCategoryBudget> findByIdCategoryId(Long categoryId);
 
     @Modifying

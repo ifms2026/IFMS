@@ -33,4 +33,10 @@ public interface AccountingJournalRepository extends JpaRepository<AccountingJou
             "where j.advanceBalanceId = :advanceBalanceId or l.advanceBalanceId = :advanceBalanceId " +
             "order by j.postingDate, j.id")
     List<AccountingJournal> findActivitiesForAdvance(@Param("advanceBalanceId") Long advanceBalanceId);
+
+    @EntityGraph(attributePaths = {"lines"})
+    @Query("select distinct j from AccountingJournal j left join j.lines l " +
+            "where j.advanceBalanceId in :advanceBalanceIds or l.advanceBalanceId in :advanceBalanceIds " +
+            "order by j.postingDate, j.id")
+    List<AccountingJournal> findActivitiesForAdvances(@Param("advanceBalanceIds") List<Long> advanceBalanceIds);
 }
