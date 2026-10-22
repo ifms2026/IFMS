@@ -1,12 +1,19 @@
 # IFMS — triển khai sổ cái và theo dõi ngân sách/tạm ứng
 
+> **Cập nhật 22/10/2026:** các lỗi scope export, cú pháp SQL matching, fixture nạp quỹ,
+> đóng tháng hiện tại và đếm PIN đồng thời đã được sửa ở code. Backend test-compile
+> từ build mới và frontend production build đã qua trong lượt sửa gần nhất; chưa chạy
+> integration cho code mới hoặc nghiệm thu V34. Filter/Excel/UI vẫn còn tồn đọng.
+> Xem bảng tổng hợp toàn bộ plan ở [review triển khai](<../../../../DA1/financial-wallet-frontend/docs/ledger-implementation-review.md>).
+> Các kết quả và lỗi ngày 21/10 bên dưới là lịch sử tại mốc đó.
+
 > **Rà soát ngày 18/10/2026:** [Review và kế hoạch hoàn thiện sổ cái/Excel](<../../../../DA1/financial-wallet-frontend/docs/ledger-completion-and-excel-plan.md>) ghi các lỗi mới đã xác định, gồm trùng V20, startup reset dữ liệu, khóa nghiệp vụ và sai nguồn chỉ tiêu. Tài liệu này mô tả phần code đã có ngày 10/10; ràng buộc migration chỉ có hiệu lực khi đã áp dụng và kiểm chứng trên database.
 
 **Cập nhật:** 10/10/2026
 **Phạm vi:** Backend IFMS và các API được dùng bởi trang Kế toán ở frontend.
 **Trạng thái ngày 21/10/2026:** Các mục bên dưới mô tả thiết kế triển khai ban đầu. Backend đã có migration V21–V33, API kỳ/đảo/đối soát/mở sổ/Excel và integration test trên PostgreSQL cô lập. Xem mục “Cập nhật triển khai” ở cuối; database chính chưa được migrate hoặc nghiệm thu.
 
-> **Review bổ sung 21/10:** [Các phát hiện F01–F11](<../../../../DA1/financial-wallet-frontend/docs/ledger-implementation-review.md>) ghi lỗi hồi quy cập nhật dự án, số liệu Manager/Team Leader, hạn mức phase, chứng cứ nạp quỹ mới, đóng kỳ/ngày đảo, transaction PIN, bootstrap và phạm vi Excel/UI. Đây là các việc còn phải sửa; chưa đủ điều kiện gọi là hoàn tất toàn bộ kế hoạch.
+> **Review bổ sung 21/10:** [Các phát hiện F01–F11](<../../../../DA1/financial-wallet-frontend/docs/ledger-implementation-review.md>) là mốc trước đợt sửa tiếp theo. Một phần đã được sửa trong working tree sau các commit triển khai ban đầu; xem trạng thái cập nhật ở cuối tài liệu. Các sửa tiếp theo chưa commit/push và chưa được kiểm chứng bằng integration test trong lượt này.
 
 ## Mô hình dữ liệu và nghiệp vụ
 
@@ -80,8 +87,22 @@ Các mục trên ghi lại phạm vi ngày 10/10 và không còn mô tả đầy
 - Trang đọc sổ theo tài khoản lấy số đầu kỳ, phát sinh và cuối kỳ từ journal. Kỳ kế toán có xem điều kiện và đóng kỳ; sai sót xử lý bằng đảo toàn phần có liên kết nguồn hoặc quy trình sửa nguồn, không sửa journal gốc.
 - Ghi bù lịch sử có tìm **mã nguồn** trực tiếp trong DB, xem trước cả lô, đối chiếu tiền/chứng từ và khóa chống ghi trùng. Nguồn không đủ chứng cứ không được tự chuyển thành journal. Mở sổ chỉ ghi chênh lệch giữa số dư nguồn đã xác nhận với journal đã có, lưu căn cứ, PIN và mốc chuyển đổi; sau đó chặn ghi bù lịch sử tự động.
 - Đối chiếu chi phí dự án kiểm tra từng nguồn EXPENSE/REIMBURSE với chứng từ phân bổ và journal theo đúng phạm vi, so với tổng tài khoản chi phí. Chỉ khi khớp mới cho sửa bộ đếm dự án/giai đoạn/danh mục, có PIN và audit ảnh chụp trước/sau ở V33.
-- Sao kê ngân hàng nhập từ file có tài khoản, mốc và trạng thái BOOKED; đối chiếu với biến động tiền thuộc công ty tại cùng thời điểm. Ghi bù nạp quỹ lịch sử kiểm BOOKED; luồng nạp quỹ mới hiện chỉ kiểm paymentRef, còn thiếu ràng buộc chứng cứ như yêu cầu F05. Ví cá nhân nạp/rút không là khoản tiền công ty giữ hộ. MockBank của luồng rút ví cá nhân vẫn là hệ thống mô phỏng, chưa được gọi là tích hợp ngân hàng thật.
+- Sao kê ngân hàng nhập từ file có tài khoản, mốc và trạng thái BOOKED; đối chiếu với biến động tiền thuộc công ty tại cùng thời điểm. Ghi bù lịch sử và luồng nạp quỹ mới đều yêu cầu dòng sao kê IN/BOOKED chưa được dùng, đúng tài khoản và số tiền; luồng mới ghi giao dịch ví, journal và kết quả đối chiếu trong cùng transaction. Ví cá nhân nạp/rút không là khoản tiền công ty giữ hộ. MockBank của luồng rút ví cá nhân vẫn là hệ thống mô phỏng, chưa được gọi là tích hợp ngân hàng thật.
 - API `/api/v1/spreadsheets` cấp danh sách dataset theo role; template `.xlsx` lấy tham chiếu hiện tại, parser kiểm schema/kiểu ô/công thức/trùng, preview không ghi nghiệp vụ, commit toàn lô có khóa và chống lặp. Export thực hiện trên server theo scope và ngày nếu dataset hỗ trợ. Payroll dùng nhân sự hiện có, không gắn mức lương mẫu. Các bộ dữ liệu đang có cho sáu vai trò gồm phòng ban, nhân sự, dự án, giai đoạn, thành viên, hạn mức, bảng lương, yêu cầu, sao kê, journal, tài khoản, ví, tạm ứng, phiếu lương, audit và báo cáo dự án.
-- Startup không nạp/reset người dùng, payroll hay số dư mẫu ngoài profile `demo`. Bản cài mới có thể cấp ADMIN đầu tiên bằng `BOOTSTRAP_ADMIN_EMAIL` và `BOOTSTRAP_ADMIN_PASSWORD` (tối thiểu 12 ký tự). Tài khoản được tạo với PIN chưa thiết lập, nhưng đường thiết lập PIN ban đầu còn thiếu F08; chưa coi onboarding đã hoàn chỉnh. Không đặt mật khẩu mặc định cho môi trường thật.
+- Startup không nạp/reset người dùng, payroll hay số dư mẫu ngoài profile `demo`. Bản cài mới có thể cấp ADMIN đầu tiên bằng `BOOTSTRAP_ADMIN_EMAIL` và `BOOTSTRAP_ADMIN_PASSWORD` (tối thiểu 12 ký tự). ADMIN bootstrap được bật first-login setup để đổi mật khẩu và thiết lập PIN qua luồng hiện có. Cần nghiệm thu onboarding trên môi trường rỗng; không đặt mật khẩu mặc định cho môi trường thật.
 
 **Kiểm chứng:** backend package thành công; PostgreSQL thử nghiệm mới và bản sao lịch sử đều lên V33; 12 integration test qua (7 nghiệp vụ/Excel, 5 ràng buộc journal). Frontend TypeScript và production build thành công. API smoke nối backend với PostgreSQL clone qua cho journal, sổ tài khoản, tạm ứng còn mở, mức sử dụng ngân sách, kỳ kế toán và danh mục Excel. Database triển khai chính chưa thay đổi. Chưa có browser provider trong phiên để nghiệm thu trực quan; cần kiểm tra UI đủ sáu role, từng loại Excel, chứng từ nguồn, ngân hàng ngoài và số dư mở sổ trên bản sao dữ liệu thực trước khi đưa vào sử dụng.
+
+## Trạng thái sau sửa theo review — 21/10/2026
+
+**Kiểm tra lại sau sửa:** chưa đạt nghiệm thu toàn bộ. Build mới biên dịch main được nhưng
+test-compile không qua vì fixture còn `setPaymentRef()` trong khi API nạp quỹ đã dùng
+`bankEvidenceId`. Review cũng phát hiện filter ghi đè scope xuất dư tạm ứng, SQL ứng viên
+đối soát không hợp lệ trên PostgreSQL, điều kiện đóng tháng hiện tại trong ngày cuối tháng,
+nguy cơ mất lượt PIN sai đồng thời và các thiếu sót filter/UI. Xem F12–F19 và F02 cập nhật
+trong [review triển khai](<../../../../DA1/financial-wallet-frontend/docs/ledger-implementation-review.md>).
+Kết quả compile/build hay test đã báo ở mốc trước không xác nhận các lỗi này đã được sửa.
+
+Các sửa sau push gồm: bỏ tạo ví lặp khi cập nhật dự án; thống nhất cách tính ngân sách khả dụng Manager/Team Leader; tính dư tạm ứng từ `AdvanceBalance` theo đúng phạm vi; chặn tổng hạn mức giai đoạn/danh mục vượt hạn mức cha; yêu cầu chứng từ sao kê hợp lệ khi nạp quỹ; thêm preview và điều kiện đóng kỳ cùng quy tắc ngày đảo; lưu lần nhập PIN sai qua transaction riêng trong khi giao dịch tài chính vẫn rollback; bật first-login setup cho ADMIN; mở rộng filter/export và audit lịch sử export; giảm một số truy vấn N+1 và bổ sung tên giai đoạn/danh mục trên phần đối chiếu chi phí. Chi tiết F01–F11 và phần còn thiếu nằm trong review frontend đã liên kết ở trên.
+
+Các sửa này hiện ở working tree, chưa commit/push. Maven compile và frontend production build đã qua; chưa chạy integration test cho các sửa mới. Migration V34 tạo bảng audit export mới nhưng chưa được chạy trên database cô lập hoặc database triển khai; database chính chưa bị thay đổi. Các phần filter/picker, phân trang, nghiệm thu ma trận Excel đủ role và kiểm tra UI trực quan vẫn còn. Không coi toàn bộ sổ cái/Excel đã nghiệm thu hoàn tất cho tới khi các kiểm chứng đó được thực hiện.
