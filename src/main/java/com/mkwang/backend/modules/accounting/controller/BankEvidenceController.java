@@ -12,11 +12,16 @@ import java.util.*;
 @RestController @RequestMapping("/accountant/ledger/bank-evidence") @RequiredArgsConstructor
 public class BankEvidenceController {
     private final BankEvidenceService bank;
-    @GetMapping("/topup-candidates") public ResponseEntity<ApiResponse<List<Map<String,Object>>>> topupCandidates() {
-        return ResponseEntity.ok(ApiResponse.success(bank.topupCandidates()));
+    @GetMapping("/topup-candidates") public ResponseEntity<ApiResponse<com.mkwang.backend.common.dto.PageResponse<com.mkwang.backend.modules.accounting.dto.response.BankCandidateResponse>>> topupCandidates(
+        @RequestParam(required=false)String search,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate from,
+        @RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate to,@RequestParam(required=false)java.math.BigDecimal amount,
+        @RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int limit) {
+        return ResponseEntity.ok(ApiResponse.success(bank.topupCandidates(search,from,to,amount,page,limit)));
     }
-    @GetMapping("/{id}/candidates") public ResponseEntity<ApiResponse<List<com.mkwang.backend.modules.wallet.dto.response.CorporateMovementResponse>>> candidates(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(bank.candidates(id)));
+    @GetMapping("/{id}/candidates") public ResponseEntity<ApiResponse<com.mkwang.backend.common.dto.PageResponse<com.mkwang.backend.modules.accounting.dto.response.BankCandidateResponse>>> candidates(@PathVariable Long id,
+        @RequestParam(required=false)String search,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate from,
+        @RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate to,@RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int limit) {
+        return ResponseEntity.ok(ApiResponse.success(bank.candidates(id,search,from,to,page,limit)));
     }
     @PostMapping("/{id}/match") public ResponseEntity<ApiResponse<String>> match(@PathVariable Long id,
             @Valid @RequestBody com.mkwang.backend.modules.accounting.dto.request.MatchBankStatementRequest request) {

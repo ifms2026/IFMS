@@ -253,7 +253,7 @@ class FinancialWorkflowIntegrationTest {
     @Test void reconciliationCandidatesExecuteOnPostgresAndFindUnmatchedMovement(){
         login("CFO");var transfer=wallets.systemTopup(money("123"),"UNMATCH-"+suffix,"Isolated fixture");
         Long line=bankEvidence.importLine("IFMS-TEST","CAND-"+suffix,LocalDate.now(),"IN",money("123"),"BOOKED","fixture",actorId(),null);
-        assertTrue(bankEvidence.candidates(line).stream().anyMatch(row->row.id().equals(transfer.getId())));
+        assertTrue(bankEvidence.candidates(line,null,null,null,1,20).getItems().stream().anyMatch(row->row.id().equals(transfer.getId())));
     }
     @Test void concurrentFailedPinsAreCountedWithoutLostUpdates() throws Exception {
         login("ACCOUNTANT");Long user=actorId();ExecutorService executor=Executors.newFixedThreadPool(5);CountDownLatch gate=new CountDownLatch(1);var futures=new ArrayList<Future<?>>();
@@ -262,5 +262,37 @@ class FinancialWorkflowIntegrationTest {
         assertEquals(Integer.valueOf(5),tx.<Integer>execute(status->em.find(UserSecuritySettings.class,user).getRetryCount()));assertTrue(Boolean.TRUE.equals(tx.<Boolean>execute(status->em.find(UserSecuritySettings.class,user).isPinLocked())));
     }
     @Test void currentAccountingMonthCannotClose(){login("ACCOUNTANT");String month=YearMonth.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString();assertFalse(periods.previewClose(month).eligible());assertThrows(BaseException.class,()->periods.close(month,"Current month cannot close",true));}
+
+    @Test void topupCandidatesPageBeyond500AndRespectFiltersAndAccount(){
+        login("CFO");Long actor=actorId();String prefix="PAGED-"+suffix+"-";LocalDate date=LocalDate.of(2020,1,2);
+        tx.executeWithoutResult(status->em.createNativeQuery("""
+            INSERT INTO bank_statement_lines(bank_account,bank_reference,booking_date,direction,amount,state,imported_by)
+            SELECT 'IFMS-TEST',concat(:prefix,n),CAST(:date AS date),'IN',777,'BOOKED',:actor FROM generate_series(1,501) n
+            """).setParameter("prefix",prefix).setParameter("date",date).setParameter("actor",actor).executeUpdate());
+        bankEvidence.importLine("FOREIGN-TEST",prefix+"FOREIGN",date,"IN",money("777"),"BOOKED","foreign",actor,null);
+        bankEvidence.importLine("IFMS-TEST",prefix+"PENDING",date,"IN",money("777"),"PENDING","pending",actor,null);
+        var last=bankEvidence.topupCandidates(prefix,date,date,money("777"),26,20);
+        assertEquals(501,last.getTotal());assertEquals(26,last.getTotalPages());assertEquals(1,last.getItems().size());
+        assertEquals(1,bankEvidence.topupCandidates(prefix+"501",date,date,money("777"),1,20).getTotal());
+        assertEquals(0,bankEvidence.topupCandidates(prefix,date.plusDays(1),null,money("777"),1,20).getTotal());
+        assertEquals(0,bankEvidence.topupCandidates(prefix,date,date,money("778"),1,20).getTotal());
+        assertThrows(BaseException.class,()->bankEvidence.topupCandidates(null,date.plusDays(1),date,null,1,20));
+        assertThrows(BaseException.class,()->bankEvidence.topupCandidates(null,null,null,null,0,20));
+        login("EMPLOYEE");assertThrows(org.springframework.security.access.AccessDeniedException.class,()->bankEvidence.topupCandidates(null,null,null,null,1,20));
+    }
+    @Test void matchingPagesFilterSignedMovementBeforePagination(){
+        login("CFO");String prefix="MATCH-"+suffix;Long actor=actorId();
+        var ids=new ArrayList<Long>();for(int n=0;n<23;n++)ids.add(wallets.systemTopup(money("321"),prefix+n,"fixture").getId());
+        Long line=bankEvidence.importLine("IFMS-TEST",prefix,LocalDate.now(),"IN",money("321"),"BOOKED","fixture",actor,null);
+        String code=tx.execute(status->em.find(com.mkwang.backend.modules.wallet.entity.Transaction.class,ids.getFirst()).getTransactionCode());
+        var second=bankEvidence.candidates(line,null,null,null,2,20);assertTrue(second.getTotal()>=23);assertFalse(second.getItems().isEmpty());
+        assertEquals(1,bankEvidence.candidates(line,code,LocalDate.now(),LocalDate.now(),1,20).getTotal());
+        bankEvidence.confirmMatch(line,ids.getFirst(),"Checked evidence");
+        assertEquals(0,bankEvidence.candidates(line,code,null,null,1,20).getTotal());
+        Long out=bankEvidence.importLine("IFMS-TEST",prefix+"OUT",LocalDate.now(),"OUT",money("321"),"BOOKED","fixture",actor,null);
+        assertEquals(0,bankEvidence.candidates(out,code,null,null,1,20).getTotal());
+        Long foreign=bankEvidence.importLine("FOREIGN-TEST",prefix,LocalDate.now(),"IN",money("321"),"BOOKED","fixture",actor,null);
+        assertThrows(BaseException.class,()->bankEvidence.candidates(foreign,null,null,null,1,20));
+    }
 
 }

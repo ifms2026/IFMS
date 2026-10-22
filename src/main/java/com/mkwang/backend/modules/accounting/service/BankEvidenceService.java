@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.*;
 @Service @RequiredArgsConstructor
 public class BankEvidenceService {
+    private final BankCandidateQueryService candidateQueries;
     private final CompanyFundRepository funds;private final WalletFinancialEvidenceService movements;
     @PersistenceContext private EntityManager em;
 
@@ -20,19 +21,8 @@ public class BankEvidenceService {
 
     @Transactional(readOnly=true)
     @PreAuthorize("hasAnyRole('CFO','ACCOUNTANT')")
-    public List<Map<String,Object>> topupCandidates() {
-        @SuppressWarnings("unchecked") List<Object[]> rows=em.createNativeQuery("""
-                SELECT s.id,s.bank_reference,s.booking_date,s.amount,s.description
-                FROM bank_statement_lines s
-                LEFT JOIN bank_booking_confirmations c ON c.statement_line_id=s.id
-                LEFT JOIN bank_statement_matches m ON m.statement_line_id=s.id
-                WHERE s.bank_account=:account AND s.direction='IN'
-                  AND (s.state='BOOKED' OR c.statement_line_id IS NOT NULL)
-                  AND m.id IS NULL
-                ORDER BY COALESCE(c.booking_date,s.booking_date) DESC,s.id DESC
-                """).setParameter("account",account()).setMaxResults(500).getResultList();
-        return rows.stream().map(row->ExcelValues.values("id",row[0],"bankReference",row[1],
-                "bookingDate",row[2].toString(),"amount",row[3],"description",row[4])).toList();
+    public com.mkwang.backend.common.dto.PageResponse<com.mkwang.backend.modules.accounting.dto.response.BankCandidateResponse> topupCandidates(String search,LocalDate from,LocalDate to,BigDecimal amount,int page,int limit) {
+        return candidateQueries.find(true,account(),search,from,to,amount,page,limit);
     }
 
     @Transactional
@@ -63,17 +53,19 @@ public class BankEvidenceService {
     }
     @Transactional(readOnly=true)
     @PreAuthorize("hasAnyRole('CFO','ACCOUNTANT')")
-    public List<com.mkwang.backend.modules.wallet.dto.response.CorporateMovementResponse> candidates(Long lineId) {
+    public com.mkwang.backend.common.dto.PageResponse<com.mkwang.backend.modules.accounting.dto.response.BankCandidateResponse> candidates(Long lineId,String search,LocalDate from,LocalDate to,int page,int limit) {
         var rows=em.createNativeQuery("SELECT bank_account,amount,direction FROM bank_statement_lines WHERE id=:id").setParameter("id",lineId).getResultList();
         if(rows.isEmpty()) throw new ResourceNotFoundException("Không có dòng sao kê");
         Object[] row=(Object[])rows.getFirst();
         if(!account().equals(row[0])) throw new BadRequestException("Dòng sao kê không thuộc tài khoản đang đối soát");
-        return movements.candidates((BigDecimal)row[1],(String)row[2]);
+        return candidateQueries.find(false,null,search,from,to,"IN".equals(row[2])?(BigDecimal)row[1]:((BigDecimal)row[1]).negate(),page,limit);
     }
     @Transactional
     @PreAuthorize("hasAnyRole('CFO','ACCOUNTANT')")
     public void confirmMatch(Long lineId,Long transactionId,String reason) {
-        candidates(lineId);
+        var accounts=em.createNativeQuery("SELECT bank_account FROM bank_statement_lines WHERE id=:id").setParameter("id",lineId).getResultList();
+        if(accounts.isEmpty())throw new ResourceNotFoundException("Không có dòng sao kê");
+        if(!account().equals(accounts.getFirst()))throw new BadRequestException("Dòng sao kê không thuộc tài khoản đang đối soát");
         var principal=(com.mkwang.backend.modules.auth.security.UserDetailsAdapter)org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         match(lineId,transactionId,principal.getUser().getId(),reason);
     }
