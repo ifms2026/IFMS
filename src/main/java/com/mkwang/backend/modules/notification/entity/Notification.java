@@ -81,7 +81,7 @@ public class Notification extends BaseEntity {
           : "/requests/" + refId;
 
       // Các notification gửi tới requester (employee xem yêu cầu của mình)
-      case REQUEST_REJECTED, REQUEST_PAID -> "/requests/" + refId;
+      case REQUEST_REJECTED, REQUEST_PAID, EXPENSE_VERIFIED, EXPENSE_PAID -> "/requests/" + refId;
 
       // Flow 2: PROJECT_TOPUP → gửi tới TL (kết quả request của TL)
       case PROJECT_TOPUP_APPROVED, PROJECT_TOPUP_REJECTED -> "/requests/" + refId;

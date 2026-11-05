@@ -15,6 +15,8 @@ public enum NotificationType {
     REQUEST_APPROVED_BY_TL,         // Team Leader duyệt → notify Accountant (kế toán) cần giải ngân
     REQUEST_REJECTED,               // Bị từ chối (bất kỳ stage) → notify requester
     REQUEST_PAID,                   // Accountant đã giải ngân → notify requester
+    EXPENSE_VERIFIED,              // Chứng từ tự chi đã được kế toán xác nhận
+    EXPENSE_PAID,                  // Khoản hoàn chi đã chuyển vào ví nhân viên
 
     // ─── Flow 2: Project Fund Top-up ───────────────────────────────────────
     PROJECT_TOPUP_APPROVED,         // Manager duyệt + auto-pay hoàn tất → notify TL
