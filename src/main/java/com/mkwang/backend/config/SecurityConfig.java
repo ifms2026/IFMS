@@ -59,6 +59,10 @@ public class SecurityConfig {
                                 .csrf(AbstractHttpConfigurer::disable)
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                                 .authorizeHttpRequests(auth -> auth
+                                                // The original REQUEST is authenticated before an SSE response starts.
+                                                // A completion/error dispatch must not attempt to write a new 401 to it.
+                                                .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC,
+                                                        jakarta.servlet.DispatcherType.ERROR).permitAll()
                                                 .requestMatchers(WHITE_LIST_URLS).permitAll()
                                                 .anyRequest().authenticated())
                                 .sessionManagement(session -> session

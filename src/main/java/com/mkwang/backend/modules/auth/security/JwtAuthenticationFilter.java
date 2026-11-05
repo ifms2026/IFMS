@@ -113,20 +113,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
 
-            filterChain.doFilter(request, response);
-
         } catch (ExpiredJwtException e) {
             log.debug("Expired JWT for user: {}", e.getClaims().getSubject());
             authenticationEntryPoint.commence(request, response,
                     new BadCredentialsException("Token has expired. Please refresh your token.", e));
+            return;
         } catch (JwtException e) {
             log.warn("Invalid JWT: {}", e.getMessage());
             authenticationEntryPoint.commence(request, response,
                     new BadCredentialsException("Invalid token.", e));
+            return;
         } catch (Exception e) {
             log.error("Authentication error: {}", e.getMessage(), e);
             authenticationEntryPoint.commence(request, response,
                     new BadCredentialsException("Authentication failed.", e));
+            return;
         }
+        // Downstream business/async failures are not authentication failures.
+        filterChain.doFilter(request, response);
     }
 }
