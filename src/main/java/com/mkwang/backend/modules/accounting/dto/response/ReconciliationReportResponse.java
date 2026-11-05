@@ -17,9 +17,9 @@ import java.time.LocalDateTime;
  *    If systemDiscrepancy ≠ 0, a mutation occurred outside WalletService.
  *
  * 2. Bank Statement Check (external reconciliation):
- *    companyFundBalance should equal externalBankBalance.
- *    If bankDiscrepancy ≠ 0, the bank statement hasn't been updated or
- *    there is unrecorded activity in the external bank account.
+ *    Confirmed corporate wallets at the statement cutoff, adjusted for
+ *    pending corporate movements, are compared with the external balance.
+ *    Personal wallet deposits and withdrawals are outside this scope.
  */
 @Data
 @Builder
@@ -59,6 +59,6 @@ public class ReconciliationReportResponse {
     private BigDecimal externalBankBalance;
     private LocalDate  lastStatementDate;
 
-    /** companyFundBalance − externalBankBalance.  Expected = 0. */
+    /** Corporate balance adjusted for pending movements − external balance. Expected = 0. */
     private BigDecimal bankDiscrepancy;
 }

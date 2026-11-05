@@ -148,3 +148,24 @@ Kết quả compile/build hay test đã báo ở mốc trước không xác nh�
 Các sửa sau push gồm: bỏ tạo ví lặp khi cập nhật dự án; thống nhất cách tính ngân sách khả dụng Manager/Team Leader; tính dư tạm ứng từ `AdvanceBalance` theo đúng phạm vi; chặn tổng hạn mức giai đoạn/danh mục vượt hạn mức cha; yêu cầu chứng từ sao kê hợp lệ khi nạp quỹ; thêm preview và điều kiện đóng kỳ cùng quy tắc ngày đảo; lưu lần nhập PIN sai qua transaction riêng trong khi giao dịch tài chính vẫn rollback; bật first-login setup cho ADMIN; mở rộng filter/export và audit lịch sử export; giảm một số truy vấn N+1 và bổ sung tên giai đoạn/danh mục trên phần đối chiếu chi phí. Chi tiết F01–F11 và phần còn thiếu nằm trong review frontend đã liên kết ở trên.
 
 Các sửa này hiện ở working tree, chưa commit/push. Maven compile và frontend production build đã qua; chưa chạy integration test cho các sửa mới. Migration V34 tạo bảng audit export mới nhưng chưa được chạy trên database cô lập hoặc database triển khai; database chính chưa bị thay đổi. Các phần filter/picker, phân trang, nghiệm thu ma trận Excel đủ role và kiểm tra UI trực quan vẫn còn. Không coi toàn bộ sổ cái/Excel đã nghiệm thu hoàn tất cho tới khi các kiểm chứng đó được thực hiện.
+
+## Kiểm tra triển khai trên bản sao DB — 05/11/2026
+
+- Bản sao PostgreSQL từ DB IFMS đang dùng ở V18 đã được nâng cấp tới V36, không
+  chỉnh sửa migration cũ. Sau kiểm chứng, đã sao lưu và nâng chính DB Docker local
+  từ V18 lên V36. Tổng số dư ví và số lượng request/transaction/payslip giữ nguyên.
+  DB gốc còn 0 journal và 0 dòng sao kê; lịch sử chỉ ghi bù khi đủ chứng từ.
+  V35 cập nhật bốn CHECK enum lịch sử
+  cho request, lịch sử hành động và phiếu lương. V36 cập nhật CHECK thông báo;
+  backend bổ sung `EXPENSE_VERIFIED`/`EXPENSE_PAID` và link về request.
+- Trước V35, xác nhận chứng từ EXPENSE trả 409 do CHECK cũ từ chối `VERIFY`.
+  Sau V35, xác nhận → thanh toán → đảo toàn phần qua API thật trên bản sao đều
+  thành công. Trước V36, RabbitMQ từ chối hai sự kiện thông báo EXPENSE; V36 là
+  phần bắt buộc của cùng luồng triển khai.
+- JWT filter chỉ xử lý lỗi xác thực của chính nó; lỗi từ downstream/stream được
+  chuyển tiếp đúng. ASYNC/ERROR dispatch của SSE được cho qua security filter,
+  trong khi request kết nối ban đầu vẫn cần xác thực.
+- Kiểm chứng browser/API, Excel và phần chưa nghiệm thu xem tài liệu frontend
+  `docs/ledger-implementation-review.md`. Khi triển khai ở môi trường khác,
+  kiểm Flyway history/checksum và dùng quy trình migration thông thường; không
+  dùng `repair` hoặc sửa các migration đã chạy.
