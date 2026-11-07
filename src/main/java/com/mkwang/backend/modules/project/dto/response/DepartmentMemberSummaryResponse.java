@@ -12,7 +12,8 @@ public record DepartmentMemberSummaryResponse(
         String role,
         String status,
         int pendingRequestsCount,
-        BigDecimal debtBalance
+        BigDecimal debtBalance,
+        int projectsCount
 ) {
 }
 

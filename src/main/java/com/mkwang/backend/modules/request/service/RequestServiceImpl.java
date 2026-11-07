@@ -119,6 +119,7 @@ public class RequestServiceImpl implements RequestService {
     private static final RequestType FLOW2_TYPE = RequestType.PROJECT_TOPUP;
 
     private final RequestRepository requestRepository;
+    private final com.mkwang.backend.modules.organization.service.DepartmentService departmentService;
     private final AdvanceBalanceRepository advanceBalanceRepository;
     private final FileStorageService fileStorageService;
     private final UserService userService;
@@ -644,6 +645,11 @@ public class RequestServiceImpl implements RequestService {
 
         Long projectId = request.getProject().getId();
         Project lockedProject = projectQueryService.lockFinancialProject(projectId);
+        // validateFinancialRequest already blocks submitting a PROJECT_TOPUP for a non-ACTIVE project,
+        // but the project's status can change while this request sits PENDING — re-check at approval time.
+        if (lockedProject.getStatus() != com.mkwang.backend.modules.project.entity.ProjectStatus.ACTIVE) {
+            throw new BadRequestException("Dự án không còn hoạt động, không thể cấp vốn");
+        }
         if (lockedProject.getAvailableBudget().add(lockedProject.getTotalSpent()).add(effectiveAmount).compareTo(lockedProject.getTotalBudget()) > 0) {
             throw new BadRequestException("Cấp vốn vượt ngân sách kế hoạch của dự án");
         }
@@ -655,6 +661,7 @@ public class RequestServiceImpl implements RequestService {
                 ReferenceType.REQUEST, request.getId(),
                 "PROJECT_TOPUP approved by manager — request " + request.getRequestCode()
         );
+        departmentService.allocateToProject(departmentId, effectiveAmount);
 
         request.getProject().addBudget(effectiveAmount);
 
@@ -807,6 +814,7 @@ public class RequestServiceImpl implements RequestService {
                 ReferenceType.REQUEST, request.getId(),
                 "DEPARTMENT_TOPUP approved by CFO — request " + request.getRequestCode()
         );
+        departmentService.receiveQuota(departmentId, effectiveAmount);
 
         request.setStatus(RequestStatus.PAID);
         request.setPaidAt(LocalDateTime.now());

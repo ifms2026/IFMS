@@ -106,6 +106,8 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                             memberCount,
                             currentPhaseId,
                             currentPhaseName,
+                            null,
+                            null,
                             p.getCreatedAt()
                     );
                 })
@@ -168,6 +170,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 resolveAvailableBudget(project, totalSpent),
                 totalSpent,
                 project.getDepartment() != null ? project.getDepartment().getId() : null,
+                project.getDepartment() != null ? project.getDepartment().getName() : null,
                 project.getManager() != null ? project.getManager().getId() : null,
                 currentPhaseId,
                 phases,

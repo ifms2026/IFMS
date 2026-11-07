@@ -171,6 +171,32 @@ public class DepartmentServiceImpl implements DepartmentService {
         return departmentRepository.count();
     }
 
+    @Override
+    @Transactional
+    public void receiveQuota(Long departmentId, BigDecimal amount) {
+        Department dept = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Department", "id", departmentId));
+        dept.receiveQuota(amount);
+        departmentRepository.save(dept);
+    }
+
+    @Override
+    @Transactional
+    public void allocateToProject(Long departmentId, BigDecimal amount) {
+        Department dept = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Department", "id", departmentId));
+        dept.allocateToProject(amount);
+        departmentRepository.save(dept);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal[] getBudgetSnapshot(Long departmentId) {
+        Department dept = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Department", "id", departmentId));
+        return new BigDecimal[]{dept.getTotalProjectQuota(), dept.getTotalAvailableBalance()};
+    }
+
     // ── Private helpers ──────────────────────────────────────────
 
     private String resolveCode(String requestedCode, String name) {

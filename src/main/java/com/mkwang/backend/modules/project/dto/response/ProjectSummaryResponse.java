@@ -14,5 +14,7 @@ public record ProjectSummaryResponse(
         int memberCount,
         Long currentPhaseId,
         String currentPhaseName,
+        Long teamLeaderId,
+        String teamLeaderName,
         LocalDateTime createdAt
 ) {}

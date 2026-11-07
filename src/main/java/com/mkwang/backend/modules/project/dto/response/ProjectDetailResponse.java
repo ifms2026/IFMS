@@ -14,6 +14,7 @@ public record ProjectDetailResponse(
         BigDecimal availableBudget,
         BigDecimal totalSpent,
         Long departmentId,
+        String departmentName,
         Long managerId,
         Long currentPhaseId,
         List<PhaseDetailResponse> phases,
