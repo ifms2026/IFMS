@@ -257,7 +257,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event, LocalDate from, LocalDate to,
             Long employeeId, Long projectId, Long requestId, int page, int limit) {
         validatePage(from, to, page, limit);
@@ -271,7 +271,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public AccountingJournalDetailResponse getJournalDetail(Long journalId) {
         AccountingJournal journal = journalRepository.findDetailById(journalId)
                 .orElseThrow(() -> new ResourceNotFoundException("AccountingJournal", "id", journalId));
@@ -280,14 +280,14 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee() {
         List<AdvanceBalance> openBalances = advanceBalanceRepository.findByStatusNotOrderByCreatedAtAscIdAsc(
                         com.mkwang.backend.modules.request.entity.AdvanceBalanceStatus.SETTLED)
                 .stream().filter(balance -> balance.getRemainingAmount().signum() > 0).toList();
         return advanceSummaries(openBalances);
     }
-    @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public PageResponse<AdvanceEmployeeSummaryResponse> getOutstandingPage(String search,int page,int limit) {
         checkPage(page,limit);
         var users=advanceBalanceRepository.findOutstandingEmployeeIds("%"+(search==null?"":search.trim().toLowerCase(java.util.Locale.ROOT))+"%",org.springframework.data.domain.PageRequest.of(page-1,limit));
@@ -328,7 +328,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public List<LedgerProjectBudgetResponse> getBudgetExposure() {
         return budgetDetails(projectRepository.findAllByOrderByCreatedAtDesc());
     }
@@ -340,7 +340,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 .orElseThrow(() -> new com.mkwang.backend.common.exception.ResourceNotFoundException("Project", "id", projectId));
         return budgetDetails(List.of(project)).get(0);
     }
-    @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public PageResponse<LedgerProjectBudgetResponse> getBudgetPage(String search,int page,int limit) {
         checkPage(page,limit);
         var spec=com.mkwang.backend.modules.accounting.repository.AccountingProjectSpecification.filter(search);

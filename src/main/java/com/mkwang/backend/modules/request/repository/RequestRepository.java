@@ -216,10 +216,13 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             """)
     long countPendingDeptTopup();
 
+    // approveCfoRequest supports partial approval (approvedAmount may be less than amount), and
+    // transitions PENDING straight to PAID within one @Transactional method — a request is never
+    // persisted at rest in APPROVED_BY_CFO — so this must sum approvedAmount for PAID rows only.
     @Query("""
-            SELECT COALESCE(SUM(r.amount), 0) FROM Request r
+            SELECT COALESCE(SUM(r.approvedAmount), 0) FROM Request r
             WHERE r.type = 'DEPARTMENT_TOPUP'
-              AND r.status IN ('APPROVED_BY_CFO', 'PAID')
+              AND r.status = 'PAID'
               AND YEAR(r.updatedAt) = :year
               AND MONTH(r.updatedAt) = :month
             """)

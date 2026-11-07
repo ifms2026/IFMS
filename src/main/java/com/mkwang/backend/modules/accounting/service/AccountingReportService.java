@@ -26,14 +26,14 @@ public class AccountingReportService {
     private final AccountingReportRepository aggregates;
     private final AccountingReportMapper mapper;
 
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AccountLedgerResponse getLedger(String account, LocalDate from, LocalDate to, Long employeeId,
             Long projectId, Long departmentId, Long phaseId, Long categoryId, int page, int limit) {
         return getLedger(account,from,to,employeeId,projectId,departmentId,phaseId,categoryId,page,limit,null);
     }
 
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public AccountLedgerResponse getLedger(String account, LocalDate from, LocalDate to, Long employeeId,
             Long projectId, Long departmentId, Long phaseId, Long categoryId, int page, int limit, AccountingJournalEvent event) {
