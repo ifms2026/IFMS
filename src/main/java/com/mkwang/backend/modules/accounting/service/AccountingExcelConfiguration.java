@@ -61,8 +61,7 @@ public class AccountingExcelConfiguration {
 
     @Bean ExcelDataset outstandingAdvancesExcel(){
         var columns=List.of(column("request","Mã yêu cầu tạm ứng","TEXT",false),column("employee","Nhân viên","TEXT",false),
-                column("department","Phòng ban","TEXT",false),column("project","Dự án","TEXT",false),column("phase","Giai đoạn","TEXT",false),
-                column("category","Danh mục","TEXT",false),column("original","Đã giải ngân","MONEY",false),
+                column("department","Phòng ban","TEXT",false),column("project","Dự án","TEXT",false),column("original","Đã giải ngân","MONEY",false),
                 column("reimbursed","Đã quyết toán chứng từ","MONEY",false),column("returned","Đã hoàn tiền thật","MONEY",false),
                 column("payrollOffset","Đã bù trừ qua lương","MONEY",false),column("unclassified","Lịch sử chưa phân loại","MONEY_INFO",false),
                 column("remaining","Còn phải quyết toán","MONEY",false),column("status","Trạng thái","TEXT",false));

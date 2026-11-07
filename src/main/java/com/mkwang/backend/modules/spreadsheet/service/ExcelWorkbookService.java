@@ -82,15 +82,9 @@ public class ExcelWorkbookService {
             schema.createRow(0).createCell(0).setCellValue(dataset.code());
             schema.getRow(0).createCell(1).setCellValue(String.valueOf(SCHEMA_VERSION));
             write(workbook,"Data",dataset.columns(),List.of());
+            formatTemplateInputRows(workbook,workbook.getSheet("Data"),dataset.columns());
             Sheet guide=workbook.createSheet("HuongDan");
-            guide.createRow(0).createCell(0).setCellValue("Chỉ nhập Data. Mã/ngày dùng Text, ngày YYYY-MM-DD; tiền dùng số, không có công thức. Xem trước rồi xác nhận toàn lô.");
-            int n=1;
-            for(var column:dataset.columns()) {
-                Row row=guide.createRow(n++);
-                row.createCell(0).setCellValue(column.key());
-                row.createCell(1).setCellValue(column.label());
-                row.createCell(2).setCellValue(column.type()+(column.required()?" · bắt buộc":" · tùy chọn"));
-            }
+            writeGuide(workbook,guide,dataset);
             if(!references.isEmpty()) {
                 Set<String> keys=new LinkedHashSet<>(); references.forEach(row->keys.addAll(row.keySet()));
                 write(workbook,"ThamChieu",keys.stream().map(key->new ExcelColumnResponse(key,key,"TEXT",false)).toList(),references);
@@ -102,36 +96,122 @@ public class ExcelWorkbookService {
     }
     public byte[] export(String title,List<ExcelColumnResponse> columns,List<Map<String,Object>> rows,String actor) {
         try(var workbook=new XSSFWorkbook()) {
-            write(workbook,"Data",columns,rows);
+            write(workbook,"Data",columns,rows,true);
             Sheet info=workbook.createSheet("ThongTin");
             String[] metadata={title,"Người xuất: "+actor,"Thời điểm chốt: "+java.time.Instant.now(),"Số dòng: "+rows.size(),"Dữ liệu theo phạm vi được cấp quyền; ô văn bản không thực thi công thức."};
-            for(int n=0;n<metadata.length;n++) info.createRow(n).createCell(0).setCellValue(metadata[n]);
+            CellStyle titleStyle=titleStyle(workbook);
+            CellStyle bodyStyle=bodyStyle(workbook);
+            for(int n=0;n<metadata.length;n++) {
+                Row row=info.createRow(n);
+                Cell cell=row.createCell(0); cell.setCellValue(metadata[n]); cell.setCellStyle(n==0?titleStyle:bodyStyle);
+                row.setHeightInPoints(n==0?30:22);
+            }
+            info.setColumnWidth(0,100*256);
             return bytes(workbook);
         } catch(IOException error) { throw new InternalSystemException("Không xuất được Excel"); }
     }
     private void write(XSSFWorkbook workbook,String name,List<ExcelColumnResponse> columns,List<Map<String,Object>> rows) {
+        write(workbook,name,columns,rows,false);
+    }
+    private void write(XSSFWorkbook workbook,String name,List<ExcelColumnResponse> columns,List<Map<String,Object>> rows,boolean friendlyHeaders) {
         Sheet sheet=workbook.createSheet(WorkbookUtil.createSafeSheetName(name));
-        var header=sheet.createRow(0); var style=workbook.createCellStyle();
-        var font=workbook.createFont();font.setBold(true);style.setFont(font);
-        for(int i=0;i<columns.size();i++) { var cell=header.createCell(i);cell.setCellValue(columns.get(i).key());cell.setCellStyle(style);sheet.setColumnWidth(i,Math.min(60,Math.max(20,columns.get(i).label().length()+3))*256); }
+        var header=sheet.createRow(0); CellStyle headerStyle=headerStyle(workbook);
+        Drawing<?> drawing=sheet.createDrawingPatriarch();
+        header.setHeightInPoints(32);
+        for(int i=0;i<columns.size();i++) {
+            var column=columns.get(i); var cell=header.createCell(i);cell.setCellValue(friendlyHeaders?column.label():column.key());cell.setCellStyle(headerStyle);
+            CreationHelper helper=workbook.getCreationHelper(); ClientAnchor anchor=helper.createClientAnchor();anchor.setCol1(i);anchor.setCol2(i+1);anchor.setRow1(0);anchor.setRow2(3);
+            Comment note=drawing.createCellComment(anchor);
+            note.setString(helper.createRichTextString(friendlyHeaders?column.key()+(column.required()?" · Bắt buộc":" · Tùy chọn"):column.label()+(column.required()?" · Bắt buộc":" · Tùy chọn"))); cell.setCellComment(note);
+            sheet.setColumnWidth(i,columnWidth(column,rows));
+        }
+        CellStyle normal=bodyStyle(workbook),alternate=alternateBodyStyle(workbook),moneyNormal=moneyStyle(workbook,false),moneyAlternate=moneyStyle(workbook,true);
         int index=1; Map<String,BigDecimal> totals=new LinkedHashMap<>();
         for(var values:rows) {
             Row row=sheet.createRow(index++);
+            row.setHeightInPoints(22);
             for(int i=0;i<columns.size();i++) {
                 var column=columns.get(i);Object value=values.get(column.key());var cell=row.createCell(i);
+                boolean isAlternate=index%2==0;cell.setCellStyle(isAlternate?alternate:normal);
                 if(value==null) continue;
                 if(("MONEY".equals(column.type())||"MONEY_INFO".equals(column.type()))&&value instanceof Number number) {
-                    writeMoney(cell,new BigDecimal(number.toString()));if("MONEY".equals(column.type())) totals.merge(column.key(),new BigDecimal(number.toString()),BigDecimal::add);
+                    writeMoney(cell,new BigDecimal(number.toString()));cell.setCellStyle(isAlternate?moneyAlternate:moneyNormal);if("MONEY".equals(column.type())) totals.merge(column.key(),new BigDecimal(number.toString()),BigDecimal::add);
                 } else cell.setCellValue(value.toString()); // STRING cell: never formula, even if starts with '='
             }
         }
         sheet.createFreezePane(0,1);
+        sheet.setDefaultRowHeightInPoints(22);
         if(!rows.isEmpty()) sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0,rows.size(),0,columns.size()-1));
         if(!totals.isEmpty()) {
-            Row total=sheet.createRow(index+1); total.createCell(0).setCellValue("TỔNG");
-            for(int i=1;i<columns.size();i++) if(totals.containsKey(columns.get(i).key())) writeMoney(total.createCell(i),totals.get(columns.get(i).key()));
+            Row total=sheet.createRow(index+1); CellStyle totalStyle=totalStyle(workbook);total.setHeightInPoints(25);
+            Cell label=total.createCell(0);label.setCellValue("TỔNG");label.setCellStyle(totalStyle);
+            for(int i=1;i<columns.size();i++) { Cell cell=total.createCell(i);cell.setCellStyle(totalStyle);if(totals.containsKey(columns.get(i).key())) writeMoney(cell,totals.get(columns.get(i).key())); }
         }
     }
+    private void writeGuide(XSSFWorkbook workbook,Sheet guide,ExcelDataset dataset) {
+        CellStyle title=titleStyle(workbook),subTitle=sectionStyle(workbook),head=headerStyle(workbook),body=bodyStyle(workbook),alt=alternateBodyStyle(workbook),note=noteStyle(workbook);
+        Row titleRow=guide.createRow(0);titleRow.setHeightInPoints(34);Cell titleCell=titleRow.createCell(0);titleCell.setCellValue("HƯỚNG DẪN NHẬP DỮ LIỆU · "+dataset.label());titleCell.setCellStyle(title);
+        Row info=guide.createRow(1);info.setHeightInPoints(38);Cell infoCell=info.createCell(0);infoCell.setCellValue("Chỉ nhập dữ liệu vào sheet Data. Sheet Ví dụ chỉ để tham khảo, không sao chép nguyên dòng vào Data. Kiểm tra xem trước trước khi xác nhận.");infoCell.setCellStyle(note);
+        Row section=guide.createRow(3);Cell sectionCell=section.createCell(0);sectionCell.setCellValue("DANH SÁCH CỘT VÀ DỮ LIỆU MINH HỌA");sectionCell.setCellStyle(subTitle);
+        guide.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0,0,0,5));
+        guide.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(1,1,0,5));
+        guide.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(3,3,0,5));
+        String[] headers={"Tên cột trong Excel","Tên dễ hiểu","Kiểu dữ liệu","Bắt buộc","Giá trị minh họa","Ghi chú"};
+        Row header=guide.createRow(4);header.setHeightInPoints(30);for(int i=0;i<headers.length;i++){Cell cell=header.createCell(i);cell.setCellValue(headers[i]);cell.setCellStyle(head);}
+        int index=5;
+        for(ExcelColumnResponse column:dataset.columns()) {
+            Row row=guide.createRow(index);row.setHeightInPoints(24);
+            String example=sampleValue(column);
+            String[] values={column.key(),column.label(),friendlyType(column.type()),column.required()?"Có":"Không",example,column.required()?"Cần nhập trước khi xem trước":"Có thể để trống nếu không áp dụng"};
+            for(int i=0;i<values.length;i++){Cell cell=row.createCell(i);cell.setCellValue(values[i]);cell.setCellStyle(index%2==1?body:alt);}
+            index++;
+        }
+        int[] widths={24,34,18,14,30,46};for(int i=0;i<widths.length;i++)guide.setColumnWidth(i,widths[i]*256);
+        guide.createFreezePane(0,5);guide.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(4,index-1,0,headers.length-1));
+    }
+    private void formatTemplateInputRows(XSSFWorkbook workbook,Sheet sheet,List<ExcelColumnResponse> columns) {
+        CellStyle normal=bodyStyle(workbook),alternate=alternateBodyStyle(workbook),moneyNormal=moneyStyle(workbook,false),moneyAlternate=moneyStyle(workbook,true);
+        for(int rowIndex=1;rowIndex<=20;rowIndex++) {
+            Row row=sheet.createRow(rowIndex);row.setHeightInPoints(24);
+            for(int columnIndex=0;columnIndex<columns.size();columnIndex++) {
+                boolean isAlternate=rowIndex%2==0;Cell cell=row.createCell(columnIndex);
+                cell.setCellStyle("MONEY".equals(columns.get(columnIndex).type())?(isAlternate?moneyAlternate:moneyNormal):(isAlternate?alternate:normal));
+            }
+        }
+        sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0,20,0,columns.size()-1));
+    }
+    private String sampleValue(ExcelColumnResponse column) {
+        String key=column.key().toLowerCase(Locale.ROOT),label=column.label().toLowerCase(Locale.ROOT);
+        if(key.contains("email")||label.contains("email"))return "nhanvien.mau@congty.vn";
+        if(key.contains("code")||key.endsWith("no"))return "SAMPLE-001";
+        if(key.contains("name")||label.contains("tên"))return "Phòng ban minh họa";
+        if(key.contains("managerid")||key.endsWith("id"))return "1001";
+        if(key.contains("date")||key.endsWith("at"))return "2026-01-15";
+        if("MONEY".equals(column.type())||"MONEY_INFO".equals(column.type()))return "25000000";
+        if(key.contains("status"))return "DRAFT";
+        if(key.contains("description")||key.contains("note"))return "Chi phí hoạt động theo kế hoạch";
+        return column.required()?"Giá trị minh họa":"";
+    }
+    private String friendlyType(String type) { return switch(type){case "MONEY","MONEY_INFO"->"Số tiền (VND)";case "DATE"->"Ngày YYYY-MM-DD";case "NUMBER"->"Số";default->"Văn bản";}; }
+    private int columnWidth(ExcelColumnResponse column,List<Map<String,Object>> rows) {
+        String key=column.key().toLowerCase(Locale.ROOT);int width=Math.max(column.label().length()+3,column.key().length()+3);
+        if(key.contains("description")||key.contains("note")||key.contains("reason"))width=Math.max(width,38);
+        else if(key.contains("name")||key.contains("email")||key.contains("title"))width=Math.max(width,28);
+        else if("MONEY".equals(column.type())||"MONEY_INFO".equals(column.type()))width=Math.max(width,20);
+        else if(key.endsWith("id")||key.contains("status")||key.contains("date"))width=Math.max(width,16);
+        for(Map<String,Object> row:rows){Object value=row.get(column.key());if(value!=null)width=Math.max(width,Math.min(42,value.toString().length()+2));}
+        return Math.min(48,Math.max(14,width))*256;
+    }
+    private CellStyle headerStyle(XSSFWorkbook workbook) { CellStyle style=workbook.createCellStyle();style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());style.setFillPattern(FillPatternType.SOLID_FOREGROUND);style.setFont(font(workbook,true,IndexedColors.WHITE.getIndex(),11));style.setVerticalAlignment(VerticalAlignment.CENTER);style.setWrapText(true);setThinBorders(style);return style; }
+    private CellStyle titleStyle(XSSFWorkbook workbook) { CellStyle style=workbook.createCellStyle();style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());style.setFillPattern(FillPatternType.SOLID_FOREGROUND);style.setFont(font(workbook,true,IndexedColors.WHITE.getIndex(),16));style.setVerticalAlignment(VerticalAlignment.CENTER);return style; }
+    private CellStyle sectionStyle(XSSFWorkbook workbook) { CellStyle style=workbook.createCellStyle();style.setFillForegroundColor(IndexedColors.LIGHT_BLUE.getIndex());style.setFillPattern(FillPatternType.SOLID_FOREGROUND);style.setFont(font(workbook,true,IndexedColors.DARK_BLUE.getIndex(),11));style.setVerticalAlignment(VerticalAlignment.CENTER);return style; }
+    private CellStyle noteStyle(XSSFWorkbook workbook) { CellStyle style=workbook.createCellStyle();style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());style.setFillPattern(FillPatternType.SOLID_FOREGROUND);style.setFont(font(workbook,false,IndexedColors.DARK_BLUE.getIndex(),10));style.setWrapText(true);style.setVerticalAlignment(VerticalAlignment.CENTER);return style; }
+    private CellStyle bodyStyle(XSSFWorkbook workbook) { CellStyle style=workbook.createCellStyle();style.setVerticalAlignment(VerticalAlignment.CENTER);setThinBorders(style);return style; }
+    private CellStyle alternateBodyStyle(XSSFWorkbook workbook) { CellStyle style=bodyStyle(workbook);style.setFillForegroundColor(IndexedColors.PALE_BLUE.getIndex());style.setFillPattern(FillPatternType.SOLID_FOREGROUND);return style; }
+    private CellStyle moneyStyle(XSSFWorkbook workbook,boolean alternate) { CellStyle style=alternate?alternateBodyStyle(workbook):bodyStyle(workbook);style.setAlignment(HorizontalAlignment.RIGHT);style.setDataFormat(workbook.createDataFormat().getFormat("#,##0\" ₫\";[Red]-#,##0\" ₫\""));return style; }
+    private CellStyle totalStyle(XSSFWorkbook workbook) { CellStyle style=workbook.createCellStyle();style.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());style.setFillPattern(FillPatternType.SOLID_FOREGROUND);style.setFont(font(workbook,true,IndexedColors.DARK_GREEN.getIndex(),10));setThinBorders(style);return style; }
+    private Font font(XSSFWorkbook workbook,boolean bold,short color,int size) { Font font=workbook.createFont();font.setBold(bold);font.setColor(color);font.setFontHeightInPoints((short)size);return font; }
+    private void setThinBorders(CellStyle style) { style.setBorderBottom(BorderStyle.THIN);style.setBottomBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());style.setBorderLeft(BorderStyle.THIN);style.setLeftBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());style.setBorderRight(BorderStyle.THIN);style.setRightBorderColor(IndexedColors.GREY_25_PERCENT.getIndex()); }
     private void writeMoney(Cell cell,BigDecimal amount) {
         if(amount.precision()>15) cell.setCellValue(amount.toPlainString()); else cell.setCellValue(amount.doubleValue());
     }

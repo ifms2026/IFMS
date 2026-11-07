@@ -14,9 +14,14 @@ import static com.mkwang.backend.modules.spreadsheet.service.ExcelValues.*;
 public class RequestExcelConfiguration {
     private final RequestRepository requests;private final AdvanceBalanceRepository advances;private final ProjectQueryService projects;
     private static final Set<String> ALL=Set.of("ADMIN","CFO","ACCOUNTANT","MANAGER","TEAM_LEADER","EMPLOYEE");
-    private List<ExcelColumnResponse> requestColumns(){return List.of(column("code","Mã yêu cầu","TEXT",false),column("type","Nghiệp vụ","TEXT",false),column("status","Trạng thái","TEXT",false),column("employee","Nhân viên","TEXT",false),column("project","Dự án","TEXT",false),column("phase","Giai đoạn","TEXT",false),column("category","Danh mục","TEXT",false),column("amount","Đề nghị","MONEY_INFO",false),column("approvedAmount","Đã duyệt","MONEY_INFO",false),column("reservedAmount","Còn giữ cho yêu cầu","MONEY",false),column("createdAt","Ngày tạo","TEXT",false));}
+    private List<ExcelColumnResponse> requestColumns(boolean personal){
+        var columns=new ArrayList<>(List.of(column("code","Mã yêu cầu","TEXT",false),column("type","Nghiệp vụ","TEXT",false),column("status","Trạng thái","TEXT",false)));
+        if(!personal)columns.add(column("employee","Nhân viên","TEXT",false));
+        columns.addAll(List.of(column("project","Dự án","TEXT",false),column("phase","Giai đoạn","TEXT",false),column("category","Danh mục","TEXT",false),column("amount","Đề nghị","MONEY_INFO",false),column("approvedAmount","Đã duyệt","MONEY_INFO",false),column("reservedAmount","Còn giữ cho yêu cầu","MONEY",false),column("createdAt","Ngày tạo","TEXT",false)));
+        return columns;
+    }
     private ExcelDataset requestExport(String code,String label,Set<String> roles,boolean personal){
-        return new ExportExcelDataset(code,label,roles,requestColumns(),(actor,filters,max)->{
+        return new ExportExcelDataset(code,label,roles,requestColumns(personal),(actor,filters,max)->{
             var spec=ExcelExportSpecification.<Request>filter(filters);
             if(personal)spec=spec.and(ExcelExportSpecification.dimension("requester.id",actor.getId()));
             else spec=spec.and(com.mkwang.backend.modules.spreadsheet.repository.ScopedLookupSpecification.scope("request",actor));
@@ -27,9 +32,14 @@ public class RequestExcelConfiguration {
     }
     @Bean ExcelDataset myRequestsHistoryExcel(){return requestExport("my-requests-history","Lịch sử yêu cầu của tôi",ALL,true);}
     @Bean ExcelDataset managedRequestsExcel(){return requestExport("managed-requests","Yêu cầu trong phạm vi phụ trách",Set.of("TEAM_LEADER","MANAGER","CFO","ACCOUNTANT"),false);}
-    private List<ExcelColumnResponse> advanceColumns(){return List.of(column("employee","Nhân viên","TEXT",false),column("department","Phòng ban","TEXT",false),column("request","Tạm ứng gốc","TEXT",false),column("project","Dự án","TEXT",false),column("original","Đã giải ngân","MONEY",false),column("receipts","Chứng từ đã xác nhận","MONEY",false),column("cashReturned","Tiền hoàn thật","MONEY",false),column("payrollOffset","Bù trừ lương","MONEY",false),column("legacyUnknown","Lịch sử chưa phân loại","MONEY",false),column("remaining","Còn phải quyết toán","MONEY",false),column("status","Trạng thái","TEXT",false));}
+    private List<ExcelColumnResponse> advanceColumns(boolean personal){
+        var columns=new ArrayList<ExcelColumnResponse>();
+        if(!personal)columns.addAll(List.of(column("employee","Nhân viên","TEXT",false),column("department","Phòng ban","TEXT",false)));
+        columns.addAll(List.of(column("request","Tạm ứng gốc","TEXT",false),column("project","Dự án","TEXT",false),column("original","Đã giải ngân","MONEY",false),column("receipts","Chứng từ đã xác nhận","MONEY",false),column("cashReturned","Tiền hoàn thật","MONEY",false),column("payrollOffset","Bù trừ lương","MONEY",false),column("legacyUnknown","Lịch sử chưa phân loại","MONEY",false),column("remaining","Còn phải quyết toán","MONEY",false),column("status","Trạng thái","TEXT",false)));
+        return columns;
+    }
     private ExcelDataset advanceExport(String code,String label,Set<String> roles,boolean personal){
-        return new ExportExcelDataset(code,label,roles,advanceColumns(),(actor,filters,max)->{
+        return new ExportExcelDataset(code,label,roles,advanceColumns(personal),(actor,filters,max)->{
             var spec=ExcelExportSpecification.<AdvanceBalance>filter(filters,personal?Map.of("user.id",actor.getId()):Map.of());
             return advances.findAll(spec,PageRequest.of(0,max+1,Sort.by("id"))).stream().map(a->values("employee",a.getUser().getFullName(),
                     "department",a.getUser().getDepartment()==null?null:a.getUser().getDepartment().getName(),"request",a.getAdvanceRequest().getRequestCode(),"project",a.getAdvanceRequest().getProject()==null?null:a.getAdvanceRequest().getProject().getName(),
