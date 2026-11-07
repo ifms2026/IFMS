@@ -33,6 +33,7 @@ public interface AccountingJournalService {
     AccountingJournalDetailResponse getJournalDetail(Long journalId);
     List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee();
     List<LedgerProjectBudgetResponse> getBudgetExposure();
+    LedgerProjectBudgetResponse getBudgetExposureForProject(Long projectId);
     PageResponse<AdvanceEmployeeSummaryResponse> getOutstandingPage(String search,int page,int limit);
     PageResponse<LedgerProjectBudgetResponse> getBudgetPage(String search,int page,int limit);
 }

@@ -32,7 +32,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             FROM Request r
             WHERE r.project IS NOT NULL
               AND r.reservedAmount > 0
-              AND r.status IN ('APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
+              AND r.status = 'APPROVED_BY_TEAM_LEADER'
             GROUP BY r.project.id, r.phase.id, r.category.id
             """)
     List<Object[]> sumActiveReservationsForLedger();
@@ -42,7 +42,7 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             FROM Request r
             WHERE r.project.id IN :projectIds
               AND r.reservedAmount > 0
-              AND r.status IN ('APPROVED_BY_TEAM_LEADER', 'ACCOUNTANT_VERIFIED')
+              AND r.status = 'APPROVED_BY_TEAM_LEADER'
             GROUP BY r.project.id, r.phase.id, r.category.id
             """)
     List<Object[]> sumActiveReservationsForLedgerProjects(@Param("projectIds") List<Long> projectIds);

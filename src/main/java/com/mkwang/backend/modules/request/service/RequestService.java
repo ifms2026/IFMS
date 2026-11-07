@@ -8,6 +8,7 @@ import com.mkwang.backend.modules.request.dto.request.RejectRequestRequest;
 import com.mkwang.backend.modules.request.dto.request.UpdateRequestRequest;
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementSummaryResponse;
+import com.mkwang.backend.modules.request.dto.response.DisbursementBudgetContextResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantRejectResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoApprovalDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoApprovalSummaryResponse;
@@ -85,6 +86,8 @@ public interface RequestService {
             RequestType type, String search, int page, int size);
 
     AccountantDisbursementDetailResponse getAccountantDisbursementDetail(Long id);
+
+    DisbursementBudgetContextResponse getAccountantDisbursementBudgetContext(Long id);
 
     DisburseResponse disburse(Long id, Long accountantId, DisburseRequest req);
 

@@ -32,6 +32,7 @@ import com.mkwang.backend.modules.request.dto.request.UpdateRequestRequest;
 import com.mkwang.backend.modules.request.dto.request.AdvanceReturnRequest;
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementSummaryResponse;
+import com.mkwang.backend.modules.request.dto.response.DisbursementBudgetContextResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantRejectResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoApprovalDetailResponse;
 import com.mkwang.backend.modules.request.dto.response.CfoApprovalSummaryResponse;
@@ -907,6 +908,66 @@ public class RequestServiceImpl implements RequestService {
                 .toList();
 
         return requestMapper.toAccountantDisbursementDetailResponse(request, timeline);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('REQUEST_VIEW_APPROVED')")
+    public DisbursementBudgetContextResponse getAccountantDisbursementBudgetContext(Long id) {
+        Request request = requestRepository.findDetailByIdForAccountant(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
+        if (request.getProject() == null || request.getPhase() == null) {
+            throw new BadRequestException("Yêu cầu chưa được gắn dự án và giai đoạn nên không thể đối chiếu ngân sách");
+        }
+
+        var projectBudget = accountingJournalService.getBudgetExposureForProject(request.getProject().getId());
+        var phaseBudget = projectBudget.phases().stream()
+                .filter(item -> item.phaseId().equals(request.getPhase().getId()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Phase budget not found"));
+        var categoryBudget = request.getCategory() == null ? null : phaseBudget.categories().stream()
+                .filter(item -> item.categoryId().equals(request.getCategory().getId()))
+                .findFirst().orElse(null);
+
+        boolean pendingRequest = request.getStatus() == RequestStatus.APPROVED_BY_TEAM_LEADER;
+        boolean hasOwnReservation = pendingRequest
+                && (request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE);
+        BigDecimal ownReservation = hasOwnReservation && request.getReservedAmount() != null
+                ? request.getReservedAmount() : BigDecimal.ZERO;
+        boolean budgetAlreadyRecognized = request.getType() == RequestType.EXPENSE
+                && request.getStatus() == RequestStatus.ACCOUNTANT_VERIFIED;
+        BigDecimal requestAmount = request.getApprovedAmount() == null ? BigDecimal.ZERO : request.getApprovedAmount();
+        boolean createsBudgetExposure = (pendingRequest
+                && (request.getType() == RequestType.ADVANCE || request.getType() == RequestType.EXPENSE))
+                || budgetAlreadyRecognized;
+        BigDecimal amountToCommit = createsBudgetExposure ? requestAmount : BigDecimal.ZERO;
+        BigDecimal recognizedBeforeRequest = budgetAlreadyRecognized ? requestAmount : BigDecimal.ZERO;
+
+        DisbursementBudgetContextResponse.Scope projectScope = toBudgetScope(projectBudget.totalBudget(),
+                projectBudget.recognizedExpense().subtract(recognizedBeforeRequest), projectBudget.lockedForRequests().subtract(ownReservation),
+                projectBudget.openAdvance(), amountToCommit);
+        DisbursementBudgetContextResponse.Scope phaseScope = toBudgetScope(phaseBudget.budgetLimit(),
+                phaseBudget.recognizedExpense().subtract(recognizedBeforeRequest), phaseBudget.lockedForRequests().subtract(ownReservation),
+                phaseBudget.openAdvance(), amountToCommit);
+        DisbursementBudgetContextResponse.Scope categoryScope = categoryBudget == null ? null : toBudgetScope(
+                categoryBudget.budgetLimit(), categoryBudget.recognizedExpense().subtract(recognizedBeforeRequest),
+                categoryBudget.lockedForRequests().subtract(ownReservation), categoryBudget.openAdvance(), amountToCommit);
+
+        return new DisbursementBudgetContextResponse(projectBudget.projectCode(), projectBudget.projectName(),
+                request.getPhase().getPhaseCode(), phaseBudget.phaseName(),
+                request.getCategory() == null ? null : request.getCategory().getName(),
+                request.getApprovedAmount(), LocalDateTime.now(), projectScope, phaseScope, categoryScope);
+    }
+
+    private DisbursementBudgetContextResponse.Scope toBudgetScope(BigDecimal limit, BigDecimal expense,
+            BigDecimal lockedOther, BigDecimal openAdvance, BigDecimal amountToCommit) {
+        BigDecimal safeLimit = limit == null ? BigDecimal.ZERO : limit;
+        BigDecimal safeExpense = expense == null ? BigDecimal.ZERO : expense;
+        BigDecimal safeLocked = lockedOther == null ? BigDecimal.ZERO : lockedOther.max(BigDecimal.ZERO);
+        BigDecimal safeAdvance = openAdvance == null ? BigDecimal.ZERO : openAdvance;
+        BigDecimal available = safeLimit.subtract(safeExpense).subtract(safeLocked).subtract(safeAdvance);
+        return new DisbursementBudgetContextResponse.Scope(safeLimit, safeExpense, safeLocked, safeAdvance,
+                available, available.subtract(amountToCommit));
     }
 
     @Override

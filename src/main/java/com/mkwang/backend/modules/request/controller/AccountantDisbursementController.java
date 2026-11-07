@@ -9,6 +9,7 @@ import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementDet
 import com.mkwang.backend.modules.request.dto.response.AccountantDisbursementSummaryResponse;
 import com.mkwang.backend.modules.request.dto.response.AccountantRejectResponse;
 import com.mkwang.backend.modules.request.dto.response.DisburseResponse;
+import com.mkwang.backend.modules.request.dto.response.DisbursementBudgetContextResponse;
 import com.mkwang.backend.modules.request.entity.RequestType;
 import com.mkwang.backend.modules.request.service.RequestService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +63,15 @@ public class AccountantDisbursementController {
         return ResponseEntity.ok(ApiResponse.success(
                 requestService.getAccountantDisbursementDetail(id)
         ));
+    }
+
+    @GetMapping("/{id}/budget-context")
+    @Operation(summary = "Get current budget context for a disbursement request",
+            description = "Read-only, request-scoped budget exposure for project, phase, and expense category. It includes recognized expenses, other approved commitments, unsettled advances, current availability, and the projected availability after this request is processed.")
+    public ResponseEntity<ApiResponse<DisbursementBudgetContextResponse>> budgetContext(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsAdapter principal) {
+        return ResponseEntity.ok(ApiResponse.success(requestService.getAccountantDisbursementBudgetContext(id)));
     }
 
     @PostMapping("/{id}/disburse")

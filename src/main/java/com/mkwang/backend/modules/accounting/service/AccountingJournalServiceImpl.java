@@ -332,6 +332,14 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
     public List<LedgerProjectBudgetResponse> getBudgetExposure() {
         return budgetDetails(projectRepository.findAllByOrderByCreatedAtDesc());
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public LedgerProjectBudgetResponse getBudgetExposureForProject(Long projectId) {
+        var project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new com.mkwang.backend.common.exception.ResourceNotFoundException("Project", "id", projectId));
+        return budgetDetails(List.of(project)).get(0);
+    }
     @Override @Transactional(readOnly=true) @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public PageResponse<LedgerProjectBudgetResponse> getBudgetPage(String search,int page,int limit) {
         checkPage(page,limit);
