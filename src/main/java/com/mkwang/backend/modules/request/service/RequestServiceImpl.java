@@ -444,7 +444,7 @@ public class RequestServiceImpl implements RequestService {
             throw new ResourceNotFoundException("Request not found");
         }
 
-        Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
+        Request request = requestRepository.findDetailByIdForTl(id, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         List<RequestHistoryResponse> timeline = requestRepository.findHistoriesByRequestId(id)
@@ -465,7 +465,7 @@ public class RequestServiceImpl implements RequestService {
             throw new ResourceNotFoundException("Request not found");
         }
 
-        Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
+        Request request = requestRepository.findDetailByIdForTl(id, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         if (request.getStatus() != RequestStatus.PENDING) {
@@ -524,7 +524,7 @@ public class RequestServiceImpl implements RequestService {
             throw new ResourceNotFoundException("Request not found");
         }
 
-        Request request = requestRepository.findDetailByIdForTl(id, leaderId, leaderProjectIds)
+        Request request = requestRepository.findDetailByIdForTl(id, leaderProjectIds)
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
 
         if (request.getStatus() != RequestStatus.PENDING) {
