@@ -57,10 +57,13 @@ class FinancialWorkflowIntegrationTest {
     @Autowired EntityManager em; @Autowired PlatformTransactionManager tm; @Autowired PasswordEncoder passwords;
     @Autowired RequestService requests; @Autowired WalletService wallets; @Autowired CompanyFundService fund;
     @Autowired com.mkwang.backend.modules.accounting.service.BankEvidenceService bankEvidence;
-    @Autowired PayrollManagementService payroll; @Autowired AccountingCorrectionService corrections; @Autowired SpreadsheetService excel;
+    @Autowired PayrollManagementService payroll; @Autowired AccountingCorrectionService corrections;
+    @Autowired com.mkwang.backend.modules.accounting.service.PayrollReplacementService payrollReplacement;
+    @Autowired SpreadsheetService excel;
     @Autowired AccountingCostReconciliationService costReconciliation; @Autowired AccountingOpeningService opening;
     @Autowired AccountingBackfillService history;
     @Autowired com.mkwang.backend.modules.spreadsheet.service.FinancialLookupService lookups;
+    @Autowired List<com.mkwang.backend.modules.spreadsheet.service.ExcelDataset> excelDatasets;
     @Autowired AccountingJournalService journalService;
     @Autowired AccountingReportService reports;
     @Autowired com.mkwang.backend.modules.audit.service.AuditLogService audits;
@@ -113,6 +116,26 @@ class FinancialWorkflowIntegrationTest {
     BigDecimal userCash(){return wallets.getWallet(WalletOwnerType.USER,actors.get("EMPLOYEE").getId()).getBalance();}
     Long advance(Long requestId){return tx.execute(s->em.createQuery("select a.id from AdvanceBalance a where a.advanceRequest.id=:id",Long.class).setParameter("id",requestId).getSingleResult());}
     BigDecimal debt(Long id){return tx.execute(s->em.find(AdvanceBalance.class,id).getRemainingAmount());}
+    List<String> importExcelRows(String code,Long scope,List<Map<String,Object>> values) throws Exception {
+        var definition=excelDatasets.stream().filter(item->item.code().equals(code)).findFirst().orElseThrow();
+        byte[] template=excel.template(code,scope),upload;
+        try(var workbook=new XSSFWorkbook(new ByteArrayInputStream(template));var output=new ByteArrayOutputStream()) {
+            var sheet=workbook.getSheet("Data");int rowIndex=1;
+            for(var data:values) {
+                var row=sheet.createRow(rowIndex++);
+                for(int column=0;column<definition.columns().size();column++) {
+                    var definitionColumn=definition.columns().get(column);Object value=data.get(definitionColumn.key());if(value==null)continue;
+                    if("MONEY".equals(definitionColumn.type())&&value instanceof Number number)row.createCell(column).setCellValue(number.doubleValue());
+                    else row.createCell(column).setCellValue(value.toString());
+                }
+            }
+            workbook.write(output);upload=output.toByteArray();
+        }
+        var preview=excel.preview(code,scope,new MockMultipartFile("file",code+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",upload));
+        assertTrue(preview.errors().isEmpty(),code+" import errors: "+preview.errors());
+        var committed=excel.commit(preview.batchId());assertEquals("COMMITTED",committed.state(),code+" should commit all rows");
+        return committed.results();
+    }
     Long journal(String event,Long requestId){return tx.execute(s->((Number)em.createNativeQuery("select id from accounting_journals where event_type=:e and request_id=:r").setParameter("e",event).setParameter("r",requestId).getSingleResult()).longValue());}
 
     @Test void expenseRecognizesCostOnceAndReversalRestoresAllSources() {
@@ -137,6 +160,39 @@ class FinancialWorkflowIntegrationTest {
         payroll.autoNetting(period);payroll.runPayroll(period);
         assertEquals(0,debt(aid).signum());assertEquals(0,userCash().compareTo(money("1200")));assertEquals(0,cost().compareTo(money("200")));
         assertThrows(BaseException.class,()->payroll.confirmOverwrite(period));assertThrows(BaseException.class,()->payroll.runPayroll(period));
+    }
+    @Test void payrollReplacementKeepsOriginalReversalAndEffectiveSlipTraceable() {
+        login("ACCOUNTANT");
+        Long[] source=tx.execute(status->{
+            var period=PayrollPeriod.builder().periodCode("REPLACE-"+suffix).name("Replacement fixture "+suffix).month(1).year(2099).build();
+            em.persist(period);
+            var slip=Payslip.builder().payslipCode("ORIGINAL-"+suffix).period(period)
+                    .user(em.find(User.class,actors.get("EMPLOYEE").getId())).baseSalary(money("1000")).build();
+            period.getPayslips().add(slip);em.persist(slip);
+            return new Long[]{period.getId(),slip.getId()};
+        });
+        payroll.autoNetting(source[0]);
+        payroll.runPayroll(source[0]);
+        Long originalJournal=tx.execute(status->((Number)em.createNativeQuery("""
+                SELECT id FROM accounting_journals WHERE event_type='PAYROLL_SETTLEMENT' AND source_id=:source
+                """).setParameter("source",source[1].toString()).getSingleResult()).longValue());
+        var request=new ReplacePayslipRequest(money("1200"),BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,
+                "Điều chỉnh dữ liệu lương sai","PAYROLL-EVIDENCE-"+suffix,PIN);
+
+        Long replacementId=payrollReplacement.replace(originalJournal,request);
+        Long retriedReplacementId=payrollReplacement.replace(originalJournal,request);
+
+        assertEquals(replacementId,retriedReplacementId,"Retry after a lost response must return the same replacement");
+        assertEquals(PayslipStatus.REVERSED,tx.execute(status->em.find(Payslip.class,source[1]).getStatus()));
+        var effective=tx.execute(status->em.find(Payslip.class,replacementId));
+        assertEquals(PayslipStatus.PAID,effective.getStatus());
+        assertEquals(source[1],effective.getReplacesPayslipId());
+        assertEquals(0,effective.getFinalNetSalary().compareTo(money("1200")));
+        assertEquals(0,userCash().compareTo(money("1200")));
+        assertEquals(Long.valueOf(1L),tx.execute(status->em.createQuery("select count(j) from AccountingJournal j where j.eventType='REVERSAL' and j.originalJournalId=:id",Long.class)
+                .setParameter("id",originalJournal).getSingleResult()));
+        assertEquals(Long.valueOf(1L),tx.execute(status->em.createQuery("select count(j) from AccountingJournal j where j.eventType='PAYROLL_SETTLEMENT' and j.sourceId=:id",Long.class)
+                .setParameter("id",replacementId.toString()).getSingleResult()));
     }
     @Test void parallelDisbursementCreatesOnePaymentAndJournal() throws Exception {
         Long req=approved(RequestType.ADVANCE,"100",null,false);ExecutorService executor=Executors.newFixedThreadPool(2);CountDownLatch gate=new CountDownLatch(1);
@@ -175,6 +231,29 @@ class FinancialWorkflowIntegrationTest {
         assertEquals(0,tx.execute(s->em.find(PhaseCategoryBudget.class,new PhaseCategoryBudgetId(phaseId,categoryId)).getBudgetLimit()).compareTo(money("4000")));
         assertEquals(0,tx.execute(s->em.find(PhaseCategoryBudget.class,new PhaseCategoryBudgetId(phaseId,second)).getBudgetLimit()).compareTo(money("1000")));
     }
+    @Test void everyImportDatasetPreviewsAndCommitsThroughItsOwningRole() throws Exception {
+        login("ADMIN");
+        assertTrue(importExcelRows("departments",null,List.of(Map.of("code","XL"+suffix,"name","Excel department "+suffix,"totalProjectQuota",10000))).getFirst().startsWith("DEPARTMENT:"));
+        Long employeeRole=actors.get("EMPLOYEE").getRole().getId();
+        Long importedEmployee=Long.valueOf(importExcelRows("employees",null,List.of(Map.of("fullName","Imported employee "+suffix,"email","excel-employee-"+suffix+"@integration.invalid","roleId",employeeRole,"departmentId",actors.get("EMPLOYEE").getDepartment().getId()))).getFirst().replace("USER:",""));
+
+        login("MANAGER");Long teamLeaderId=actors.get("TEAM_LEADER").getId();
+        Long importedProject=Long.valueOf(importExcelRows("projects",null,List.of(Map.of("name","Excel project "+suffix,"description","Isolated Excel import fixture","totalBudget",1000,"teamLeaderId",teamLeaderId))).getFirst().replace("PROJECT:",""));
+        login("TEAM_LEADER");
+        Long importedPhase=Long.valueOf(importExcelRows("phases",importedProject,List.of(Map.of("name","Excel phase "+suffix,"budgetLimit",800))).getFirst().replace("PHASE:",""));
+        assertTrue(importExcelRows("project-members",importedProject,List.of(Map.of("userId",importedEmployee,"position","Engineer"))).getFirst().startsWith("MEMBER:"));
+        assertTrue(importExcelRows("category-budgets",importedProject,List.of(Map.of("phaseId",importedPhase,"categoryId",categoryId,"budgetLimit",800))).getFirst().startsWith("BUDGET:"));
+
+        login("ACCOUNTANT");Long payrollPeriod=tx.execute(status->{var period=PayrollPeriod.builder().periodCode("IMPORT-"+suffix).name("Excel import "+suffix).month(10).year(2026).build();em.persist(period);return period.getId();});
+        String employeeCode=actors.get("EMPLOYEE").getProfile().getEmployeeCode();
+        assertTrue(importExcelRows("payroll",payrollPeriod,List.of(Map.of("employeeCode",employeeCode,"employeeName",actors.get("EMPLOYEE").getFullName(),"baseSalary",1000,"bonus",0,"allowance",0,"deduction",0))).getFirst().startsWith("PAYSLIP:"));
+        assertTrue(importExcelRows("bank-statements",null,List.of(Map.of("bankAccount","IFMS-TEST","bankReference","IMPORT-"+suffix,"bookingDate",LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString(),"direction","IN","amount",500,"state","PENDING","description","Isolated import fixture"))).getFirst().startsWith("BANK_LINE:"));
+
+        login("EMPLOYEE");
+        assertTrue(importExcelRows("requests",null,List.of(Map.of("type","ADVANCE","projectId",projectId,"phaseId",phaseId,"categoryId",categoryId,"amount",100,"description","Excel request "+suffix))).getFirst().startsWith("REQUEST:"));
+        login("EMPLOYEE");assertThrows(BaseException.class,()->excel.template("bank-statements",null));
+        login("CFO");assertThrows(BaseException.class,()->excel.template("employees",null));
+    }
     @Test void costCountersOnlyReconcileAgainstVerifiedDocumentsAndJournal() {
         Long id=approved(RequestType.EXPENSE,"100",null,true);login("ACCOUNTANT");
         requests.disburse(id,actorId(),new DisburseRequest(PIN,"Receipt accepted",documents(id,"100")));
@@ -209,6 +288,69 @@ class FinancialWorkflowIntegrationTest {
         assertThrows(BaseException.class,()->history.preview(new BackfillJournalBatchRequest(List.of(),true)));
     }
     int exportedRows(byte[] bytes) throws Exception {try(var b=new XSSFWorkbook(new ByteArrayInputStream(bytes))){return Integer.parseInt(b.getSheet("ThongTin").getRow(3).getCell(0).getStringCellValue().replace("Số dòng: ",""));}}
+    @Test void everyRoleExportMatchesItsCatalogAndContainsOnlyValues() throws Exception {
+        tx.executeWithoutResult(status->{
+            var period=PayrollPeriod.builder().periodCode("EXCEL-"+suffix).name("Excel export fixture").month(10).year(2026).build();em.persist(period);
+            var payslip=Payslip.builder().payslipCode("EXCEL-PS-"+suffix).period(period).user(em.find(User.class,actors.get("EMPLOYEE").getId()))
+                    .baseSalary(money("1000")).bonus(money("100")).allowance(money("50")).deduction(money("25")).advanceDeduct(money("0"))
+                    .finalNetSalary(money("1125")).status(PayslipStatus.DRAFT).build();period.getPayslips().add(payslip);em.persist(payslip);
+        });
+        for(String role:List.of("ADMIN","CFO","ACCOUNTANT","MANAGER","TEAM_LEADER","EMPLOYEE")) {
+            login(role);
+            var catalog=excel.list();
+            assertFalse(catalog.isEmpty(),"No export catalog for "+role);
+            for(var dataset:catalog) {
+                var definition=excelDatasets.stream().filter(item->item.code().equals(dataset.code())).findFirst().orElseThrow();
+                var exportColumns=definition.exportColumns();
+                Long scope=null;
+                if(dataset.scopeLabel()!=null) {
+                    var scopes=excel.scopes(dataset.code());
+                    assertFalse(scopes.isEmpty(),role+" has no fixture scope for "+dataset.code());
+                    scope=((Number)scopes.getFirst().get("id")).longValue();
+                }
+                byte[] bytes=excel.export(dataset.code(),scope,Map.of());
+                try(var workbook=new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+                    var data=workbook.getSheet("Data");
+                    assertNotNull(data,role+" / "+dataset.code()+" has no Data sheet");
+                    var header=data.getRow(0);
+                    assertEquals(exportColumns.size(),header.getLastCellNum(),role+" / "+dataset.code()+" column count");
+                    for(int column=0;column<exportColumns.size();column++)
+                        assertEquals(exportColumns.get(column).key(),header.getCell(column).getStringCellValue(),role+" / "+dataset.code()+" column "+column);
+                    int actualRows=0;Map<String,BigDecimal> expectedTotals=new HashMap<>();
+                    for(int row=1;row<=data.getLastRowNum();row++) {
+                        var record=data.getRow(row);if(record==null)continue;
+                        boolean populated=false;
+                        for(int column=0;column<exportColumns.size();column++) {
+                            var cell=record.getCell(column);
+                            if(cell!=null&&cell.getCellType()!=org.apache.poi.ss.usermodel.CellType.BLANK)populated=true;
+                            assertTrue(cell==null||cell.getCellType()!=org.apache.poi.ss.usermodel.CellType.FORMULA,
+                                    role+" / "+dataset.code()+" must export values, never formulas");
+                        }
+                        if(!populated)continue;
+                        if(record.getCell(0)!=null&&"TỔNG".equals(record.getCell(0).toString()))continue;
+                        for(int column=0;column<exportColumns.size();column++) if("MONEY".equals(exportColumns.get(column).type())) {
+                            var cell=record.getCell(column);if(cell==null||cell.getCellType()==org.apache.poi.ss.usermodel.CellType.BLANK)continue;
+                            BigDecimal value=cell.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC
+                                    ?BigDecimal.valueOf(cell.getNumericCellValue()):new BigDecimal(cell.getStringCellValue());
+                            expectedTotals.merge(exportColumns.get(column).key(),value,BigDecimal::add);
+                        }
+                        actualRows++;
+                    }
+                    assertEquals(exportedRows(bytes),actualRows,role+" / "+dataset.code()+" metadata row count");
+                    if(actualRows>0&&!expectedTotals.isEmpty()) {
+                        var total=data.getRow(actualRows+2);assertNotNull(total,role+" / "+dataset.code()+" missing totals row");
+                        assertEquals("TỔNG",total.getCell(0).getStringCellValue(),role+" / "+dataset.code()+" totals label");
+                        for(var entry:expectedTotals.entrySet()) {
+                            int column=java.util.stream.IntStream.range(0,exportColumns.size()).filter(index->exportColumns.get(index).key().equals(entry.getKey())).findFirst().orElseThrow();
+                            var cell=total.getCell(column);BigDecimal actual=cell.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC
+                                    ?BigDecimal.valueOf(cell.getNumericCellValue()):new BigDecimal(cell.getStringCellValue());
+                            assertEquals(0,entry.getValue().compareTo(actual),role+" / "+dataset.code()+" total for "+entry.getKey());
+                        }
+                    }
+                }
+            }
+        }
+    }
     @Test void accountEventAndJournalRequestFiltersMatchExport() throws Exception {
         Long id=approved(RequestType.EXPENSE,"100",null,true);login("ACCOUNTANT");requests.disburse(id,actorId(),new DisburseRequest(PIN,"Verified",documents(id,"100")));
         Long ar=approved(RequestType.ADVANCE,"400",null,false);login("ACCOUNTANT");requests.disburse(ar,actorId(),new DisburseRequest(PIN,"Advance",List.of()));
@@ -262,6 +404,119 @@ class FinancialWorkflowIntegrationTest {
         assertEquals(Integer.valueOf(5),tx.<Integer>execute(status->em.find(UserSecuritySettings.class,user).getRetryCount()));assertTrue(Boolean.TRUE.equals(tx.<Boolean>execute(status->em.find(UserSecuritySettings.class,user).isPinLocked())));
     }
     @Test void currentAccountingMonthCannotClose(){login("ACCOUNTANT");String month=YearMonth.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString();assertFalse(periods.previewClose(month).eligible());assertThrows(BaseException.class,()->periods.close(month,"Current month cannot close",true));}
+
+    @Test void closingPeriodSerializesWithJournalWritersAndBlocksLatePosting() throws Exception {
+        String period="1900-01";
+        ExecutorService executor=Executors.newFixedThreadPool(2);
+        CountDownLatch lockHeld=new CountDownLatch(1);
+        CountDownLatch releaseLock=new CountDownLatch(1);
+        CountDownLatch closeStarted=new CountDownLatch(1);
+        Future<?> lockHolder=null;
+        Future<?> closeFuture=null;
+        try {
+            lockHolder=executor.submit(()->tx.executeWithoutResult(status->{
+                insertFixtureJournal(period);
+                em.flush(); // The journal INSERT trigger now owns the period lock.
+                lockHeld.countDown();
+                try {
+                    if(!releaseLock.await(10,TimeUnit.SECONDS))throw new AssertionError("Timed out holding the accounting period lock");
+                } catch(InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(error);
+                }
+                status.setRollbackOnly(); // The writer leaves no invalid historical source behind.
+            }));
+            assertTrue(lockHeld.await(5,TimeUnit.SECONDS),"The journal writer must acquire the period lock");
+
+            closeFuture=executor.submit(()->{
+                login("ACCOUNTANT");
+                closeStarted.countDown();
+                try { periods.close(period,"Concurrent close regression",true); }
+                finally { SecurityContextHolder.clearContext(); }
+            });
+            assertTrue(closeStarted.await(5,TimeUnit.SECONDS));
+            Thread.sleep(250);
+            assertFalse(closeFuture.isDone(),"Closing must wait while a journal writer owns the same period lock");
+
+            releaseLock.countDown();
+            lockHolder.get(10,TimeUnit.SECONDS);
+            closeFuture.get(10,TimeUnit.SECONDS);
+            login("ACCOUNTANT");
+            Boolean isClosed=tx.execute(status->periods.previewClose(period).blockingIssues().contains("Kỳ đã được đóng trước đó"));
+            assertTrue(Boolean.TRUE.equals(isClosed));
+
+            RuntimeException rejected=assertThrows(RuntimeException.class,()->tx.executeWithoutResult(status->{
+                insertFixtureJournal(period);
+                em.flush();
+            }));
+            assertTrue(rootCauseMessage(rejected).contains("Accounting period is closed"),rootCauseMessage(rejected));
+        } finally {
+            releaseLock.countDown();
+            if(lockHolder!=null)lockHolder.get(10,TimeUnit.SECONDS);
+            if(closeFuture!=null)closeFuture.get(10,TimeUnit.SECONDS);
+            executor.shutdownNow();
+            tx.executeWithoutResult(status->em.createNativeQuery("DELETE FROM accounting_periods WHERE period=:period")
+                    .setParameter("period",period).executeUpdate());
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    private void insertFixtureJournal(String period) {
+        var journal=AccountingJournal.builder().journalCode("JRN-CLOSED-"+UUID.randomUUID().toString().substring(0,12))
+                .eventType(AccountingJournalEvent.ADVANCE_DISBURSED).postingDate(YearMonth.parse(period).atDay(15))
+                .postingPeriod(period).description("Period lock regression")
+                .sourceType("REQUEST").sourceId("rollback-writer-fixture").totalAmount(money("100"))
+                .sourceSnapshot("{}").createdAt(Instant.now()).build();
+        journal.getLines().add(AccountingJournalLine.builder().journal(journal).lineNumber(1)
+                .accountCode("ADVANCE_RECEIVABLE").accountName("Tạm ứng nhân viên chưa quyết toán")
+                .debitAmount(money("100")).creditAmount(BigDecimal.ZERO).effectDescription("Closed period regression").build());
+        journal.getLines().add(AccountingJournalLine.builder().journal(journal).lineNumber(2)
+                .accountCode("PROJECT_WALLET").accountName("Tiền trong ví dự án")
+                .debitAmount(BigDecimal.ZERO).creditAmount(money("100")).effectDescription("Closed period regression").build());
+        em.persist(journal);
+    }
+
+    private String rootCauseMessage(Throwable error) {
+        Throwable current=error;
+        while(current.getCause()!=null)current=current.getCause();
+        return current.getMessage()==null?current.toString():current.getMessage();
+    }
+
+    @Test void closePreviewValidatesSourcesAndPaginatesIssues() {
+        login("ACCOUNTANT");
+        String sourceId="invalid-source-"+UUID.randomUUID();
+        String period=YearMonth.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString();
+        var before=periods.previewClose(period,1,100);
+        var carryBefore=before.carryForwardNotes();
+        bankEvidence.importLine("FOREIGN-TEST","CLOSE-FOREIGN-"+suffix,LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")),"IN",money("100"),"PENDING","outside the confirmed company account",actorId(),null);
+        assertEquals(carryBefore,periods.previewClose(period).carryForwardNotes(),"A pending statement for another bank account must not appear as a company carry-forward");
+        tx.executeWithoutResult(status->{
+            var journal=AccountingJournal.builder().journalCode("JRN-TEST-"+UUID.randomUUID().toString().substring(0,12))
+                    .eventType(AccountingJournalEvent.ADVANCE_DISBURSED).postingDate(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")))
+                    .postingPeriod(period).description("Invalid source fixture for close preview")
+                    .sourceType("REQUEST").sourceId(sourceId).totalAmount(money("100"))
+                    .sourceSnapshot("{}").createdAt(Instant.now()).build();
+            journal.getLines().add(AccountingJournalLine.builder().journal(journal).lineNumber(1)
+                    .accountCode("ADVANCE_RECEIVABLE").accountName("Tạm ứng nhân viên chưa quyết toán")
+                    .debitAmount(money("100")).creditAmount(BigDecimal.ZERO).effectDescription("Test source validation").build());
+            journal.getLines().add(AccountingJournalLine.builder().journal(journal).lineNumber(2)
+                    .accountCode("PROJECT_WALLET").accountName("Tiền trong ví dự án")
+                    .debitAmount(BigDecimal.ZERO).creditAmount(money("100")).effectDescription("Test source validation").build());
+            em.persist(journal);
+        });
+
+        var first=periods.previewClose(period,1,1);
+        assertFalse(first.eligible());
+        assertTrue(first.missingSourceCount()>=1);
+        assertTrue(first.invalidSourceLinkCount()>=1);
+        assertTrue(first.sourceAmountMismatchCount()>=1);
+        assertEquals(before.issueTotal()+3,first.issueTotal());
+        assertEquals(1,first.issues().size());
+        assertThrows(BaseException.class,()->periods.previewClose(period,1,101));
+        var next=periods.previewClose(period,2,1);
+        assertEquals(2,next.issuePage());
+        assertEquals(1,next.issues().size());
+    }
 
     @Test void topupCandidatesPageBeyond500AndRespectFiltersAndAccount(){
         login("CFO");Long actor=actorId();String prefix="PAGED-"+suffix+"-";LocalDate date=LocalDate.of(2020,1,2);

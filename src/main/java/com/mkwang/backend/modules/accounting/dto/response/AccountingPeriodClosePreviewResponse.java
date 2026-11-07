@@ -9,5 +9,12 @@ public record AccountingPeriodClosePreviewResponse(
         long invalidJournalCount,
         long missingSourceCount,
         long unmatchedTopupCount,
+        long invalidSourceLinkCount,
+        long sourceAmountMismatchCount,
+        long invalidAdvanceBalanceCount,
+        long issueTotal,
+        int issuePage,
+        int issueSize,
+        java.util.List<AccountingPeriodCloseIssueResponse> issues,
         List<String> blockingIssues,
         List<String> carryForwardNotes) {}

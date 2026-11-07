@@ -17,8 +17,11 @@ public class AccountingPeriodController {
         return ResponseEntity.ok(ApiResponse.success(periods.list()));
     }
     @GetMapping("/{period}/close-preview")
-    public ResponseEntity<ApiResponse<com.mkwang.backend.modules.accounting.dto.response.AccountingPeriodClosePreviewResponse>> previewClose(@PathVariable String period) {
-        return ResponseEntity.ok(ApiResponse.success(periods.previewClose(period)));
+    public ResponseEntity<ApiResponse<com.mkwang.backend.modules.accounting.dto.response.AccountingPeriodClosePreviewResponse>> previewClose(
+            @PathVariable String period,
+            @RequestParam(defaultValue = "1") int issuePage,
+            @RequestParam(defaultValue = "20") int issueSize) {
+        return ResponseEntity.ok(ApiResponse.success(periods.previewClose(period, issuePage, issueSize)));
     }
     @PostMapping("/{period}/close")
     public ResponseEntity<ApiResponse<String>> close(@PathVariable String period, @Valid @RequestBody CloseAccountingPeriodRequest request) {

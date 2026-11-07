@@ -1,5 +1,46 @@
 # IFMS — triển khai sổ cái và theo dõi ngân sách/tạm ứng
 
+## Cập nhật hoàn thiện P0–P6 — 06/11/2026
+
+- **P1 — đóng kỳ:** `GET /accountant/ledger/periods/{period}/close-preview`
+  nhận `issuePage` (mặc định 1) và `issueSize` (mặc định 20, tối đa 100).
+  Response giữ các trường đếm cũ, bổ sung `issueTotal`, trang hiện tại/kích cỡ,
+  `issues[]` có mã, mức độ, journal/source, số tiền, mô tả và hướng xử lý.
+  API đóng kỳ lấy cùng advisory lock mà writer journal dùng, chạy lại điều kiện
+  chặn trong transaction rồi mới đánh dấu đóng. Preview không thay thế lần kiểm
+  tra ở thời điểm ghi đóng.
+- Nhóm kiểm tra trước đóng kỳ gồm journal thiếu dòng/lệch tổng, source/event và
+  trạng thái không hợp lệ, amount/transaction lệch, chứng từ chi phí thiếu hoặc
+  phân bổ không khớp, advance balance sai, payroll/link đảo không hợp lệ và
+  topup chưa khớp sao kê IN/BOOKED cùng tài khoản. Tạm ứng còn mở, hoàn chi chưa
+  thanh toán và sao kê chờ được trình bày là số dư chuyển tiếp, không tự sửa.
+  Ghi chú sao kê chờ chỉ tính tài khoản đã cấu hình của quỹ công ty.
+- Hồi quy đóng kỳ hiện kiểm tra đồng thời trên PostgreSQL: thao tác close chờ
+  transaction đang giữ khóa kỳ; sau khi close hoàn tất, trigger từ chối journal
+  ghi vào kỳ đã đóng. Hồi quy chuỗi hiệu lực kiểm đảo EXPENSE toàn phần và thay
+  phiếu lương: giữ phiếu gốc, journal đảo, phiếu mới, journal mới và retry trả
+  lại cùng phiếu thay thế.
+- **P3 — Excel:** integration test đi qua catalog export theo quyền sáu role,
+  kiểm header theo export schema, số dòng trong workbook/metadata, dòng tổng
+  tiền và không có ô công thức. Các dataset có import đều chạy template →
+  preview → commit trong DB cô lập; riêng test khác kiểm lô/idempotency, công
+  thức, hạn mức, filter và scope. Đây chưa phải đối chiếu độc lập mọi báo cáo
+  với API tại cùng snapshot hoặc nghiệm thu file ở môi trường thật.
+- **P4 — dữ liệu cũ:** kiểm kê chỉ đọc DB Docker local ngày 06/11/2026: V36,
+  24 giao dịch ví, 0 journal, 0 dòng sao kê; có khoản EXPENSE thiếu chứng từ và
+  phiếu lương thiếu giao dịch khớp. Chưa có backfill. Chi tiết số tổng hợp và
+  điều kiện xử lý nằm trong [báo cáo kiểm kê](<../../../../DA1/financial-wallet-frontend/docs/ledger-legacy-data-inventory-2026-11-06.md>).
+- **Kiểm thử hiện tại:** `FinancialWorkflowIntegrationTest` đạt 20/20 trên
+  PostgreSQL 16 cô lập mới, Flyway lên V36; bao gồm test close/writer đồng thời,
+  đảo EXPENSE và chuỗi thay phiếu lương/idempotent retry. Frontend production
+  build và 19 browser fixture test đã đạt. Trên bản sao DB Docker local, UAT
+  đọc/điều hướng với API thật đạt 8/8 ca cho sáu role, sổ cái và export, cộng
+  2/2 ca link giao dịch ví → nguồn. Hợp đồng endpoint chi tiết ở
+  [`ledger-api-contract.md`](ledger-api-contract.md). P2, P4 (ghi bù), P5
+  (luồng ghi U01–U12) và đối chiếu đầy đủ P3 vẫn chưa đóng.
+- Lần hoàn thiện này không sửa migration/schema. Các migration đã chạy tiếp tục
+  bất biến; chưa ghi dữ liệu tài chính vào DB gốc.
+
 ## Cập nhật sau sửa F20–F24 — 23/10/2026
 
 - `GET /accountant/ledger/bank-evidence/topup-candidates` và
