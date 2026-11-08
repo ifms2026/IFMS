@@ -41,6 +41,7 @@ public class ManagerApprovalSummaryResponse {
         private String name;
         private BigDecimal availableBudget;
         private BigDecimal totalBudget;
+        private BigDecimal totalSpent;
         private ProjectStatus status;
     }
 }

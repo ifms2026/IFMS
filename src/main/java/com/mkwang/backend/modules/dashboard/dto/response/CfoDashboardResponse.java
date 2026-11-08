@@ -13,6 +13,7 @@ import java.util.List;
 public class CfoDashboardResponse {
 
     private BigDecimal companyFundBalance;
+    private String fundHealth;
     private long pendingApprovalsCount;
     private BigDecimal monthlyApprovedAmount;
     private long monthlyRejectedCount;

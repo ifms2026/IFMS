@@ -54,6 +54,18 @@ public class TeamLeaderApprovalController {
         ));
     }
 
+    @GetMapping("/pending-amount")
+    @Operation(
+        summary = "Sum of amounts awaiting this Team Leader's approval",
+        description = "Returns the total requested amount across all PENDING ADVANCE/EXPENSE/REIMBURSE requests in projects led by the authenticated Team Leader, not just the current page of results."
+    )
+    public ResponseEntity<ApiResponse<com.mkwang.backend.modules.request.dto.response.TlPendingAmountResponse>> getPendingAmount(
+            @AuthenticationPrincipal UserDetailsAdapter principal) {
+        return ResponseEntity.ok(ApiResponse.success(
+                requestService.getTlPendingAmount(principal.getUser().getId())
+        ));
+    }
+
     @GetMapping("/{id}")
     @Operation(
         summary = "Get approval detail",

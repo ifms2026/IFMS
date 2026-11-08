@@ -177,6 +177,20 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
     );
 
     /**
+     * Sum of requested amounts for ADVANCE/EXPENSE/REIMBURSE requests awaiting this Team Leader's
+     * own approval decision (status = PENDING), scoped to the projects they lead. Backs the TL
+     * dashboard's "Tổng giá trị đang chờ duyệt" banner so it reflects the full pending set rather
+     * than just the first page of items fetched for preview cards.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(r.amount), 0) FROM Request r
+            WHERE r.project.id IN :projectIds
+              AND r.status = 'PENDING'
+              AND r.type IN ('ADVANCE', 'EXPENSE', 'REIMBURSE')
+            """)
+    BigDecimal sumPendingAmountForProjects(@Param("projectIds") List<Long> projectIds);
+
+    /**
      * Top-10 most recent requests for a member scoped to a set of projects.
      * Used by Team Leader team-members detail to populate recentRequests.
      */

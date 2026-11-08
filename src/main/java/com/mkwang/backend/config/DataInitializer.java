@@ -546,7 +546,11 @@ public class DataInitializer implements CommandLineRunner {
                 new Object[]{"WITHDRAW_LIMIT_MANAGER",    "50000000",  "Hạn mức rút tự động cho Manager (VNĐ)"},
                 new Object[]{"WITHDRAW_LIMIT_ACCOUNTANT", "100000000", "Hạn mức rút tự động cho Accountant (VNĐ)"},
                 new Object[]{"WITHDRAW_LIMIT_CFO",        "500000000", "Hạn mức rút tự động cho CFO (VNĐ)"},
-                new Object[]{"WITHDRAW_LIMIT_ADMIN",      "0",         "Admin không được rút tự động (luôn cần Accountant duyệt)"}
+                new Object[]{"WITHDRAW_LIMIT_ADMIN",      "0",         "Admin không được rút tự động (luôn cần Accountant duyệt)"},
+
+                // ── Ngưỡng sức khỏe quỹ công ty (CFO dashboard) ──────────────────────────
+                new Object[]{"FUND_HEALTH_THRESHOLD_HEALTHY", "500000000", "Số dư quỹ công ty từ mức này trở lên được coi là khỏe mạnh (VNĐ)"},
+                new Object[]{"FUND_HEALTH_THRESHOLD_LOW",     "100000000", "Số dư quỹ công ty từ mức này trở lên (nhưng dưới ngưỡng khỏe mạnh) được coi là thấp; dưới mức này là nguy cấp (VNĐ)"}
         );
 
         for (Object[] row : configs) {
