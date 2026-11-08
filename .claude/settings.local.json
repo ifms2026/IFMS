@@ -5,7 +5,20 @@
       "Bash(xargs grep:*)",
       "Bash(git worktree *)",
       "Bash(xargs cat *)",
-      "Bash(./mvnw compile *)"
+      "Bash(./mvnw compile *)",
+      "Read(//d/IFMS_FE/INTERNAL_FINANCIAL_CASHFLOW_MANAGEMENT_SYSTEM_USING_INTERNAL_WALLET_MODEL_FRONTEND/**)",
+      "Bash(grep -v -E '\\\\.\\(png|jpg|svg|ico|woff2?\\)$')",
+      "Bash(cd \"D:/IFMS_FE/INTERNAL_FINANCIAL_CASHFLOW_MANAGEMENT_SYSTEM_USING_INTERNAL_WALLET_MODEL_FRONTEND\" && cat \"app/\\(dashboard\\)/layout.tsx\")",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(grep -rnoE \"\\(api\\\\.\\(get|post|put|patch|delete\\)|downloadFile|fetch\\)\\(<[^>]*>\\)?\\\\\\(\\\\s*[\\\\`\\\\\"'][^\\\\`\\\\\"']*\" app components lib/adapters)",
+      "Bash(cd \"D:/IFMS_FE/INTERNAL_FINANCIAL_CASHFLOW_MANAGEMENT_SYSTEM_USING_INTERNAL_WALLET_MODEL_FRONTEND\" && echo \"== role checks\"; grep -rnE \"hasRole|hasAnyRole|RoleName\\\\.[A-Z_]+|user\\\\?\\\\.role\" app components --include=*.tsx | grep -v \"layout.tsx\" | cut -c1-200; echo \"== zod usage\"; grep -rln \"zod\\\\|schemas\" app components lib; echo \"== recharts\"; grep -rln \"recharts\" app components; echo \"== EventSource\"; grep -rn \"EventSource\\\\|fetchEventSource\\\\|stream\" app components lib --include=*.ts* | grep -v \"use-user-stream\" | cut -c1-200; echo \"== window events\"; grep -rnoE \"\\(addEventListener|dispatchEvent\\)\\\\\\([^,\\)]*\" app components lib | sort -u)",
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Bash(cd \"D:/IFMS_FE/INTERNAL_FINANCIAL_CASHFLOW_MANAGEMENT_SYSTEM_USING_INTERNAL_WALLET_MODEL_FRONTEND\" && grep -rn \"callbackUrl\" app components lib; echo ==maint; sed -n 1,200p app/maintenance/page.tsx | grep -nE \"api|fetch|setInterval|router|href|useEffect\" ; echo ==lib-api-usage; grep -rnoE \"from \\\\\"@/lib/api\\\\\"|import \\\\{[^}]*\\\\} from \\\\\"@/lib/api\\\\\"\" app components | sort | uniq -c | head -40; echo ==cloudinary; grep -rn \"cloudinary\\\\|uploads/signature\" app components lib | cut -c1-220; echo ==roles; grep -n \"enum RoleName\" -A10 types/*.ts; echo == forgot; grep -nE \"forgotPassword|verifyPasswordReset|step\" \"app/\\(auth\\)/forgot-password/page.tsx\" | head; echo ==cp; grep -nE \"schema|firstLoginSetup|pin\" \"app/\\(auth\\)/change-password/page.tsx\" | head)",
+      "Bash(grep -v '^\\\\s*$')",
+      "Bash(cd \"D:/IFMS_FE/INTERNAL_FINANCIAL_CASHFLOW_MANAGEMENT_SYSTEM_USING_INTERNAL_WALLET_MODEL_FRONTEND\" && head -60 app/maintenance/page.tsx; echo ==profile-cloud; sed -n 270,305p \"app/\\(dashboard\\)/profile/page.tsx\"; grep -n \"CLOUDINARY_CLOUD_NAME\\\\s*=\" -A2 \"app/\\(dashboard\\)/profile/page.tsx\"; echo ==reqnew; sed -n 125,150p \"app/\\(dashboard\\)/requests/new/page.tsx\"; grep -n \"Schema\\\\|safeParse\" \"app/\\(dashboard\\)/requests/new/page.tsx\")"
+    ],
+    "additionalDirectories": [
+      "D:\\IFMS_FE\\INTERNAL_FINANCIAL_CASHFLOW_MANAGEMENT_SYSTEM_USING_INTERNAL_WALLET_MODEL_FRONTEND"
     ]
   }
 }

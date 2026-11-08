@@ -31,7 +31,12 @@ public class PayrollExcelDataset implements ExcelDataset {
     public List<ExcelRowErrorResponse> validate(List<ExcelRowResponse> rows,User actor,Long scope){
         draft(scope);
         return ExcelValidation.rows(rows,row->row.values().get("employeeCode"),row->{
-            var v=row.values();User user=users.getUserByEmployeeCode(v.get("employeeCode"));
+            // findUserByEmployeeCode (not getUserByEmployeeCode): the latter is @Transactional and
+            // throws for a missing code, which marks this method's ambient transaction rollback-only
+            // even though we catch it right here — the whole preview then fails with
+            // UnexpectedRollbackException instead of reporting a normal per-row error.
+            var v=row.values();User user=users.findUserByEmployeeCode(v.get("employeeCode"))
+                    .orElseThrow(()->new BadRequestException("Không tìm thấy nhân viên có mã này"));
             if(user.getStatus()!=UserStatus.ACTIVE) throw new BadRequestException("Nhân viên không hoạt động");
             if(!v.get("employeeName").isBlank()&&!user.getFullName().equalsIgnoreCase(v.get("employeeName"))) throw new BadRequestException("Họ tên không khớp mã nhân viên");
             BigDecimal base=money(v,"baseSalary");
@@ -44,7 +49,9 @@ public class PayrollExcelDataset implements ExcelDataset {
         draft(scope);period.getPayslips().clear();period.setNettingApplied(false);periods.flush();
     }
     public String commit(ExcelRowResponse row,User actor,Long scope){
-        var v=row.values();var period=draft(scope);var user=users.getUserByEmployeeCode(v.get("employeeCode"));
+        var v=row.values();var period=draft(scope);
+        var user=users.findUserByEmployeeCode(v.get("employeeCode"))
+                .orElseThrow(()->new BadRequestException("Không tìm thấy nhân viên có mã này"));
         var base=money(v,"baseSalary");var bonus=money(v,"bonus");var allowance=money(v,"allowance");var deduction=money(v,"deduction");
         var slip=Payslip.builder().period(period).user(user).payslipCode(String.format("PSL-%s-%02d%02d",v.get("employeeCode"),period.getMonth(),period.getYear()%100))
                 .baseSalary(base).bonus(bonus).allowance(allowance).deduction(deduction).advanceDeduct(BigDecimal.ZERO)

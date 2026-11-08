@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
  * cannot establish its internal loopback connection
  * ("Unable to establish loopback connection" / WSAEINVAL on connect()).
  * <p>
- * This has been observed on some Windows machines (JDK 21+/24, certain
+ * This has been observed on some Windows machines (JDK 21+/25, certain
  * VPN/antivirus/WSL vEthernet adapters interfering with the Winsock loopback
  * fast path) and blocks the embedded server from starting at all.
  * <p>

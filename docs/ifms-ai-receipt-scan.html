@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IFMS Receipt Scan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#F2F5F7; --surface:#FFFFFF; --surface-2:#E8EEF2; --ink:#14202B; --ink-2:#4A5A68; --ink-3:#6F808D;
+  --line:#CAD5DD; --line-2:#DFE6EB;
+  --accent:#0F6E8C; --accent-soft:#D5EAF1; --accent-ink:#0B5068;
+  --ai:#6D4BC9; --ai-soft:#EDE7FB;
+  --ok:#2F7D5B; --ok-soft:#DCEFE5; --bad:#B4413C; --bad-soft:#F6E0DE; --warn:#A86A12; --warn-soft:#F6EAD3;
+  --font-display:"Be Vietnam Pro","Segoe UI",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0E151B; --surface:#15202A; --surface-2:#1C2A35; --ink:#E2E9EF; --ink-2:#A2B3C0; --ink-3:#7C8E9C;
+    --line:#2E404D; --line-2:#233340;
+    --accent:#5BB9D5; --accent-soft:#143746; --accent-ink:#9AD6E8;
+    --ai:#A98BF0; --ai-soft:#2A2145;
+    --ok:#62C293; --ok-soft:#16352A; --bad:#E5827A; --bad-soft:#3C1E1D; --warn:#E3AA4E; --warn-soft:#3A2C14;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0E151B; --surface:#15202A; --surface-2:#1C2A35; --ink:#E2E9EF; --ink-2:#A2B3C0; --ink-3:#7C8E9C;
+  --line:#2E404D; --line-2:#233340;
+  --accent:#5BB9D5; --accent-soft:#143746; --accent-ink:#9AD6E8;
+  --ai:#A98BF0; --ai-soft:#2A2145;
+  --ok:#62C293; --ok-soft:#16352A; --bad:#E5827A; --bad-soft:#3C1E1D; --warn:#E3AA4E; --warn-soft:#3A2C14;
+}
+*{box-sizing:border-box}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+code{font-family:var(--font-mono);font-size:.84em;background:var(--surface-2);color:var(--accent-ink);padding:.06em .36em;border-radius:5px}
+h1,h2,h3{font-family:var(--font-display);margin:0;line-height:1.25;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:1.5rem}
+p{margin:.55rem 0;max-width:74ch}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,48px);padding-block:36px 72px}
+
+/* header */
+.top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.eyebrow{font:600 .74rem var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--ai);margin-bottom:6px}
+h1{font-size:clamp(1.9rem,4vw,2.7rem);font-weight:700;letter-spacing:-.025em}
+.lede{font-size:1.06rem;color:var(--ink-2);margin-top:12px}
+.themes{display:flex;gap:6px}
+.btn{font:500 .82rem var(--font-body);padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--ai);border-color:var(--ai);color:#fff}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:10px;overflow:hidden;margin-top:24px}
+.stat{background:var(--surface);padding:14px 16px}
+.stat b{display:block;font:700 1.55rem var(--font-display);font-variant-numeric:tabular-nums}
+.stat span{font-size:.8rem;color:var(--ink-3)}
+.toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:20px}
+.toc a{font-size:.82rem;text-decoration:none;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:var(--surface)}
+.toc a:hover{border-color:var(--ai);color:var(--ink)}
+
+/* sections & figures */
+section{padding-top:44px}
+.fignum{font:600 .74rem var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.fig{margin-top:16px;background:var(--surface);border:1px solid var(--line-2);border-radius:12px;overflow:hidden}
+.fig-scroll{overflow-x:auto;padding:16px}
+.fig svg{display:block;width:100%;height:auto;min-width:760px;color:var(--ink)}
+figure{margin:0}
+figcaption{font-size:.86rem;color:var(--ink-3);margin-top:8px;max-width:84ch}
+svg text{font-family:var(--font-body);fill:currentColor}
+.tt{font:600 13.5px var(--font-display)}
+.ts{font-size:11.5px;fill:var(--ink-3)}
+.tm{font:500 11px var(--font-mono)}
+.te{font-size:11px;fill:var(--ink-2);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+.box{fill:var(--surface);stroke:var(--line);stroke-width:1.3}
+.box.ext{fill:var(--surface-2);stroke-dasharray:5 3}
+.box.ai{fill:var(--ai-soft);stroke:var(--ai)}
+.box.core{fill:var(--accent-soft);stroke:var(--accent)}
+.box.ok{fill:var(--ok-soft);stroke:var(--ok)}
+.box.bad{fill:var(--bad-soft);stroke:var(--bad)}
+.box.warn{fill:var(--warn-soft);stroke:var(--warn)}
+.zone{fill:none;stroke:var(--line);stroke-width:1.2;stroke-dasharray:2 4}
+.zl{font:600 11px var(--font-display);letter-spacing:.08em;fill:var(--ink-3)}
+.e{stroke:var(--ink-3);stroke-width:1.4;fill:none}
+.e.dash{stroke-dasharray:5 4}
+.e.ai{stroke:var(--ai);stroke-width:1.8}
+.e.ok{stroke:var(--ok)} .e.bad{stroke:var(--bad)}
+.ah{fill:var(--ink-3)} .ah.ai{fill:var(--ai)} .ah.ok{fill:var(--ok)} .ah.bad{fill:var(--bad)}
+
+/* before / after */
+.flows{display:grid;gap:14px;padding:18px}
+.flowrow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:14px;align-items:center}
+.flowrow h3{font-size:.95rem}
+.flowrow h3 small{display:block;font:400 .78rem var(--font-body);color:var(--ink-3)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-size:.83rem;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
+.chip.user{border-color:var(--line)}
+.chip.ai{background:var(--ai-soft);border-color:var(--ai);color:var(--ink)}
+.chip.rule{background:var(--accent-soft);border-color:var(--accent)}
+.arrow{color:var(--ink-3);font-size:.9rem}
+.group{display:inline-flex;flex-wrap:wrap;gap:6px;padding:6px;border-radius:10px;border:1.5px dashed var(--ai)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;padding:0 18px 16px;font-size:.8rem;color:var(--ink-2)}
+.legend i{display:inline-block;width:14px;height:12px;border-radius:3px;border:1px solid;margin-right:6px;vertical-align:-2px}
+
+/* sequence stepper */
+.seq .msg{transition:opacity .2s}
+.seq.stepping .msg{opacity:.18}
+.seq.stepping .msg.on{opacity:1}
+.seq .msg.on line,.seq .msg.on path{stroke:var(--ai);stroke-width:2.2}
+.seq .msg.on .num{fill:var(--ai)}
+.num{fill:var(--ink-3)}
+.numt{font:700 10px var(--font-mono);fill:var(--surface)}
+.stepper{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px;border-top:1px solid var(--line-2);background:var(--surface-2)}
+.stepper .desc{flex:1 1 320px;font-size:.92rem;color:var(--ink)}
+.stepper .desc b{color:var(--ai)}
+
+/* tables */
+.tbl{overflow-x:auto;margin-top:14px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:top}
+th{font:600 .76rem var(--font-display);letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+.y{color:var(--ok);font-weight:600}.no{color:var(--ink-3)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:16px}
+.card{background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:14px 16px}
+.card h3{font-size:.98rem;margin-bottom:4px}
+.card p{font-size:.9rem;color:var(--ink-2);margin:.3rem 0}
+.tag{display:inline-block;font:600 .7rem var(--font-body);letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin-bottom:6px}
+.tag.done{background:var(--ok-soft);color:var(--ok)}
+.tag.todo{background:var(--warn-soft);color:var(--warn)}
+@media (max-width:700px){.flowrow{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <div class="eyebrow">IFMS · Đồ án 2 · Tính năng F1</div>
+    <h1>AI đọc chứng từ, tự điền yêu cầu chi</h1>
+    <p class="lede">Nhân viên tải ảnh hoá đơn lên form tạo yêu cầu; AI đọc <b>số tiền, ngày, người bán, nội dung chi</b> và chọn <b>hạng mục chi phí</b> có sẵn của giai đoạn. Người dùng chỉ kiểm tra lại và bổ sung mục đích chi. Bản trích xuất được lưu lại để đối chiếu với số người dùng nhập và phát hiện hoá đơn dùng lại.</p>
+  </div>
+  <div class="themes" role="group" aria-label="Giao diện">
+    <button class="btn" type="button" data-th="light">Sáng</button>
+    <button class="btn" type="button" data-th="dark">Tối</button>
+    <button class="btn" type="button" data-th="">Hệ thống</button>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><b>5 / 9</b><span>ô trên form AI tự điền</span></div>
+  <div class="stat"><b>3 / 3</b><span>hoá đơn mẫu đọc đúng mọi trường</span></div>
+  <div class="stat"><b>6–12 s</b><span>mỗi ảnh với Gemini 3.5 Flash</span></div>
+  <div class="stat"><b>0 đ</b><span>chi phí — Gemini free tier</span></div>
+  <div class="stat"><b>4 lớp</b><span>bảo đảm hạng mục đúng danh sách</span></div>
+</div>
+
+<nav class="toc" aria-label="Mục lục">
+  <a href="#s1">1. Trước / sau</a><a href="#s2">2. Kiến trúc thành phần</a><a href="#s3">3. Luồng xử lý</a>
+  <a href="#s4">4. Chọn hạng mục</a><a href="#s5">5. Kiểm tra kết quả AI</a><a href="#s6">6. Khi gửi yêu cầu</a>
+  <a href="#s7">7. Độ tin cậy</a><a href="#s8">8. Dữ liệu</a><a href="#s9">9. Kết quả & hướng phát triển</a>
+</nav>
+
+<!-- ═════════ 1. BEFORE / AFTER ═════════ -->
+<section id="s1">
+  <div class="fignum">Hình 1</div>
+  <h2>Người dùng tiết kiệm được những bước nào</h2>
+  <figure>
+    <div class="fig">
+      <div class="flows">
+        <div class="flowrow">
+          <h3>Trước<small>9 thao tác tay</small></h3>
+          <div class="chips">
+            <span class="chip user">Loại yêu cầu</span><span class="arrow">→</span>
+            <span class="chip user">Dự án · Giai đoạn</span><span class="arrow">→</span>
+            <span class="chip user">Hạng mục</span><span class="arrow">→</span>
+            <span class="chip user">Số tiền</span><span class="arrow">→</span>
+            <span class="chip user">Ngày chi</span><span class="arrow">→</span>
+            <span class="chip user">Tiêu đề</span><span class="arrow">→</span>
+            <span class="chip user">Mô tả</span><span class="arrow">→</span>
+            <span class="chip user">Đính kèm chứng từ</span><span class="arrow">→</span>
+            <span class="chip user">Gửi</span>
+          </div>
+        </div>
+        <div class="flowrow">
+          <h3>Sau<small>tải ảnh trước, AI điền phần còn lại</small></h3>
+          <div class="chips">
+            <span class="chip user">Loại yêu cầu</span><span class="arrow">→</span>
+            <span class="chip rule">Dự án · Giai đoạn</span><span class="arrow">→</span>
+            <span class="chip user">Tải chứng từ</span><span class="arrow">→</span>
+            <span class="group" aria-label="AI tự điền">
+              <span class="chip ai">✨ Số tiền</span><span class="chip ai">✨ Ngày chi</span><span class="chip ai">✨ Tiêu đề</span><span class="chip ai">✨ Mô tả</span><span class="chip ai">✨ Hạng mục</span>
+            </span><span class="arrow">→</span>
+            <span class="chip user">Kiểm tra + mục đích chi</span><span class="arrow">→</span>
+            <span class="chip user">Gửi</span>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="border-color:var(--line);background:var(--surface)"></i>người dùng nhập</span>
+        <span><i style="border-color:var(--ai);background:var(--ai-soft)"></i>AI điền từ chứng từ</span>
+        <span><i style="border-color:var(--accent);background:var(--accent-soft)"></i>điền theo quy tắc (quyết toán: lấy theo khoản tạm ứng gốc)</span>
+      </div>
+    </div>
+    <figcaption>Áp dụng cho <b>Hoàn chi nhân viên</b> và <b>Quyết toán tạm ứng</b> — hai loại bắt buộc có chứng từ. AI chỉ điền ô trống; ô người dùng đã sửa thì AI không ghi đè.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 2. COMPONENTS ═════════ -->
+<section id="s2">
+  <div class="fignum">Hình 2</div>
+  <h2>Kiến trúc thành phần</h2>
+  <p>Tính năng nằm trong một module mới <code>modules/ai</code>. Nhà cung cấp AI ẩn sau interface <code>ReceiptExtractor</code>, nên đổi Gemini sang mô hình khác hoặc chạy chế độ mock không phải sửa phần còn lại.</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 1060 540" role="img" aria-label="Frontend Next.js gọi AiReceiptController; ReceiptExtractionServiceImpl dùng Redis, PostgreSQL, ProjectQueryService và interface ReceiptExtractor với hai bản Gemini và Mock; Gemini gọi Google Gemini API; RequestServiceImpl liên kết bản trích xuất khi gửi yêu cầu.">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+          <marker id="a1ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah ai"/></marker>
+        </defs>
+        <rect class="zone" x="16" y="34" width="262" height="420" rx="14"/><text class="zl" x="30" y="56">FRONTEND · NEXT.JS</text>
+        <rect class="zone" x="326" y="34" width="480" height="460" rx="14"/><text class="zl" x="340" y="56">BACKEND · SPRING BOOT · modules/ai</text>
+        <rect class="zone" x="846" y="34" width="200" height="460" rx="14"/><text class="zl" x="860" y="56">HẠ TẦNG &amp; DỊCH VỤ NGOÀI</text>
+
+        <line class="e" x1="145" y1="146" x2="145" y2="350" marker-end="url(#a1)"/>
+        <text class="te" x="152" y="250">gọi khi chọn file</text>
+        <path class="e ai" d="M254 380 C 320 380, 320 112, 378 112" marker-end="url(#a1ai)"/>
+        <text class="te" x="300" y="300" text-anchor="middle">multipart</text>
+        <line class="e" x1="565" y1="138" x2="565" y2="168" marker-end="url(#a1)"/>
+        <line class="e" x1="565" y1="226" x2="565" y2="258" marker-end="url(#a1)"/>
+        <line class="e dash" x1="470" y1="300" x2="470" y2="330" marker-end="url(#a1)"/>
+        <line class="e dash" x1="660" y1="300" x2="660" y2="330" marker-end="url(#a1)"/>
+        <text class="te" x="565" y="318" text-anchor="middle">implements</text>
+        <path class="e" d="M750 198 H 782 V 437 H 752" marker-end="url(#a1)"/>
+        <text class="te" x="788" y="320">hạng mục</text>
+        <path class="e" d="M380 437 H 344 V 206 H 378" marker-end="url(#a1)"/>
+        <text class="te" x="338" y="330" text-anchor="middle" transform="rotate(-90 338 330)">linkToRequest</text>
+        <path class="e" d="M750 186 C 804 186, 804 132, 858 132" marker-end="url(#a1)"/>
+        <text class="te" x="808" y="112" text-anchor="middle">cache · lượt</text>
+        <path class="e" d="M750 212 C 804 212, 804 238, 858 238" marker-end="url(#a1)"/>
+        <text class="te" x="808" y="254" text-anchor="middle">lưu</text>
+        <path class="e ai" d="M750 360 C 804 360, 804 344, 858 344" marker-end="url(#a1ai)"/>
+        <text class="te" x="808" y="384" text-anchor="middle">ảnh + schema</text>
+        <path class="e dash" d="M145 408 V 516 H 946 V 472" marker-end="url(#a1)"/>
+        <text class="te" x="560" y="510" text-anchor="middle">khi bấm Gửi: upload file thật lên Cloudinary (luồng có sẵn)</text>
+
+        <g><rect class="box" x="36" y="90" width="218" height="56" rx="9"/><text class="tt" x="50" y="113">Form tạo yêu cầu</text><text class="tm" x="50" y="133">requests/new/page.tsx</text></g>
+        <g><rect class="box" x="36" y="166" width="218" height="52" rx="9"/><text class="tt" x="50" y="188">Trạng thái từng file</text><text class="tm" x="50" y="206">ReceiptScanStatus</text></g>
+        <g><rect class="box" x="36" y="238" width="218" height="52" rx="9"/><text class="tt" x="50" y="260">Xem ảnh + giá trị AI</text><text class="tm" x="50" y="278">ReceiptPreviewModal</text></g>
+        <g><rect class="box ai" x="36" y="352" width="218" height="56" rx="9"/><text class="tt" x="50" y="375">API client</text><text class="tm" x="50" y="395">lib/api/ai.ts</text></g>
+
+        <g><rect class="box" x="380" y="90" width="370" height="48" rx="9"/><text class="tt" x="394" y="111">AiReceiptController</text><text class="tm" x="394" y="128">/ai/status · /ai/receipts/**</text></g>
+        <g><rect class="box ai" x="380" y="170" width="370" height="56" rx="9"/><text class="tt" x="394" y="192">ReceiptExtractionServiceImpl</text><text class="ts" x="394" y="212">kiểm tra file · hash · cache · hạn mức · kiểm tra kết quả AI</text></g>
+        <g><rect class="box" x="380" y="260" width="370" height="40" rx="9" style="stroke-dasharray:4 3"/><text class="tm" x="565" y="285" text-anchor="middle">«interface» ReceiptExtractor</text></g>
+        <g><rect class="box" x="380" y="332" width="180" height="56" rx="9"/><text class="tt" x="394" y="355">MockReceiptExtractor</text><text class="ts" x="394" y="375">demo offline</text></g>
+        <g><rect class="box ai" x="570" y="332" width="180" height="56" rx="9"/><text class="tt" x="584" y="355">GeminiReceiptExtractor</text><text class="ts" x="584" y="375">schema · model dự phòng</text></g>
+        <g><rect class="box" x="380" y="410" width="180" height="54" rx="9"/><text class="tt" x="394" y="432">RequestServiceImpl</text><text class="ts" x="394" y="451">khi gửi yêu cầu</text></g>
+        <g><rect class="box" x="570" y="410" width="180" height="54" rx="9"/><text class="tt" x="584" y="432">ProjectQueryService</text><text class="ts" x="584" y="451">hạng mục của giai đoạn</text></g>
+
+        <g><rect class="box" x="860" y="104" width="172" height="56" rx="9"/><text class="tt" x="874" y="127">Redis</text><text class="ts" x="874" y="146">cache hash · lượt/ngày</text></g>
+        <g><rect class="box" x="860" y="210" width="172" height="56" rx="9"/><text class="tt" x="874" y="233">PostgreSQL</text><text class="tm" x="874" y="252">document_extractions</text></g>
+        <g><rect class="box ext" x="860" y="316" width="172" height="56" rx="9"/><text class="tt" x="874" y="339">Google Gemini API</text><text class="ts" x="874" y="358">generateContent · free tier</text></g>
+        <g><rect class="box ext" x="860" y="414" width="172" height="56" rx="9"/><text class="tt" x="874" y="437">Cloudinary</text><text class="ts" x="874" y="456">lưu file chứng từ</text></g>
+      </svg>
+    </div></div>
+    <figcaption>Màu tím là phần mới của tính năng AI. <code>ProjectQueryService</code> và <code>RequestServiceImpl</code> thuộc module khác nên được gọi qua Service interface, đúng quy ước liên module của dự án. Viền đứt là dịch vụ bên ngoài.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 3. SEQUENCE ═════════ -->
+<section id="s3">
+  <div class="fignum">Hình 3</div>
+  <h2>Luồng xử lý khi người dùng tải một chứng từ</h2>
+  <figure>
+    <div class="fig">
+      <div class="fig-scroll">
+        <svg id="seq" class="seq" viewBox="0 0 960 600" role="img" aria-label="Sơ đồ tuần tự 13 bước từ lúc người dùng chọn ảnh tới lúc form được điền.">
+          <defs>
+            <marker id="s1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+          </defs>
+          <g id="lifelines"></g>
+          <g id="msgs"></g>
+        </svg>
+      </div>
+      <div class="stepper">
+        <button class="btn" type="button" id="seq-all">Xem tất cả</button>
+        <button class="btn" type="button" id="seq-prev">← Trước</button>
+        <button class="btn primary" type="button" id="seq-next">Bước tiếp →</button>
+        <div class="desc" id="seq-desc" aria-live="polite"></div>
+      </div>
+    </div>
+    <figcaption>Gọi <b>đồng bộ</b> (người dùng đang đứng chờ trên form, 6–12 giây). Cùng một file tải lại sẽ trả từ cache ở bước 4, không gọi AI và không tốn lượt. Bấm “Bước tiếp” để trình bày từng bước.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 4. CATEGORY ═════════ -->
+<section id="s4">
+  <div class="fignum">Hình 4</div>
+  <h2>Làm sao AI chỉ chọn hạng mục có sẵn</h2>
+  <p>Mỗi yêu cầu phải thuộc một hạng mục mà Trưởng nhóm đã cấp ngân sách cho giai đoạn. AI không được tự đặt tên hạng mục — bốn lớp sau bảo đảm điều đó.</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 980 300" role="img" aria-label="Bốn lớp: danh sách hạng mục lấy từ CSDL, JSON schema enum, backend kiểm tra lại, người dùng xác nhận.">
+        <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah ai"/></marker></defs>
+        <g><rect class="box core" x="16" y="30" width="215" height="150" rx="10"/>
+          <text class="tt" x="30" y="56">① Danh sách từ CSDL</text>
+          <text class="ts" x="30" y="78">Backend tự lấy theo phaseId,</text><text class="ts" x="30" y="94">không tin danh sách client gửi</text>
+          <text class="tm" x="30" y="122">1 Travel &amp; Accommodation</text><text class="tm" x="30" y="138">3 Meals &amp; Entertainment</text><text class="tm" x="30" y="154">5 Office Supplies …</text>
+          <text class="ts" x="30" y="172">kèm mô tả tiếng Việt</text></g>
+        <line class="e ai" x1="231" y1="105" x2="262" y2="105" marker-end="url(#a4)"/>
+        <g><rect class="box ai" x="264" y="30" width="215" height="150" rx="10"/>
+          <text class="tt" x="278" y="56">② JSON schema enum</text>
+          <text class="ts" x="278" y="78">Gemini buộc phải trả về</text><text class="ts" x="278" y="94">một giá trị trong danh sách</text>
+          <text class="tm" x="278" y="128">"categoryId": {</text><text class="tm" x="278" y="144">  "enum": ["1","2","3",</text><text class="tm" x="278" y="160">   "4","5","NONE"] }</text></g>
+        <line class="e ai" x1="479" y1="105" x2="510" y2="105" marker-end="url(#a4)"/>
+        <g><rect class="box" x="512" y="30" width="215" height="150" rx="10"/>
+          <text class="tt" x="526" y="56">③ Backend kiểm tra lại</text>
+          <text class="ts" x="526" y="78">id phải thuộc danh sách ở ①;</text><text class="ts" x="526" y="94">"NONE" hoặc id lạ → để trống</text>
+          <text class="tm" x="526" y="132">toCategory(id, list)</text><text class="ts" x="526" y="154">không đoán khi không chắc</text></g>
+        <line class="e ai" x1="727" y1="105" x2="758" y2="105" marker-end="url(#a4)"/>
+        <g><rect class="box ok" x="760" y="30" width="204" height="150" rx="10"/>
+          <text class="tt" x="774" y="56">④ Người dùng xác nhận</text>
+          <text class="ts" x="774" y="78">Ô hạng mục hiện nhãn</text><text class="ts" x="774" y="94">“✨ AI gợi ý”, sửa được</text>
+          <text class="ts" x="774" y="128">sửa → nhãn mất, AI</text><text class="ts" x="774" y="144">không ghi đè lần sau</text></g>
+        <!-- examples -->
+        <text class="zl" x="16" y="222">VÍ DỤ ĐÃ CHẠY THỬ VỚI GEMINI</text>
+        <g><rect class="box" x="16" y="234" width="230" height="44" rx="8"/><text class="ts" x="28" y="252">Biên lai Grab</text><text class="tm" x="28" y="269">→ 1 Travel &amp; Accommodation</text></g>
+        <g><rect class="box" x="260" y="234" width="230" height="44" rx="8"/><text class="ts" x="272" y="252">Hoá đơn nhà hàng</text><text class="tm" x="272" y="269">→ 3 Meals &amp; Entertainment</text></g>
+        <g><rect class="box" x="504" y="234" width="230" height="44" rx="8"/><text class="ts" x="516" y="252">Hoá đơn GTGT văn phòng phẩm</text><text class="tm" x="516" y="269">→ 5 Office Supplies</text></g>
+        <g><rect class="box warn" x="748" y="234" width="216" height="44" rx="8"/><text class="ts" x="760" y="252">Không mục nào phù hợp</text><text class="tm" x="760" y="269">→ NONE · để trống</text></g>
+      </svg>
+    </div></div>
+    <figcaption>Với <b>Quyết toán tạm ứng</b>, hạng mục không qua AI: lấy đúng hạng mục của khoản tạm ứng gốc và khoá lại. Nếu người dùng chọn giai đoạn <i>sau</i> khi tải ảnh, hệ thống chỉ gửi lại văn bản tóm tắt (không gửi lại ảnh) để chọn hạng mục.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 5. VALIDATION ═════════ -->
+<section id="s5">
+  <div class="fignum">Hình 5</div>
+  <h2>Kiểm tra kết quả AI trước khi trả về</h2>
+  <p>Không dựa vào mức “tự tin” do mô hình tự báo. Backend tự kiểm tra từng trường; trường sai được bỏ trống và kèm cảnh báo, để người dùng nhập tay thay vì nhận số sai.</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 980 330" role="img" aria-label="JSON từ Gemini đi qua năm bước kiểm tra; trường hợp lệ được giữ, trường sai bị bỏ trống kèm cảnh báo.">
+        <defs>
+          <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+          <marker id="a5ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah ok"/></marker>
+          <marker id="a5bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah bad"/></marker>
+        </defs>
+        <g><rect class="box ai" x="16" y="120" width="170" height="90" rx="10"/><text class="tt" x="30" y="146">JSON từ Gemini</text><text class="tm" x="30" y="168">totalAmount, invoiceDate,</text><text class="tm" x="30" y="184">vatAmount, lineItems,</text><text class="tm" x="30" y="200">categoryId …</text></g>
+        <line class="e" x1="186" y1="165" x2="232" y2="165" marker-end="url(#a5)"/>
+        <g>
+          <rect class="box" x="234" y="20" width="390" height="50" rx="8"/><text class="tt" x="248" y="41">Số tiền ≤ 0 hoặc &gt; 1 tỷ</text><text class="tm" x="248" y="59">→ bỏ trống · AMOUNT_UNREADABLE</text>
+          <rect class="box" x="234" y="80" width="390" height="50" rx="8"/><text class="tt" x="248" y="101">Ngày trong tương lai / cũ hơn 180 ngày</text><text class="tm" x="248" y="119">→ giữ · INVOICE_DATE_IN_FUTURE / _TOO_OLD</text>
+          <rect class="box" x="234" y="140" width="390" height="50" rx="8"/><text class="tt" x="248" y="161">Tổng dòng hàng (+VAT) lệch tổng tiền &gt; 2%</text><text class="tm" x="248" y="179">→ giữ · LINE_ITEMS_MISMATCH</text>
+          <rect class="box" x="234" y="200" width="390" height="50" rx="8"/><text class="tt" x="248" y="221">VAT ≥ tổng tiền · tiền tệ khác VND</text><text class="tm" x="248" y="239">→ bỏ VAT · CURRENCY_NOT_VND</text>
+          <rect class="box" x="234" y="260" width="390" height="50" rx="8"/><text class="tt" x="248" y="281">Hạng mục không thuộc danh sách của giai đoạn</text><text class="tm" x="248" y="299">→ bỏ trống (Hình 4, lớp ③)</text>
+        </g>
+        <line class="e ok" x1="624" y1="120" x2="700" y2="100" marker-end="url(#a5ok)"/>
+        <line class="e bad" x1="624" y1="210" x2="700" y2="232" marker-end="url(#a5bad)"/>
+        <g><rect class="box ok" x="702" y="54" width="262" height="90" rx="10"/><text class="tt" x="716" y="80">Trường hợp lệ</text><text class="ts" x="716" y="102">điền vào form, nhãn “✨ AI gợi ý”</text><text class="ts" x="716" y="120">ngưỡng nằm trong application.yml</text></g>
+        <g><rect class="box bad" x="702" y="188" width="262" height="90" rx="10"/><text class="tt" x="716" y="214">Trường không tin được</text><text class="ts" x="716" y="236">để trống + cảnh báo dưới tên file</text><text class="ts" x="716" y="254">→ người dùng nhập tay</text></g>
+      </svg>
+    </div></div>
+    <figcaption>Nguyên tắc: <b>độ tin cậy thấp thì im lặng</b>. Một ô trống buộc người dùng nhập tay; một số sai được điền sẵn dễ bị bỏ qua khi duyệt.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 6. ON SUBMIT ═════════ -->
+<section id="s6">
+  <div class="fignum">Hình 6</div>
+  <h2>Khi gửi yêu cầu: từ tiện ích thành chốt kiểm soát</h2>
+  <p>Điền sẵn form chỉ là tiện ích cho người đề nghị. Giá trị kiểm soát nằm ở chỗ bản trích xuất được <b>gắn với yêu cầu</b> và <b>đối chiếu</b> với số người dùng thực sự nhập.</p>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 980 300" role="img" aria-label="Khi gửi, file được upload lên Cloudinary, yêu cầu được tạo kèm extractionId, backend gắn bản trích xuất và sinh cờ lệch số tiền hoặc hoá đơn dùng lại cho người duyệt.">
+        <defs>
+          <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+          <marker id="a6bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah bad"/></marker>
+        </defs>
+        <g><rect class="box" x="16" y="40" width="150" height="70" rx="10"/><text class="tt" x="30" y="66">Bấm Gửi</text><text class="ts" x="30" y="86">upload Cloudinary</text></g>
+        <line class="e" x1="166" y1="75" x2="198" y2="75" marker-end="url(#a6)"/>
+        <g><rect class="box" x="200" y="40" width="190" height="70" rx="10"/><text class="tt" x="214" y="64">POST /requests</text><text class="tm" x="214" y="84">attachments[i]</text><text class="tm" x="214" y="100">  .extractionId</text></g>
+        <line class="e" x1="390" y1="75" x2="422" y2="75" marker-end="url(#a6)"/>
+        <g><rect class="box core" x="424" y="40" width="200" height="70" rx="10"/><text class="tt" x="438" y="64">createRequest</text><text class="ts" x="438" y="84">lưu yêu cầu + file, rồi</text><text class="tm" x="438" y="100">linkToRequest(…)</text></g>
+        <line class="e" x1="624" y1="75" x2="656" y2="75" marker-end="url(#a6)"/>
+        <g><rect class="box ai" x="658" y="40" width="306" height="70" rx="10"/><text class="tt" x="672" y="64">Gắn bản trích xuất</text><text class="ts" x="672" y="84">request_id, file_id — chỉ bản do</text><text class="ts" x="672" y="100">chính người gửi tạo; id lạ bị bỏ qua</text></g>
+        <path class="e" d="M811 110 V 140 H 260 V 160" marker-end="url(#a6)"/>
+        <path class="e" d="M811 140 H 700 V 160" marker-end="url(#a6)"/>
+        <g><rect class="box warn" x="110" y="162" width="300" height="74" rx="10"/><text class="tt" x="124" y="188">Đối chiếu số tiền</text><text class="ts" x="124" y="208">|số nhập − tổng hoá đơn| &gt; 2%</text><text class="tm" x="124" y="226">→ RECEIPT_AMOUNT_MISMATCH</text></g>
+        <g><rect class="box bad" x="550" y="162" width="300" height="74" rx="10"/><text class="tt" x="564" y="188">Hoá đơn dùng lại</text><text class="ts" x="564" y="208">cùng MST + số hoá đơn đã gắn yêu cầu khác</text><text class="tm" x="564" y="226">→ RECEIPT_REUSED</text></g>
+        <path class="e dash" d="M260 236 V 268 H 480" marker-end="url(#a6bad)"/>
+        <path class="e dash" d="M700 236 V 268 H 520"/>
+        <g><rect class="box ext" x="400" y="252" width="200" height="36" rx="8"/><text class="ts" x="500" y="275" text-anchor="middle">Người duyệt thấy cờ (Task 1)</text></g>
+      </svg>
+    </div></div>
+    <figcaption>Liên kết chạy trong cùng transaction tạo yêu cầu nhưng <b>không bao giờ chặn</b> việc tạo: lỗi ở bước này chỉ ghi log. Hiển thị cờ trên màn duyệt thuộc Task 1 (luồng truy vết cho người duyệt), đang ở giai đoạn kế hoạch.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 7. RESILIENCE ═════════ -->
+<section id="s7">
+  <div class="fignum">Hình 7</div>
+  <h2>Độ tin cậy: AI lỗi thì form vẫn dùng được</h2>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 980 280" role="img" aria-label="Thứ tự xử lý: cache, hạn mức, model chính, các model dự phòng, cuối cùng là nhập tay.">
+        <defs>
+          <marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker>
+          <marker id="a7ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah ok"/></marker>
+          <marker id="a7bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah bad"/></marker>
+        </defs>
+        <g><rect class="box" x="16" y="40" width="140" height="64" rx="10"/><text class="tt" x="30" y="66">Cache Redis</text><text class="ts" x="30" y="86">cùng file? trả ngay</text></g>
+        <line class="e" x1="156" y1="72" x2="188" y2="72" marker-end="url(#a7)"/>
+        <g><rect class="box" x="190" y="40" width="140" height="64" rx="10"/><text class="tt" x="204" y="66">Hạn mức</text><text class="ts" x="204" y="86">30 lượt/người/ngày</text></g>
+        <line class="e" x1="330" y1="72" x2="362" y2="72" marker-end="url(#a7)"/>
+        <g><rect class="box ai" x="364" y="40" width="170" height="64" rx="10"/><text class="tt" x="378" y="66">Model chính</text><text class="tm" x="378" y="86">gemini-3.5-flash</text></g>
+        <line class="e bad" x1="534" y1="72" x2="566" y2="72" marker-end="url(#a7bad)"/>
+        <text class="te" x="568" y="128">mũi tên đỏ: 503 · 429 · 404 · timeout → thử model kế tiếp</text>
+        <g><rect class="box ai" x="568" y="40" width="170" height="64" rx="10"/><text class="tt" x="582" y="66">Dự phòng 1</text><text class="tm" x="582" y="86">gemini-flash-latest</text></g>
+        <line class="e bad" x1="738" y1="72" x2="770" y2="72" marker-end="url(#a7bad)"/>
+        <g><rect class="box ai" x="772" y="40" width="192" height="64" rx="10"/><text class="tt" x="786" y="66">Dự phòng 2</text><text class="tm" x="786" y="86">gemini-flash-lite-latest</text></g>
+        <!-- outcomes -->
+        <path class="e ok" d="M86 104 V 190 H 360" marker-end="url(#a7ok)"/>
+        <path class="e ok" d="M449 104 V 160" marker-end="url(#a7ok)"/>
+        <path class="e bad" d="M260 104 V 248 H 560" marker-end="url(#a7bad)"/>
+        <path class="e bad" d="M868 104 V 248 H 820" marker-end="url(#a7bad)"/>
+        <g><rect class="box ok" x="362" y="162" width="200" height="52" rx="10"/><text class="tt" x="376" y="185">Có kết quả</text><text class="ts" x="376" y="203">lưu + điền form</text></g>
+        <g><rect class="box bad" x="562" y="222" width="256" height="52" rx="10"/><text class="tt" x="576" y="245">Lỗi 429 / 502 có thông báo</text><text class="ts" x="576" y="263">form vẫn nhập tay như cũ</text></g>
+        <text class="te" x="268" y="240">hết lượt</text>
+        <text class="te" x="876" y="190">cả 3 lỗi</text>
+      </svg>
+    </div></div>
+    <figcaption>Model thực sự trả lời được lưu ở cột <code>model</code>. Thiếu API key thì tính năng tự tắt; đặt <code>AI_PROVIDER=mock</code> để demo không cần mạng. Lỗi AI trả <b>502</b> chứ không phải 503, vì frontend coi mọi 503 là “hệ thống bảo trì”.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 8. DATA ═════════ -->
+<section id="s8">
+  <div class="fignum">Hình 8</div>
+  <h2>Dữ liệu: bảng <code>document_extractions</code> (migration V20)</h2>
+  <figure>
+    <div class="fig"><div class="fig-scroll">
+      <svg viewBox="0 0 980 330" role="img" aria-label="Bảng document_extractions liên kết với users, requests và file_storages.">
+        <defs><marker id="a8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+        <g><rect class="box ai" x="320" y="16" width="340" height="300" rx="10"/>
+          <text class="tt" x="336" y="42">document_extractions</text>
+          <line x1="320" y1="54" x2="660" y2="54" stroke="var(--ai)" stroke-width="1"/>
+          <text class="tm" x="336" y="76">id · user_id · file_hash (SHA-256)</text>
+          <text class="tm" x="336" y="98">provider · model</text>
+          <text class="tm" x="336" y="120">total_amount · vat_amount · currency</text>
+          <text class="tm" x="336" y="142">invoice_date</text>
+          <text class="tm" x="336" y="164">vendor_name · vendor_tax_code</text>
+          <text class="tm" x="336" y="186">invoice_number · expense_summary</text>
+          <text class="tm" x="336" y="208">line_items  JSONB</text>
+          <text class="tm" x="336" y="230">warnings    JSONB</text>
+          <text class="tm" x="336" y="252">raw_response JSONB</text>
+          <text class="tm" x="336" y="274">request_id · file_id  (gán khi gửi)</text>
+          <text class="ts" x="336" y="300">+ created_at / updated_at / created_by</text></g>
+        <g><rect class="box" x="20" y="40" width="200" height="56" rx="9"/><text class="tt" x="34" y="64">users</text><text class="ts" x="34" y="83">người tải chứng từ</text></g>
+        <g><rect class="box" x="760" y="80" width="200" height="56" rx="9"/><text class="tt" x="774" y="104">requests</text><text class="ts" x="774" y="123">yêu cầu đã gửi</text></g>
+        <g><rect class="box" x="760" y="210" width="200" height="56" rx="9"/><text class="tt" x="774" y="234">file_storages</text><text class="ts" x="774" y="253">file trên Cloudinary</text></g>
+        <g><rect class="box" x="20" y="200" width="250" height="96" rx="9"/><text class="tt" x="34" y="224">Index</text>
+          <text class="tm" x="34" y="246">(user_id, file_hash) → cache</text><text class="tm" x="34" y="266">(request_id)</text><text class="tm" x="34" y="286">(tax_code, invoice_no) → dùng lại</text></g>
+        <line class="e" x1="320" y1="68" x2="222" y2="68" marker-end="url(#a8)"/><text class="te" x="270" y="60" text-anchor="middle">user_id</text>
+        <path class="e" d="M660 270 H 712 V 108 H 758" marker-end="url(#a8)"/><text class="te" x="716" y="190">request_id</text>
+        <path class="e" d="M660 280 H 734 V 238 H 758" marker-end="url(#a8)"/><text class="te" x="736" y="292">file_id</text>
+      </svg>
+    </div></div>
+    <figcaption>Bảng vừa là <b>dấu vết kiểm toán</b> (AI đọc ra gì, model nào), vừa là <b>dữ liệu đánh giá</b> độ chính xác cho báo cáo. Khoá ngoại có trong SQL; entity chỉ giữ id để module <code>ai</code> không phụ thuộc entity của module khác.</figcaption>
+  </figure>
+</section>
+
+<!-- ═════════ 9. RESULTS ═════════ -->
+<section id="s9">
+  <h2>Kết quả chạy thử và hướng phát triển</h2>
+  <p>Ba hoá đơn tiếng Việt mẫu (dựng lại theo mẫu thật) với Gemini 3.5 Flash, ngày 10/10/2026:</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Chứng từ</th><th>Tổng tiền</th><th>Ngày</th><th>Người bán · MST · Số HĐ</th><th>VAT · dòng hàng</th><th>Hạng mục</th><th>Thời gian</th></tr></thead>
+    <tbody>
+      <tr><td>Biên lai Grab</td><td class="n y">138.000 ✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓ (có dòng khuyến mãi âm)</td><td class="y">Travel ✓</td><td class="n">6,6 s</td></tr>
+      <tr><td>Hoá đơn nhà hàng</td><td class="n y">1.026.000 ✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓ 76.000 · 4 món</td><td class="y">Meals ✓</td><td class="n">9,1 s</td></tr>
+      <tr><td>Hoá đơn GTGT văn phòng phẩm</td><td class="n y">792.000 ✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓ 72.000 · 3 mặt hàng</td><td class="y">Office Supplies ✓</td><td class="n">11,8 s</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cols">
+    <div class="card"><span class="tag done">Đã xong</span><h3>Phạm vi đã triển khai</h3>
+      <p>Đọc chứng từ, chọn hạng mục trong danh sách đóng, cache + hạn mức, model dự phòng, chế độ mock, gắn bản trích xuất khi gửi, cờ lệch số tiền và hoá đơn dùng lại, xem ảnh lớn kèm giá trị AI.</p></div>
+    <div class="card"><span class="tag todo">Tiếp theo</span><h3>Nhiều hoá đơn khác hạng mục</h3>
+      <p>Một yêu cầu chỉ có một hạng mục. Khi các hoá đơn thuộc nhiều hạng mục, cần hiện hạng mục từng file và cảnh báo tách yêu cầu, thay vì tự chọn.</p></div>
+    <div class="card"><span class="tag todo">Tiếp theo</span><h3>Đo độ chính xác (AI-8)</h3>
+      <p>Chạy trên 15–30 hoá đơn thật có nhãn đúng, báo cáo tỉ lệ đúng từng trường và tỉ lệ phát hiện lệch — dữ liệu lấy thẳng từ bảng <code>document_extractions</code>.</p></div>
+    <div class="card"><span class="tag todo">Lưu ý</span><h3>Quyền riêng tư</h3>
+      <p>Ở free tier, Google có thể dùng dữ liệu gửi lên để cải thiện sản phẩm. Demo chỉ dùng hoá đơn mẫu; triển khai thật cần gói trả phí hoặc mô hình chạy nội bộ.</p></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+const root = document.documentElement;
+try { const t = localStorage.getItem('ifms-ai-theme'); if (t) root.setAttribute('data-theme', t); } catch (e) {}
+document.querySelectorAll('[data-th]').forEach(b => b.onclick = () => {
+  const t = b.dataset.th;
+  if (t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+  try { t ? localStorage.setItem('ifms-ai-theme', t) : localStorage.removeItem('ifms-ai-theme'); } catch (e) {}
+});
+
+/* ── Sequence diagram ── */
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+const L = { user: 70, fe: 220, be: 410, redis: 590, db: 730, gem: 880 };
+const HEADS = [['user','Nhân viên','trình duyệt'],['fe','Frontend','form Next.js'],['be','Backend','modules/ai'],['redis','Redis','cache · lượt'],['db','PostgreSQL','CSDL'],['gem','Gemini API','Google']];
+const STEPS = [
+  ['user','fe','chọn ảnh chứng từ', 'Người dùng chọn một hoặc nhiều ảnh/PDF. Mỗi file được đọc riêng, song song.'],
+  ['fe','be','POST /ai/receipts/extract', 'Frontend gửi file (multipart) kèm <b>phaseId</b> nếu đã chọn giai đoạn — để AI chọn luôn hạng mục.'],
+  ['be','be','kiểm tra loại file · SHA-256', 'Chỉ nhận JPG/PNG/WEBP/PDF ≤ 10 MB. Tính <b>SHA-256</b> nội dung file làm khoá cache.'],
+  ['be','redis','tra cache theo hash', 'Cùng người, cùng file đã đọc trong 7 ngày → trả ngay bản cũ, <b>không gọi AI, không tốn lượt</b>.'],
+  ['be','redis','trừ 1 lượt hôm nay', 'Mỗi người tối đa <b>30 lượt/ngày</b> (cấu hình được). Hết lượt → báo người dùng nhập tay.'],
+  ['be','db','hạng mục của giai đoạn', 'Lấy danh sách hạng mục <b>đã cấp ngân sách cho giai đoạn</b> từ CSDL, kèm mô tả tiếng Việt (Hình 4, lớp ①).'],
+  ['be','gem','ảnh + prompt + JSON schema', 'Gửi ảnh, hướng dẫn đọc hoá đơn Việt Nam và <b>JSON schema</b> — trong đó categoryId là enum chỉ gồm id của danh sách trên.'],
+  ['gem','be','JSON kết quả', 'Gemini trả JSON đúng schema. Model quá tải (503/429/404) → tự thử <b>model dự phòng</b> (Hình 7).'],
+  ['be','be','kiểm tra & chuẩn hoá', 'Kiểm tra số tiền, ngày, VAT, tổng dòng hàng, hạng mục thuộc danh sách. Trường sai → để trống + cảnh báo (Hình 5).'],
+  ['be','db','lưu document_extractions', 'Lưu bản trích xuất (và JSON gốc) để đối chiếu khi gửi và đo độ chính xác.'],
+  ['be','redis','lưu cache theo hash', 'Ghi khoá hash → extractionId, hạn 7 ngày.'],
+  ['be','fe','extractionId + gợi ý + cảnh báo', 'Trả về các trường đọc được, tiêu đề và mô tả gợi ý, hạng mục (nếu chắc) và danh sách cảnh báo.'],
+  ['fe','user','điền ô trống ✨', 'Frontend chỉ điền <b>ô còn trống</b>; nhiều file thì cộng tổng tiền, lấy ngày muộn nhất. Người dùng kiểm tra, sửa và gửi.'],
+];
+const svg = document.getElementById('seq');
+const ll = document.getElementById('lifelines'), mg = document.getElementById('msgs');
+const TOP = 70, STEP = 38, H = TOP + 26 + STEPS.length * STEP;
+svg.setAttribute('viewBox', `0 0 960 ${H + 10}`);
+HEADS.forEach(([k, t, s]) => {
+  const x = L[k];
+  el('line', { x1: x, y1: 62, x2: x, y2: H, stroke: 'var(--line)', 'stroke-width': 1.2, 'stroke-dasharray': '3 4' }, ll);
+  el('rect', { class: k === 'be' ? 'box ai' : (k === 'gem' ? 'box ext' : 'box'), x: x - 66, y: 12, width: 132, height: 48, rx: 9 }, ll);
+  const a = el('text', { class: 'tt', x, y: 32, 'text-anchor': 'middle' }, ll); a.textContent = t;
+  const b = el('text', { class: 'ts', x, y: 50, 'text-anchor': 'middle' }, ll); b.textContent = s;
+});
+const groups = STEPS.map(([from, to, label], i) => {
+  const y = TOP + 30 + i * STEP;
+  const g = el('g', { class: 'msg' }, mg);
+  const x1 = L[from], x2 = L[to];
+  const back = x2 < x1;
+  if (from === to) {
+    el('path', { class: 'e', d: `M${x1} ${y - 8} h 34 v 16 h -32`, 'marker-end': 'url(#s1a)' }, g);
+    const t = el('text', { class: 'te', x: x1 + 42, y: y + 4 }, g); t.textContent = label;
+  } else {
+    el('line', { class: back ? 'e dash' : 'e', x1, y1: y, x2: x2 + (back ? 4 : -4), y2: y, 'marker-end': 'url(#s1a)' }, g);
+    const t = el('text', { class: 'te', x: (x1 + x2) / 2, y: y - 6, 'text-anchor': 'middle' }, g); t.textContent = label;
+  }
+  const cx = Math.min(x1, x2) - 16;
+  el('circle', { class: 'num', cx: from === to ? x1 - 16 : cx, cy: y, r: 9 }, g);
+  const n = el('text', { class: 'numt', x: from === to ? x1 - 16 : cx, y: y + 3.5, 'text-anchor': 'middle' }, g); n.textContent = i + 1;
+  return g;
+});
+let cur = -1;
+const desc = document.getElementById('seq-desc');
+function show(i) {
+  cur = i;
+  svg.classList.toggle('stepping', i >= 0);
+  groups.forEach((g, j) => g.classList.toggle('on', j === i));
+  document.getElementById('seq-prev').disabled = i <= 0;
+  document.getElementById('seq-next').disabled = i >= STEPS.length - 1;
+  desc.innerHTML = i < 0
+    ? 'Đang xem toàn bộ 13 bước. Bấm <b>Bước tiếp</b> để trình bày lần lượt.'
+    : `<b>Bước ${i + 1}/${STEPS.length}.</b> ${STEPS[i][3]}`;
+}
+document.getElementById('seq-next').onclick = () => show(Math.min(STEPS.length - 1, cur + 1));
+document.getElementById('seq-prev').onclick = () => show(Math.max(0, cur - 1));
+document.getElementById('seq-all').onclick = () => show(-1);
+document.addEventListener('keydown', e => {
+  const r = svg.getBoundingClientRect();
+  if (r.top > window.innerHeight || r.bottom < 0) return;
+  if (e.key === 'ArrowRight') show(Math.min(STEPS.length - 1, cur + 1));
+  if (e.key === 'ArrowLeft') show(Math.max(0, cur - 1));
+});
+show(-1);
+})();
+</script>
+</body>
+</html>
