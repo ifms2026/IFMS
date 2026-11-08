@@ -54,7 +54,9 @@ public class SpreadsheetService {
     public byte[] template(String code,Long scope) {
         var dataset=dataset(code,scope);
         if(!dataset.importEnabled()) throw new BadRequestException("Bộ dữ liệu chỉ hỗ trợ xuất");
-        return workbooks.template(dataset,dataset.references(actor(),scope));
+        User user=actor();
+        var references=dataset.references(user,scope);
+        return workbooks.template(dataset,references,dataset.sampleRows(user,scope,references));
     }
     @Transactional
     @PreAuthorize("isAuthenticated()")

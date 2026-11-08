@@ -41,6 +41,13 @@ public class UserExcelDataset implements ExcelDataset {
         depts.getItems().forEach(dept->result.add(values("kind","DEPARTMENT","id",dept.getId(),"name",dept.getName())));
         return result;
     }
+    public List<Map<String,Object>> sampleRows(User actor,Long scope,List<Map<String,Object>> references){
+        var role=references.stream().filter(row->"ROLE".equals(row.get("kind"))&&"EMPLOYEE".equals(row.get("name"))).findFirst().orElse(null);
+        var department=references.stream().filter(row->"DEPARTMENT".equals(row.get("kind"))).findFirst().orElse(null);
+        if(role==null||department==null)return List.of();
+        String token=UUID.randomUUID().toString().replace("-","").substring(0,8).toLowerCase(Locale.ROOT);
+        return List.of(values("fullName","Nhân viên ví dụ "+token,"email","demo."+token+"@example.invalid","roleId",String.valueOf(role.get("id")),"departmentId",String.valueOf(department.get("id"))));
+    }
     public List<ExcelColumnResponse> exportColumns(){return List.of(column("employeeCode","Mã nhân viên","TEXT",false),column("fullName","Họ tên","TEXT",false),column("email","Email","TEXT",false),column("role","Vai trò","TEXT",false),column("department","Phòng ban","TEXT",false),column("status","Trạng thái","TEXT",false));}
     public List<Map<String,Object>> export(User actor,Long scope,Map<String,String> filters,int max){
         return users.findAll(com.mkwang.backend.modules.spreadsheet.repository.ExcelExportSpecification.filter(filters),PageRequest.of(0,max+1,Sort.by("id"))).stream().map(u->values("employeeCode",u.getProfile()==null?null:u.getProfile().getEmployeeCode(),"fullName",u.getFullName(),"email",u.getEmail(),"role",u.getRole().getName(),"department",u.getDepartment()==null?null:u.getDepartment().getName(),"status",u.getStatus())).toList();

@@ -5628,3 +5628,513 @@ Unconditional classes:
 2026-11-07T22:32:17.036+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
 2026-11-07T22:32:17.036+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:32:17.036082200)]
 2026-11-07T22:32:17.039+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2026-11-07T22:33:40.348+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        u1_0.id,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.department_id,
+        u1_0.email,
+        u1_0.full_name,
+        u1_0.is_first_login,
+        u1_0.password,
+        u1_0.role_id,
+        u1_0.status,
+        u1_0.token_version,
+        u1_0.updated_at,
+        u1_0.updated_by 
+    from
+        users u1_0 
+    where
+        u1_0.email=?
+2026-11-07T22:33:40.398+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        up1_0.user_id,
+        up1_0.address,
+        up1_0.avatar_file_id,
+        up1_0.bank_account_num,
+        up1_0.bank_account_owner,
+        up1_0.bank_name,
+        up1_0.citizen_id,
+        up1_0.date_of_birth,
+        up1_0.employee_code,
+        up1_0.job_title,
+        up1_0.phone_number 
+    from
+        user_profiles up1_0 
+    where
+        up1_0.user_id=?
+2026-11-07T22:33:40.409+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        r1_0.id,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.description,
+        r1_0.name,
+        p1_0.role_id,
+        p1_0.permission,
+        r1_0.updated_at,
+        r1_0.updated_by 
+    from
+        roles r1_0 
+    left join
+        role_permissions p1_0 
+            on r1_0.id=p1_0.role_id 
+    where
+        r1_0.id=?
+2026-11-07T22:33:40.423+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        uss1_0.user_id,
+        uss1_0.created_at,
+        uss1_0.created_by,
+        uss1_0.locked_until,
+        uss1_0.retry_count,
+        uss1_0.transaction_pin,
+        uss1_0.updated_at,
+        uss1_0.updated_by 
+    from
+        user_security_settings uss1_0 
+    where
+        uss1_0.user_id=?
+2026-11-07T22:33:40.481+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] c.m.b.m.a.context.AuditContextFilter     : [AuditContextFilter] ✅ Authenticated: actorId=3, GET /notifications/unread-count
+2026-11-07T22:33:40.483+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.web.servlet.DispatcherServlet        : GET "/api/v1/notifications/unread-count", parameters={}
+2026-11-07T22:33:40.484+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.mkwang.backend.modules.notification.controller.NotificationController#getUnreadCount(UserDetailsAdapter)
+2026-11-07T22:33:40.497+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        count(n1_0.id) 
+    from
+        notifications n1_0 
+    left join
+        users u1_0 
+            on u1_0.id=n1_0.user_id 
+    where
+        u1_0.id=? 
+        and not(n1_0.is_read)
+2026-11-07T22:33:40.520+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
+2026-11-07T22:33:40.523+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:33:40.515723700)]
+2026-11-07T22:33:40.535+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2026-11-07T22:33:40.568+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] org.hibernate.SQL                        : 
+    select
+        u1_0.id,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.department_id,
+        u1_0.email,
+        u1_0.full_name,
+        u1_0.is_first_login,
+        u1_0.password,
+        u1_0.role_id,
+        u1_0.status,
+        u1_0.token_version,
+        u1_0.updated_at,
+        u1_0.updated_by 
+    from
+        users u1_0 
+    where
+        u1_0.email=?
+2026-11-07T22:33:40.574+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] org.hibernate.SQL                        : 
+    select
+        up1_0.user_id,
+        up1_0.address,
+        up1_0.avatar_file_id,
+        up1_0.bank_account_num,
+        up1_0.bank_account_owner,
+        up1_0.bank_name,
+        up1_0.citizen_id,
+        up1_0.date_of_birth,
+        up1_0.employee_code,
+        up1_0.job_title,
+        up1_0.phone_number 
+    from
+        user_profiles up1_0 
+    where
+        up1_0.user_id=?
+2026-11-07T22:33:40.578+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] org.hibernate.SQL                        : 
+    select
+        r1_0.id,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.description,
+        r1_0.name,
+        p1_0.role_id,
+        p1_0.permission,
+        r1_0.updated_at,
+        r1_0.updated_by 
+    from
+        roles r1_0 
+    left join
+        role_permissions p1_0 
+            on r1_0.id=p1_0.role_id 
+    where
+        r1_0.id=?
+2026-11-07T22:33:40.584+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] org.hibernate.SQL                        : 
+    select
+        uss1_0.user_id,
+        uss1_0.created_at,
+        uss1_0.created_by,
+        uss1_0.locked_until,
+        uss1_0.retry_count,
+        uss1_0.transaction_pin,
+        uss1_0.updated_at,
+        uss1_0.updated_by 
+    from
+        user_security_settings uss1_0 
+    where
+        uss1_0.user_id=?
+2026-11-07T22:33:40.598+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] c.m.b.m.a.context.AuditContextFilter     : [AuditContextFilter] ✅ Authenticated: actorId=3, GET /notifications/unread-count
+2026-11-07T22:33:40.599+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] o.s.web.servlet.DispatcherServlet        : GET "/api/v1/notifications/unread-count", parameters={}
+2026-11-07T22:33:40.599+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.mkwang.backend.modules.notification.controller.NotificationController#getUnreadCount(UserDetailsAdapter)
+2026-11-07T22:33:40.605+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] org.hibernate.SQL                        : 
+    select
+        count(n1_0.id) 
+    from
+        notifications n1_0 
+    left join
+        users u1_0 
+            on u1_0.id=n1_0.user_id 
+    where
+        u1_0.id=? 
+        and not(n1_0.is_read)
+2026-11-07T22:33:40.612+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
+2026-11-07T22:33:40.613+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:33:40.612075900)]
+2026-11-07T22:33:40.614+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2026-11-07T22:34:17.378+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] org.hibernate.SQL                        : 
+    select
+        u1_0.id,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.department_id,
+        u1_0.email,
+        u1_0.full_name,
+        u1_0.is_first_login,
+        u1_0.password,
+        u1_0.role_id,
+        u1_0.status,
+        u1_0.token_version,
+        u1_0.updated_at,
+        u1_0.updated_by 
+    from
+        users u1_0 
+    where
+        u1_0.email=?
+2026-11-07T22:34:17.384+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] org.hibernate.SQL                        : 
+    select
+        up1_0.user_id,
+        up1_0.address,
+        up1_0.avatar_file_id,
+        up1_0.bank_account_num,
+        up1_0.bank_account_owner,
+        up1_0.bank_name,
+        up1_0.citizen_id,
+        up1_0.date_of_birth,
+        up1_0.employee_code,
+        up1_0.job_title,
+        up1_0.phone_number 
+    from
+        user_profiles up1_0 
+    where
+        up1_0.user_id=?
+2026-11-07T22:34:17.386+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] org.hibernate.SQL                        : 
+    select
+        r1_0.id,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.description,
+        r1_0.name,
+        p1_0.role_id,
+        p1_0.permission,
+        r1_0.updated_at,
+        r1_0.updated_by 
+    from
+        roles r1_0 
+    left join
+        role_permissions p1_0 
+            on r1_0.id=p1_0.role_id 
+    where
+        r1_0.id=?
+2026-11-07T22:34:17.390+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] org.hibernate.SQL                        : 
+    select
+        uss1_0.user_id,
+        uss1_0.created_at,
+        uss1_0.created_by,
+        uss1_0.locked_until,
+        uss1_0.retry_count,
+        uss1_0.transaction_pin,
+        uss1_0.updated_at,
+        uss1_0.updated_by 
+    from
+        user_security_settings uss1_0 
+    where
+        uss1_0.user_id=?
+2026-11-07T22:34:17.398+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] c.m.b.m.a.context.AuditContextFilter     : [AuditContextFilter] ✅ Authenticated: actorId=3, GET /notifications/unread-count
+2026-11-07T22:34:17.399+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] o.s.web.servlet.DispatcherServlet        : GET "/api/v1/notifications/unread-count", parameters={}
+2026-11-07T22:34:17.400+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.mkwang.backend.modules.notification.controller.NotificationController#getUnreadCount(UserDetailsAdapter)
+2026-11-07T22:34:17.402+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] org.hibernate.SQL                        : 
+    select
+        count(n1_0.id) 
+    from
+        notifications n1_0 
+    left join
+        users u1_0 
+            on u1_0.id=n1_0.user_id 
+    where
+        u1_0.id=? 
+        and not(n1_0.is_read)
+2026-11-07T22:34:17.410+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
+2026-11-07T22:34:17.410+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:34:17.407827100)]
+2026-11-07T22:34:17.412+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-3] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2026-11-07T22:34:17.457+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] org.hibernate.SQL                        : 
+    select
+        u1_0.id,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.department_id,
+        u1_0.email,
+        u1_0.full_name,
+        u1_0.is_first_login,
+        u1_0.password,
+        u1_0.role_id,
+        u1_0.status,
+        u1_0.token_version,
+        u1_0.updated_at,
+        u1_0.updated_by 
+    from
+        users u1_0 
+    where
+        u1_0.email=?
+2026-11-07T22:34:17.462+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] org.hibernate.SQL                        : 
+    select
+        up1_0.user_id,
+        up1_0.address,
+        up1_0.avatar_file_id,
+        up1_0.bank_account_num,
+        up1_0.bank_account_owner,
+        up1_0.bank_name,
+        up1_0.citizen_id,
+        up1_0.date_of_birth,
+        up1_0.employee_code,
+        up1_0.job_title,
+        up1_0.phone_number 
+    from
+        user_profiles up1_0 
+    where
+        up1_0.user_id=?
+2026-11-07T22:34:17.465+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] org.hibernate.SQL                        : 
+    select
+        r1_0.id,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.description,
+        r1_0.name,
+        p1_0.role_id,
+        p1_0.permission,
+        r1_0.updated_at,
+        r1_0.updated_by 
+    from
+        roles r1_0 
+    left join
+        role_permissions p1_0 
+            on r1_0.id=p1_0.role_id 
+    where
+        r1_0.id=?
+2026-11-07T22:34:17.469+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] org.hibernate.SQL                        : 
+    select
+        uss1_0.user_id,
+        uss1_0.created_at,
+        uss1_0.created_by,
+        uss1_0.locked_until,
+        uss1_0.retry_count,
+        uss1_0.transaction_pin,
+        uss1_0.updated_at,
+        uss1_0.updated_by 
+    from
+        user_security_settings uss1_0 
+    where
+        uss1_0.user_id=?
+2026-11-07T22:34:17.525+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] c.m.b.m.a.context.AuditContextFilter     : [AuditContextFilter] ✅ Authenticated: actorId=3, GET /notifications/unread-count
+2026-11-07T22:34:17.526+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] o.s.web.servlet.DispatcherServlet        : GET "/api/v1/notifications/unread-count", parameters={}
+2026-11-07T22:34:17.526+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.mkwang.backend.modules.notification.controller.NotificationController#getUnreadCount(UserDetailsAdapter)
+2026-11-07T22:34:17.530+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] org.hibernate.SQL                        : 
+    select
+        count(n1_0.id) 
+    from
+        notifications n1_0 
+    left join
+        users u1_0 
+            on u1_0.id=n1_0.user_id 
+    where
+        u1_0.id=? 
+        and not(n1_0.is_read)
+2026-11-07T22:34:17.536+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
+2026-11-07T22:34:17.537+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:34:17.536146)]
+2026-11-07T22:34:17.539+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-5] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2026-11-07T22:35:16.999+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] org.hibernate.SQL                        : 
+    select
+        u1_0.id,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.department_id,
+        u1_0.email,
+        u1_0.full_name,
+        u1_0.is_first_login,
+        u1_0.password,
+        u1_0.role_id,
+        u1_0.status,
+        u1_0.token_version,
+        u1_0.updated_at,
+        u1_0.updated_by 
+    from
+        users u1_0 
+    where
+        u1_0.email=?
+2026-11-07T22:35:17.004+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] org.hibernate.SQL                        : 
+    select
+        up1_0.user_id,
+        up1_0.address,
+        up1_0.avatar_file_id,
+        up1_0.bank_account_num,
+        up1_0.bank_account_owner,
+        up1_0.bank_name,
+        up1_0.citizen_id,
+        up1_0.date_of_birth,
+        up1_0.employee_code,
+        up1_0.job_title,
+        up1_0.phone_number 
+    from
+        user_profiles up1_0 
+    where
+        up1_0.user_id=?
+2026-11-07T22:35:17.007+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] org.hibernate.SQL                        : 
+    select
+        r1_0.id,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.description,
+        r1_0.name,
+        p1_0.role_id,
+        p1_0.permission,
+        r1_0.updated_at,
+        r1_0.updated_by 
+    from
+        roles r1_0 
+    left join
+        role_permissions p1_0 
+            on r1_0.id=p1_0.role_id 
+    where
+        r1_0.id=?
+2026-11-07T22:35:17.009+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] org.hibernate.SQL                        : 
+    select
+        uss1_0.user_id,
+        uss1_0.created_at,
+        uss1_0.created_by,
+        uss1_0.locked_until,
+        uss1_0.retry_count,
+        uss1_0.transaction_pin,
+        uss1_0.updated_at,
+        uss1_0.updated_by 
+    from
+        user_security_settings uss1_0 
+    where
+        uss1_0.user_id=?
+2026-11-07T22:35:17.018+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] c.m.b.m.a.context.AuditContextFilter     : [AuditContextFilter] ✅ Authenticated: actorId=3, GET /notifications/unread-count
+2026-11-07T22:35:17.018+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.web.servlet.DispatcherServlet        : GET "/api/v1/notifications/unread-count", parameters={}
+2026-11-07T22:35:17.018+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.mkwang.backend.modules.notification.controller.NotificationController#getUnreadCount(UserDetailsAdapter)
+2026-11-07T22:35:17.022+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] org.hibernate.SQL                        : 
+    select
+        count(n1_0.id) 
+    from
+        notifications n1_0 
+    left join
+        users u1_0 
+            on u1_0.id=n1_0.user_id 
+    where
+        u1_0.id=? 
+        and not(n1_0.is_read)
+2026-11-07T22:35:17.027+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
+2026-11-07T22:35:17.028+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:35:17.027672600)]
+2026-11-07T22:35:17.029+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-7] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2026-11-07T22:35:17.057+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        u1_0.id,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.department_id,
+        u1_0.email,
+        u1_0.full_name,
+        u1_0.is_first_login,
+        u1_0.password,
+        u1_0.role_id,
+        u1_0.status,
+        u1_0.token_version,
+        u1_0.updated_at,
+        u1_0.updated_by 
+    from
+        users u1_0 
+    where
+        u1_0.email=?
+2026-11-07T22:35:17.060+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        up1_0.user_id,
+        up1_0.address,
+        up1_0.avatar_file_id,
+        up1_0.bank_account_num,
+        up1_0.bank_account_owner,
+        up1_0.bank_name,
+        up1_0.citizen_id,
+        up1_0.date_of_birth,
+        up1_0.employee_code,
+        up1_0.job_title,
+        up1_0.phone_number 
+    from
+        user_profiles up1_0 
+    where
+        up1_0.user_id=?
+2026-11-07T22:35:17.062+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        r1_0.id,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.description,
+        r1_0.name,
+        p1_0.role_id,
+        p1_0.permission,
+        r1_0.updated_at,
+        r1_0.updated_by 
+    from
+        roles r1_0 
+    left join
+        role_permissions p1_0 
+            on r1_0.id=p1_0.role_id 
+    where
+        r1_0.id=?
+2026-11-07T22:35:17.065+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        uss1_0.user_id,
+        uss1_0.created_at,
+        uss1_0.created_by,
+        uss1_0.locked_until,
+        uss1_0.retry_count,
+        uss1_0.transaction_pin,
+        uss1_0.updated_at,
+        uss1_0.updated_by 
+    from
+        user_security_settings uss1_0 
+    where
+        uss1_0.user_id=?
+2026-11-07T22:35:17.072+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] c.m.b.m.a.context.AuditContextFilter     : [AuditContextFilter] ✅ Authenticated: actorId=3, GET /notifications/unread-count
+2026-11-07T22:35:17.072+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.web.servlet.DispatcherServlet        : GET "/api/v1/notifications/unread-count", parameters={}
+2026-11-07T22:35:17.073+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.mkwang.backend.modules.notification.controller.NotificationController#getUnreadCount(UserDetailsAdapter)
+2026-11-07T22:35:17.076+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] org.hibernate.SQL                        : 
+    select
+        count(n1_0.id) 
+    from
+        notifications n1_0 
+    left join
+        users u1_0 
+            on u1_0.id=n1_0.user_id 
+    where
+        u1_0.id=? 
+        and not(n1_0.is_read)
+2026-11-07T22:35:17.082+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json, application/yaml]
+2026-11-07T22:35:17.083+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [ApiResponse(success=true, message=Success, data=0, timestamp=2026-11-07T22:35:17.082456300)]
+2026-11-07T22:35:17.084+07:00 DEBUG 109900 --- [IFMS-Backend] [io2-8080-exec-9] o.s.web.servlet.DispatcherServlet        : Completed 200 OK

@@ -56,6 +56,18 @@ public class PayrollExcelDataset implements ExcelDataset {
                 .map(user->values("kind","EMPLOYEE","id",user.getProfile().getEmployeeCode(),"name",user.getFullName()))
                 .toList();
     }
+    public List<Map<String,Object>> sampleRows(User actor,Long scope,List<Map<String,Object>> references){
+        var employees=users.getPayrollReferenceUsers(5000).stream().limit(2).toList();
+        var examples=new ArrayList<Map<String,Object>>();
+        BigDecimal[] salaries={new BigDecimal("18500000"),new BigDecimal("22000000")};
+        for(int i=0;i<employees.size()&&i<salaries.length;i++){
+            var user=employees.get(i);
+            examples.add(values("employeeCode",user.getProfile().getEmployeeCode(),"employeeName",user.getFullName(),
+                    "baseSalary",salaries[i],"bonus",new BigDecimal(i==0?"1200000":"1800000"),
+                    "allowance",new BigDecimal(i==0?"800000":"1200000"),"deduction",new BigDecimal(i==0?"100000":"250000")));
+        }
+        return examples;
+    }
     public List<ExcelColumnResponse> exportColumns(){var result=new ArrayList<>(columns());result.addAll(List.of(column("advanceDeduct","Khấu trừ tạm ứng","MONEY",false),column("finalNetSalary","Thực lĩnh","MONEY",false),column("status","Trạng thái","TEXT",false)));return result;}
     public List<Map<String,Object>> export(User actor,Long scope,Map<String,String> filters,int max){
         var p=periods.findById(scope).orElseThrow(()->new ResourceNotFoundException("PayrollPeriod not found"));

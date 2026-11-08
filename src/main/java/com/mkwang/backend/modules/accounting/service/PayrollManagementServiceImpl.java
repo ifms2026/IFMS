@@ -190,7 +190,8 @@ public class PayrollManagementServiceImpl implements PayrollManagementService {
     @Override
     @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
     public byte[] downloadTemplate() {
-        return excelWorkbooks.template(payrollExcelDataset, payrollExcelDataset.references(null, null));
+        var references=payrollExcelDataset.references(null,null);
+        return excelWorkbooks.template(payrollExcelDataset,references,payrollExcelDataset.sampleRows(null,null,references));
     }
 
     // ─────────────────────────────────────────────────────────────────

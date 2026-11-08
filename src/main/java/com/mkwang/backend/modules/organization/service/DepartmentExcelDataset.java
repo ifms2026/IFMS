@@ -24,6 +24,13 @@ public class DepartmentExcelDataset implements ExcelDataset {
         return userRepository.findAvailableDepartmentManagers().stream()
                 .map(user->values("kind","MANAGER","id",user.getId(),"name",user.getFullName(),"email",user.getEmail())).toList();
     }
+    public List<Map<String,Object>> sampleRows(User actor,Long scope,List<Map<String,Object>> references){
+        String token=UUID.randomUUID().toString().replace("-","").substring(0,8).toUpperCase(Locale.ROOT);
+        return List.of(
+                values("code","EX-"+token+"-01","name","Phòng ban ví dụ "+token+" 01","managerId","","totalProjectQuota",new BigDecimal("150000000")),
+                values("code","EX-"+token+"-02","name","Phòng ban ví dụ "+token+" 02","managerId","","totalProjectQuota",new BigDecimal("90000000"))
+        );
+    }
     public List<ExcelRowErrorResponse> validate(List<ExcelRowResponse> rows,User actor,Long scope){
         var errors=new ArrayList<>(ExcelValidation.rows(rows,row->row.values().get("code").toUpperCase(Locale.ROOT),row->{
             var v=row.values();String code=v.get("code").toUpperCase(Locale.ROOT);

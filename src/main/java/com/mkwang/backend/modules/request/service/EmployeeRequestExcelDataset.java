@@ -68,6 +68,22 @@ public class EmployeeRequestExcelDataset implements ExcelDataset {
         }
         return result;
     }
+    public List<Map<String,Object>> sampleRows(User actor,Long scope,List<Map<String,Object>> references){
+        for(var category:references) {
+            if(!"CATEGORY".equals(category.get("kind"))||category.get("projectId")==null||category.get("phaseId")==null)continue;
+            Long phaseId=Long.valueOf(category.get("phaseId").toString());
+            Long categoryId=Long.valueOf(category.get("id").toString());
+            var phase=phases.findById(phaseId).orElse(null);
+            if(phase==null||!"ACTIVE".equals(phase.getStatus().name()))continue;
+            var budget=categoryBudgets.findById(new PhaseCategoryBudgetId(phaseId,categoryId)).orElse(null);
+            if(budget==null||budget.getAvailableBalance().signum()<=0)continue;
+            var amount=budget.getAvailableBalance().min(new java.math.BigDecimal("650000"));
+            return List.of(values("type","EXPENSE","projectId",String.valueOf(category.get("projectId")),"phaseId",String.valueOf(phaseId),
+                    "categoryId",String.valueOf(categoryId),"advanceBalanceId","","amount",amount,
+                    "description","DÒNG MINH HỌA · chi phí nhân viên tự chi; tải chứng từ và cập nhật ID trước khi nhập","documentIds",""));
+        }
+        return List.of();
+    }
     public List<ExcelColumnResponse> exportColumns(){var cols=new ArrayList<>(columns());cols.add(column("requestCode","Mã yêu cầu","TEXT",false));cols.add(column("status","Trạng thái","TEXT",false));return cols;}
     public List<Map<String,Object>> export(User actor,Long scope,Map<String,String> filters,int max){
         var spec=com.mkwang.backend.modules.spreadsheet.repository.ExcelExportSpecification.<Request>filter(filters)

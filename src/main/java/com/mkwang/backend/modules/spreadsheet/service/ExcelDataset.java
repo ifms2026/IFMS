@@ -16,6 +16,7 @@ public interface ExcelDataset {
     void authorize(User actor, Long scope);
     default List<Map<String,Object>> scopes(User actor) { return List.of(); }
     default List<Map<String,Object>> references(User actor, Long scope) { return List.of(); }
+    default List<Map<String,Object>> sampleRows(User actor, Long scope, List<Map<String,Object>> references) { return List.of(); }
     default List<ExcelRowErrorResponse> validate(List<ExcelRowResponse> rows, User actor, Long scope) { return List.of(); }
     default String commit(ExcelRowResponse row, User actor, Long scope) {
         throw new com.mkwang.backend.common.exception.BadRequestException("Bộ dữ liệu chỉ hỗ trợ xuất");

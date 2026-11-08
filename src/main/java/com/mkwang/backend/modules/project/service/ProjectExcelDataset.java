@@ -54,6 +54,32 @@ public class ProjectExcelDataset implements ExcelDataset {
         }
         return result;
     }
+    public List<Map<String,Object>> sampleRows(User actor,Long scope,List<Map<String,Object>> references){
+        String token=UUID.randomUUID().toString().replace("-","").substring(0,8).toUpperCase(Locale.ROOT);
+        if(kind.equals("projects")) {
+            var leader=references.stream().filter(row->"TEAM_LEADER".equals(row.get("kind"))).findFirst().orElse(null);
+            return leader==null?List.of():List.of(values("name","Dự án ví dụ "+token,"description","Dòng minh họa · thay bằng nội dung dự án thật","totalBudget",new BigDecimal("10000000"),"teamLeaderId",String.valueOf(leader.get("id"))));
+        }
+        if(kind.equals("phases")) {
+            var today=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+            return List.of(values("name","Giai đoạn ví dụ "+token,"budgetLimit",new BigDecimal("1000000"),"startDate",today.toString(),"endDate",today.plusDays(30).toString()));
+        }
+        if(kind.equals("project-members")) {
+            var employee=references.stream().filter(row->"EMPLOYEE".equals(row.get("kind"))).findFirst().orElse(null);
+            return employee==null?List.of():List.of(values("userId",String.valueOf(employee.get("id")),"position","Vị trí minh họa · thay bằng vị trí thật"));
+        }
+        for(var phase:phases.findByProject_IdOrderByCreatedAtAsc(scope)) {
+            var current=budgets.findByIdPhaseId(phase.getId());
+            if(!current.isEmpty()) {
+                var budget=current.get(0);
+                return List.of(values("phaseId",String.valueOf(phase.getId()),"categoryId",String.valueOf(budget.getCategory().getId()),"budgetLimit",budget.getBudgetLimit()));
+            }
+        }
+        var phase=references.stream().filter(row->"PHASE".equals(row.get("kind"))).findFirst().orElse(null);
+        var category=references.stream().filter(row->"CATEGORY".equals(row.get("kind"))).findFirst().orElse(null);
+        if(phase==null||category==null)return List.of();
+        return List.of(values("phaseId",String.valueOf(phase.get("id")),"categoryId",String.valueOf(category.get("id")),"budgetLimit",new BigDecimal("1000000")));
+    }
     public List<ExcelRowErrorResponse> validate(List<ExcelRowResponse> rows,User actor,Long scope){
         var errors=new ArrayList<>(ExcelValidation.rows(rows,row->switch(kind){case "projects","phases"->row.values().get("name").toLowerCase(Locale.ROOT);case "project-members"->row.values().get("userId");default->row.values().get("phaseId")+":"+row.values().get("categoryId");},row->{
             var v=row.values();

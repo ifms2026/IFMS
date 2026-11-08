@@ -16,6 +16,14 @@ public class BankStatementExcelDataset implements ExcelDataset {
     public List<ExcelColumnResponse> columns(){return List.of(column("bankAccount","Tài khoản công ty","TEXT",true),column("bankReference","Mã giao dịch ngân hàng","TEXT",true),column("bookingDate","Ngày sao kê YYYY-MM-DD","TEXT",true),column("direction","IN/OUT","TEXT",true),column("amount","Số tiền","MONEY",true),column("state","BOOKED/PENDING","TEXT",true),column("transactionId","ID giao dịch IFMS nếu đã xác minh khớp","TEXT",false),column("description","Diễn giải","TEXT",false));}
     public void authorize(User actor,Long scope){if(scope!=null) throw new BadRequestException("Sao kê dùng tài khoản công ty được cấu hình");bank.account();}
     public List<Map<String,Object>> references(User actor,Long scope){return List.of(values("bankAccount",bank.account()));}
+    public List<Map<String,Object>> sampleRows(User actor,Long scope,List<Map<String,Object>> references){
+        String token=UUID.randomUUID().toString().replace("-","").substring(0,10).toUpperCase(Locale.ROOT);
+        LocalDate yesterday=LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).minusDays(1);
+        return List.of(
+                values("bankAccount",bank.account(),"bankReference","DEMO-TEMPLATE-"+token+"-01","bookingDate",yesterday.toString(),"direction","IN","amount",new java.math.BigDecimal("1250000"),"state","PENDING","transactionId","","description","DÒNG MINH HỌA · thay bằng dữ liệu sao kê thật"),
+                values("bankAccount",bank.account(),"bankReference","DEMO-TEMPLATE-"+token+"-02","bookingDate",yesterday.toString(),"direction","OUT","amount",new java.math.BigDecimal("780000"),"state","BOOKED","transactionId","","description","DÒNG MINH HỌA · không dùng để chốt đối soát")
+        );
+    }
     public List<ExcelRowErrorResponse> validate(List<ExcelRowResponse> rows,User actor,Long scope){
         return ExcelValidation.rows(rows,row->row.values().get("bankAccount")+":"+row.values().get("bankReference").toUpperCase(Locale.ROOT),row->{
             var v=row.values();
