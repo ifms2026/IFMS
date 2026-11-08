@@ -2,12 +2,16 @@ package com.mkwang.backend.modules.accounting.mapper;
 
 import com.mkwang.backend.modules.accounting.dto.response.*;
 import com.mkwang.backend.modules.accounting.entity.*;
+import com.mkwang.backend.modules.accounting.repository.AccountingJournalRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.Comparator;
 
 @Component
+@RequiredArgsConstructor
 public class AccountingJournalMapper {
+    private final AccountingJournalRepository journals;
     public BigDecimal debit(AccountingJournal journal) {
         return journal.getLines().stream().map(AccountingJournalLine::getDebitAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -38,6 +42,7 @@ public class AccountingJournalMapper {
                 j.getLines().stream().sorted(Comparator.comparing(AccountingJournalLine::getLineNumber)).map(this::toLine).toList(),
                 j.getCreatedByUserId(), j.getCreatedByName(), j.getCreatedAt(), j.getBusinessDate(), j.getDepartmentId(),
                 j.getDepartmentName(), j.getPhaseId(), j.getPhaseName(), j.getCategoryId(), j.getCategoryName(),
-                j.getSourceSnapshot(), j.getOriginalJournalId());
+                j.getSourceSnapshot(), j.getOriginalJournalId(),
+                journals.findByOriginalJournalId(j.getId()).map(AccountingJournal::getId).orElse(null));
     }
 }

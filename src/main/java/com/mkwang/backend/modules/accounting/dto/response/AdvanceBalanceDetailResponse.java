@@ -9,6 +9,7 @@ import java.util.List;
 public record AdvanceBalanceDetailResponse(
         Long id,
         String requestCode,
+        Long requestId,
         LocalDate disbursedDate,
         Long projectId,
         String projectName,

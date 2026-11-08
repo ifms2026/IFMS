@@ -33,5 +33,5 @@ public record AccountingJournalDetailResponse(
         Instant createdAt,
         LocalDate businessDate, Long departmentId, String departmentName,
         Long phaseId, String phaseName, Long categoryId, String categoryName,
-        String sourceSnapshot, Long originalJournalId
+        String sourceSnapshot, Long originalJournalId, Long reversalJournalId
 ) {}

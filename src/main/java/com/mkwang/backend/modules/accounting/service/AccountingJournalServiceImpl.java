@@ -444,7 +444,7 @@ public class AccountingJournalServiceImpl implements AccountingJournalService {
                 .map(journal -> new AdvanceActivityResponse(journal.getId(), journal.getJournalCode(), journal.getEventType(),
                         journal.getPostingDate(), journal.getDescription(), activityAmount(journal, balance.getId())))
                 .toList();
-        return new AdvanceBalanceDetailResponse(balance.getId(), request.getRequestCode(), request.getPaidAt() == null
+        return new AdvanceBalanceDetailResponse(balance.getId(), request.getRequestCode(), request.getId(), request.getPaidAt() == null
                 ? request.getCreatedAt().toLocalDate() : request.getPaidAt().toLocalDate(),
                 project == null ? null : project.getId(), project == null ? null : project.getName(),
                 request.getPhase() == null ? null : request.getPhase().getName(),
