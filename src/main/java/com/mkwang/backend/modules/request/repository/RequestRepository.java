@@ -89,11 +89,12 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             LEFT JOIN FETCH r.attachments att
             LEFT JOIN FETCH att.file
             WHERE r.id = :id AND r.project.id IN :projectIds
-              AND r.requester.id <> :leaderId
             """)
+    // Intentionally does NOT exclude the leader's own requests: the detail screen must be able to
+    // show a TL's own request (with a "you can't approve this" banner) rather than 404. Approve/reject
+    // still check requester.id == leaderId explicitly in RequestServiceImpl before acting.
     Optional<Request> findDetailByIdForTl(
             @Param("id") Long id,
-            @Param("leaderId") Long leaderId,
             @Param("projectIds") List<Long> projectIds);
 
     @Query("""
@@ -215,10 +216,13 @@ public interface RequestRepository extends JpaRepository<Request, Long>, JpaSpec
             """)
     long countPendingDeptTopup();
 
+    // approveCfoRequest supports partial approval (approvedAmount may be less than amount), and
+    // transitions PENDING straight to PAID within one @Transactional method — a request is never
+    // persisted at rest in APPROVED_BY_CFO — so this must sum approvedAmount for PAID rows only.
     @Query("""
-            SELECT COALESCE(SUM(r.amount), 0) FROM Request r
+            SELECT COALESCE(SUM(r.approvedAmount), 0) FROM Request r
             WHERE r.type = 'DEPARTMENT_TOPUP'
-              AND r.status IN ('APPROVED_BY_CFO', 'PAID')
+              AND r.status = 'PAID'
               AND YEAR(r.updatedAt) = :year
               AND MONTH(r.updatedAt) = :month
             """)

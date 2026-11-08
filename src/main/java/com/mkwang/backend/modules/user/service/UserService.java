@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface UserService {
 
@@ -21,6 +22,16 @@ public interface UserService {
 
     User getUserById(Long userId);
     User getUserByEmployeeCode(String employeeCode);
+
+    /**
+     * Non-throwing lookup for Excel row validators. getUserByEmployeeCode() is
+     * @Transactional, so a row-not-found exception from it marks the caller's
+     * ambient transaction rollback-only even if the caller catches it, which
+     * turns a normal "invalid row" into a 500 UnexpectedRollbackException on
+     * commit. Validators must use this method and throw their own BaseException
+     * instead of letting getUserByEmployeeCode()'s exception cross a @Transactional boundary.
+     */
+    Optional<User> findUserByEmployeeCode(String employeeCode);
     List<User> getPayrollReferenceUsers(int max);
     void lockFinancialScope(Long userId);
 

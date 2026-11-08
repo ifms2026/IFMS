@@ -47,7 +47,7 @@ Base runtime configuration:
 
 ## 3. Technology Stack
 
-- Java 21
+- Java 25 (LTS)
 - Spring Boot 3.4.x
 - Spring Security + JJWT
 - Spring Data JPA + Hibernate 6
@@ -101,7 +101,7 @@ Project source root: `src/main/java/com/mkwang/backend/modules`
 ## 6. Prerequisites
 
 Install and verify:
-- JDK 21+
+- JDK 25+
 - Maven 3.8+ (or use included Maven Wrapper)
 - Docker Desktop (for PostgreSQL, Redis, RabbitMQ)
 

@@ -12,7 +12,9 @@ spring:
   # java.net.http.HttpClient (NIO Selector-based). Some Windows/JDK 24
   # environments fail to open a loopback NIO Pipe for the Selector
   # ("Unable to establish loopback connection"); "simple" avoids that
-  # code path entirely since it never opens an NIO Selector.
+  # code path entirely since it never opens an NIO Selector. Keep this
+  # explicit for Java 25 runtimes until all supported Windows environments
+  # can reliably create the selector loopback pipe.
   http:
     client:
       factory: simple

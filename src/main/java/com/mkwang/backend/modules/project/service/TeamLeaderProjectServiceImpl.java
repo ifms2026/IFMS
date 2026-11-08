@@ -106,6 +106,8 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                             memberCount,
                             currentPhaseId,
                             currentPhaseName,
+                            null,
+                            null,
                             p.getCreatedAt()
                     );
                 })
@@ -168,6 +170,7 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
                 resolveAvailableBudget(project, totalSpent),
                 totalSpent,
                 project.getDepartment() != null ? project.getDepartment().getId() : null,
+                project.getDepartment() != null ? project.getDepartment().getName() : null,
                 project.getManager() != null ? project.getManager().getId() : null,
                 currentPhaseId,
                 phases,
@@ -265,6 +268,15 @@ public class TeamLeaderProjectServiceImpl implements TeamLeaderProjectService {
         List<Long> singleProjectList = List.of(projectId);
         if (projectMemberRepository.hasPendingRequestsInProjects(userId, singleProjectList)) {
             throw new BadRequestException("Cannot remove member with pending requests in this project");
+        }
+
+        // Cannot remove if member still has an unsettled advance from this project — removing them
+        // would make that debt disappear from every TL-facing debt view (getTeamMembers/getTeamMemberDetail
+        // only scan current ProjectMember rows), even though the AdvanceBalance row still exists.
+        List<Object[]> outstanding = advanceBalanceRepository.sumRemainingByUserIdsAndProjectIds(
+                List.of(userId), singleProjectList);
+        if (!outstanding.isEmpty() && ((BigDecimal) outstanding.get(0)[1]).signum() > 0) {
+            throw new BadRequestException("Cannot remove member with an unsettled advance in this project");
         }
 
         projectMemberRepository.delete(member);

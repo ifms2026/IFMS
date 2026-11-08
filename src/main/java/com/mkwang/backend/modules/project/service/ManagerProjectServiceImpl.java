@@ -31,7 +31,6 @@ import com.mkwang.backend.modules.request.repository.AdvanceBalanceRepository;
 import com.mkwang.backend.modules.user.entity.User;
 import com.mkwang.backend.modules.user.service.UserService;
 import com.mkwang.backend.modules.wallet.entity.WalletOwnerType;
-import com.mkwang.backend.modules.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -62,7 +61,7 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final RequestRepository requestRepository;
     private final AdvanceBalanceRepository advanceBalanceRepository;
-    private final WalletRepository walletRepository;
+    private final com.mkwang.backend.modules.organization.service.DepartmentService departmentService;
     private final BusinessCodeGenerator businessCodeGenerator;
     private final ManagerProjectMapper managerProjectMapper;
 
@@ -88,12 +87,14 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         List<Long> userIds = memberPage.getContent().stream().map(User::getId).toList();
         Map<Long, BigDecimal> debtBalanceByUserId = loadDebtBalances(userIds);
         Map<Long, Integer> pendingCountByUserId = loadPendingCounts(userIds);
+        Map<Long, Integer> projectsCountByUserId = loadProjectsCounts(userIds);
 
         List<DepartmentMemberSummaryResponse> items = memberPage.getContent().stream()
                 .map(user -> managerProjectMapper.toDepartmentMemberSummaryResponse(
                         user,
                         pendingCountByUserId.getOrDefault(user.getId(), 0),
-                        debtBalanceByUserId.getOrDefault(user.getId(), BigDecimal.ZERO)))
+                        debtBalanceByUserId.getOrDefault(user.getId(), BigDecimal.ZERO),
+                        projectsCountByUserId.getOrDefault(user.getId(), 0)))
                 .toList();
 
         return PageResponse.<DepartmentMemberSummaryResponse>builder()
@@ -144,7 +145,9 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         );
 
         Page<Project> projectPage = projectRepository.findAll(spec, pageable);
-        Map<Long, Integer> memberCounts = loadMemberCounts(projectPage.getContent().stream().map(Project::getId).toList());
+        List<Long> projectIds = projectPage.getContent().stream().map(Project::getId).toList();
+        Map<Long, Integer> memberCounts = loadMemberCounts(projectIds);
+        Map<Long, ProjectMember> leaders = loadLeaders(projectIds);
 
         List<Project> projects = projectPage.getContent();
         Map<Long, BigDecimal> spentByProject = loadProjectCategorySpent(projects.stream().map(Project::getId).toList());
@@ -152,11 +155,14 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
         List<ProjectSummaryResponse> items = projects.stream()
                 .map(project -> {
                     BigDecimal totalSpent = resolveTotalSpent(project, spentByProject.get(project.getId()));
+                    ProjectMember leader = leaders.get(project.getId());
                     return managerProjectMapper.toProjectSummaryResponse(
                             project,
                             memberCounts.getOrDefault(project.getId(), 0),
                             resolveAvailableBudget(project, totalSpent),
-                            totalSpent);
+                            totalSpent,
+                            leader != null ? leader.getUser().getId() : null,
+                            leader != null ? leader.getUser().getFullName() : null);
                 })
                 .toList();
 
@@ -262,13 +268,11 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
     public BigDecimal[] getDeptBudgetSnapshot(Long managerId) {
         User manager = getManagerOrThrow(managerId);
         Long deptId = manager.getDepartment().getId();
-        BigDecimal projectQuota = coalesce(projectRepository.sumTotalBudgetByDeptId(deptId));
-        BigDecimal walletAvailable = walletRepository.findByOwnerTypeAndOwnerId(WalletOwnerType.DEPARTMENT, deptId)
-                .map(wallet -> coalesce(wallet.getAvailableBalance()))
-                .orElse(BigDecimal.ZERO);
-        BigDecimal totalQuota = projectQuota.max(walletAvailable);
-        BigDecimal totalAvailable = walletAvailable;
-        return new BigDecimal[]{totalQuota, totalAvailable};
+        // totalProjectQuota = lifetime total received from CFO (only grows); totalAvailableBalance
+        // tracks the department wallet's real current balance. Both are kept in sync with the
+        // actual money movement by DepartmentService.receiveQuota/allocateToProject, called from
+        // RequestServiceImpl's approveCfoRequest/approveManagerRequest.
+        return departmentService.getBudgetSnapshot(deptId);
     }
 
     @Override
@@ -511,6 +515,30 @@ public class ManagerProjectServiceImpl implements ManagerProjectService {
             Long projectId = ((Number) row[0]).longValue();
             Integer count = ((Number) row[1]).intValue();
             result.put(projectId, count);
+        }
+        return result;
+    }
+
+    private Map<Long, Integer> loadProjectsCounts(List<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Integer> result = new HashMap<>();
+        for (Object[] row : projectMemberRepository.countProjectsByUserIds(userIds)) {
+            Long userId = ((Number) row[0]).longValue();
+            Integer count = ((Number) row[1]).intValue();
+            result.put(userId, count);
+        }
+        return result;
+    }
+
+    private Map<Long, ProjectMember> loadLeaders(List<Long> projectIds) {
+        if (projectIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, ProjectMember> result = new HashMap<>();
+        for (ProjectMember pm : projectMemberRepository.findLeadersByProjectIds(projectIds)) {
+            result.put(pm.getProject().getId(), pm);
         }
         return result;
     }

@@ -1,5 +1,6 @@
 package com.mkwang.backend.modules.request.dto.response;
 
+import com.mkwang.backend.modules.project.entity.ProjectStatus;
 import com.mkwang.backend.modules.request.entity.RequestStatus;
 import com.mkwang.backend.modules.request.entity.RequestType;
 import lombok.Builder;
@@ -39,6 +40,8 @@ public class ManagerApprovalSummaryResponse {
         private String projectCode;
         private String name;
         private BigDecimal availableBudget;
+        private BigDecimal totalBudget;
+        private ProjectStatus status;
     }
 }
 

@@ -24,7 +24,8 @@ public class ManagerProjectMapper {
     public DepartmentMemberSummaryResponse toDepartmentMemberSummaryResponse(
             User user,
             int pendingRequestsCount,
-            BigDecimal debtBalance) {
+            BigDecimal debtBalance,
+            int projectsCount) {
 
         UserProfile profile = user.getProfile();
         return new DepartmentMemberSummaryResponse(
@@ -37,7 +38,8 @@ public class ManagerProjectMapper {
                 user.getRole() != null ? user.getRole().getName() : null,
                 user.getStatus().name(),
                 pendingRequestsCount,
-                debtBalance
+                debtBalance,
+                projectsCount
         );
     }
 
@@ -74,14 +76,16 @@ public class ManagerProjectMapper {
     }
 
     public ProjectSummaryResponse toProjectSummaryResponse(Project project, int memberCount) {
-        return toProjectSummaryResponse(project, memberCount, project.getAvailableBudget(), project.getTotalSpent());
+        return toProjectSummaryResponse(project, memberCount, project.getAvailableBudget(), project.getTotalSpent(), null, null);
     }
 
     public ProjectSummaryResponse toProjectSummaryResponse(
             Project project,
             int memberCount,
             BigDecimal availableBudget,
-            BigDecimal totalSpent) {
+            BigDecimal totalSpent,
+            Long teamLeaderId,
+            String teamLeaderName) {
 
         return new ProjectSummaryResponse(
                 project.getId(),
@@ -94,6 +98,8 @@ public class ManagerProjectMapper {
                 memberCount,
                 project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null,
                 project.getCurrentPhase() != null ? project.getCurrentPhase().getName() : null,
+                teamLeaderId,
+                teamLeaderName,
                 project.getCreatedAt()
         );
     }
@@ -123,6 +129,7 @@ public class ManagerProjectMapper {
                 availableBudget,
                 totalSpent,
                 project.getDepartment() != null ? project.getDepartment().getId() : null,
+                project.getDepartment() != null ? project.getDepartment().getName() : null,
                 project.getManager() != null ? project.getManager().getId() : null,
                 project.getCurrentPhase() != null ? project.getCurrentPhase().getId() : null,
                 phases,

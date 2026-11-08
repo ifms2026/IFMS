@@ -69,6 +69,14 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", "code", employeeCode));
     }
 
+    // Not @Transactional: callers run this inside a validation loop whose own
+    // @Transactional method must stay committable even when the code is missing.
+    // See UserService.findUserByEmployeeCode for why getUserByEmployeeCode() is unsafe there.
+    @Override
+    public java.util.Optional<User> findUserByEmployeeCode(String employeeCode) {
+        return userRepository.findByProfile_EmployeeCode(employeeCode);
+    }
+
     private final UserRepository                 userRepository;
     private final RoleRepository                 roleRepository;
     private final DepartmentRepository           departmentRepository;

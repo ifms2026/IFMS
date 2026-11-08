@@ -61,6 +61,22 @@ public interface ProjectMemberRepository
     List<Object[]> countMembersByProjectIds(@Param("projectIds") List<Long> projectIds);
 
     @Query("""
+            SELECT pm FROM ProjectMember pm
+            JOIN FETCH pm.user u
+            WHERE pm.project.id IN :projectIds
+              AND pm.projectRole = 'LEADER'
+            """)
+    List<ProjectMember> findLeadersByProjectIds(@Param("projectIds") List<Long> projectIds);
+
+    @Query("""
+            SELECT pm.user.id, COUNT(pm)
+            FROM ProjectMember pm
+            WHERE pm.user.id IN :userIds
+            GROUP BY pm.user.id
+            """)
+    List<Object[]> countProjectsByUserIds(@Param("userIds") List<Long> userIds);
+
+    @Query("""
             SELECT u FROM User u
             LEFT JOIN FETCH u.profile up
             LEFT JOIN FETCH up.avatarFile

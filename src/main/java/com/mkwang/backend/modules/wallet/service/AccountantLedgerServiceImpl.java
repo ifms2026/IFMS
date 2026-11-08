@@ -69,7 +69,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public PageResponse<AccountantLedgerItemResponse> getLedger(
             TransactionType type, TransactionStatus status, ReferenceType referenceType,
             LocalDate from, LocalDate to, int page, int limit) {
@@ -97,7 +97,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public AccountantLedgerSummaryResponse getLedgerSummary(TransactionType type, TransactionStatus status,
             ReferenceType referenceType, LocalDate from, LocalDate to) {
         validateFilters(from, to);
@@ -124,7 +124,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public PageResponse<AccountantWalletTransactionResponse> getWalletTransactions(
             TransactionType type, TransactionStatus status, ReferenceType referenceType,
             LocalDate from, LocalDate to, int page, int limit) {
@@ -149,7 +149,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public PageResponse<AccountingJournalItemResponse> getJournals(AccountingJournalEvent event,
             LocalDate from, LocalDate to, Long employeeId, Long projectId, Long requestId, int page, int limit) {
         return accountingJournalService.getJournals(event, from, to, employeeId, projectId, requestId, page, limit);
@@ -157,21 +157,21 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public AccountingJournalDetailResponse getJournalDetail(Long journalId) {
         return accountingJournalService.getJournalDetail(journalId);
     }
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public List<AdvanceEmployeeSummaryResponse> getOutstandingAdvancesByEmployee() {
         return accountingJournalService.getOutstandingAdvancesByEmployee();
     }
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public List<LedgerProjectBudgetResponse> getBudgetExposure() {
         return accountingJournalService.getBudgetExposure();
     }
@@ -182,7 +182,7 @@ public class AccountantLedgerServiceImpl implements AccountantLedgerService {
 
     @Override
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAuthority('PAYROLL_MANAGE')")
+    @PreAuthorize("hasAuthority('COMPANY_FUND_VIEW')")
     public AccountantTransactionDetailResponse getTransactionDetail(Long transactionId) {
         Transaction txn = transactionRepository.findById(transactionId)
                 .orElseGet(() -> ledgerEntryRepository.findById(transactionId)

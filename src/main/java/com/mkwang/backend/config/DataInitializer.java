@@ -1,6 +1,5 @@
 package com.mkwang.backend.config;
 
-import com.mkwang.backend.modules.accounting.entity.CompanyFund;
 import com.mkwang.backend.modules.accounting.entity.PayrollPeriod;
 import com.mkwang.backend.modules.accounting.entity.PayrollStatus;
 import com.mkwang.backend.modules.accounting.entity.Payslip;
@@ -467,14 +466,25 @@ public class DataInitializer implements CommandLineRunner {
     private void initCompanyFund() {
         log.info("── [4/6] Seeding CompanyFund + system wallets ...");
 
-        // 4a. CompanyFund metadata record (singleton id=1)
-        if (companyFundRepository.count() == 0) {
-            CompanyFund fund = CompanyFund.builder()
-                    .bankName("Vietcombank")
-                    .bankAccount("0011004999999")
-                    .externalBankBalance(INITIAL_FUND)
-                    .build();
-            companyFundRepository.save(fund);
+        // 4a. CompanyFund metadata record (singleton id=1). Inserted via native SQL with an
+        // explicit id — plain JPA save() with GenerationType.IDENTITY would ignore any id we
+        // set and let the sequence pick one, which only "happens" to be 1 on a fresh table.
+        // Every runtime read path (findDefault(), getWallet(COMPANY_FUND, 1L), etc.) assumes id=1.
+        if (!companyFundRepository.existsById(1L)) {
+            entityManager.createNativeQuery("""
+                    INSERT INTO company_funds(id,created_at,updated_at,bank_name,bank_account,
+                        external_bank_balance,bank_scope_confirmed)
+                    VALUES (1,now(),now(),:bankName,:bankAccount,:externalBankBalance,false)
+                    ON CONFLICT (id) DO NOTHING
+                    """)
+                    .setParameter("bankName", "Vietcombank")
+                    .setParameter("bankAccount", "0011004999999")
+                    .setParameter("externalBankBalance", INITIAL_FUND)
+                    .executeUpdate();
+            entityManager.createNativeQuery("""
+                    SELECT setval(pg_get_serial_sequence('company_funds','id'),
+                        GREATEST((SELECT MAX(id) FROM company_funds),1))
+                    """).getSingleResult();
             log.info("   💰 CompanyFund metadata created");
         } else {
             log.info("   💰 CompanyFund already exists, skipping.");

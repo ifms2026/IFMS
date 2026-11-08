@@ -242,6 +242,8 @@ public class RequestMapper {
                         .projectCode(request.getProject().getProjectCode())
                         .name(request.getProject().getName())
                         .availableBudget(request.getProject().getAvailableBudget())
+                        .totalBudget(request.getProject().getTotalBudget())
+                        .status(request.getProject().getStatus())
                         .build()
                         : null)
                 .createdAt(request.getCreatedAt())
@@ -282,6 +284,7 @@ public class RequestMapper {
                         .name(request.getProject().getName())
                         .availableBudget(request.getProject().getAvailableBudget())
                         .totalBudget(request.getProject().getTotalBudget())
+                        .status(request.getProject().getStatus())
                         .build()
                         : null)
                 .department(department != null
