@@ -59,6 +59,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AdvanceBalanceRepository advanceBalanceRepository;
     private final com.mkwang.backend.modules.request.repository.RequestRepository requestRepository;
+    private final com.mkwang.backend.modules.accounting.service.CompanyFundService companyFundService;
 
     @Override
     @Transactional(readOnly = true)
@@ -126,6 +127,7 @@ public class DashboardServiceImpl implements DashboardService {
 
         return AccountantDashboardResponse.builder()
                 .systemFundBalance(fundBalance)
+                .fundHealth(companyFundService.resolveFundHealth(fundBalance))
                 .pendingDisbursementsCount(pendingDisbursements)
                 .monthlyInflow(monthlyInflow)
                 .monthlyOutflow(monthlyOutflow)
@@ -159,6 +161,7 @@ public class DashboardServiceImpl implements DashboardService {
 
         return CfoDashboardResponse.builder()
                 .companyFundBalance(fundBalance)
+                .fundHealth(companyFundService.resolveFundHealth(fundBalance))
                 .pendingApprovalsCount(pendingApprovals)
                 .monthlyApprovedAmount(monthlyApproved)
                 .monthlyRejectedCount(monthlyRejected)

@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 public class AccountantDashboardResponse {
 
     private BigDecimal systemFundBalance;
+    private String fundHealth;
     private long pendingDisbursementsCount;
     private BigDecimal monthlyInflow;
     private BigDecimal monthlyOutflow;

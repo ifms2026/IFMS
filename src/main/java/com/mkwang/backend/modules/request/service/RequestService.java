@@ -65,6 +65,8 @@ public interface RequestService {
 
     TlRejectResponse rejectTlRequest(Long id, Long leaderId, RejectRequestRequest req);
 
+    com.mkwang.backend.modules.request.dto.response.TlPendingAmountResponse getTlPendingAmount(Long leaderId);
+
     PageResponse<ManagerApprovalSummaryResponse> getManagerApprovals(
             Long managerId, RequestStatus status, String search, int page, int size);
 

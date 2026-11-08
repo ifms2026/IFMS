@@ -439,6 +439,17 @@ public class RequestServiceImpl implements RequestService {
     @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('REQUEST_APPROVE_TEAM_LEADER')")
+    public com.mkwang.backend.modules.request.dto.response.TlPendingAmountResponse getTlPendingAmount(Long leaderId) {
+        List<Long> leaderProjectIds = projectQueryService.getLeaderProjectIds(leaderId);
+        BigDecimal pendingAmount = leaderProjectIds.isEmpty()
+                ? BigDecimal.ZERO
+                : requestRepository.sumPendingAmountForProjects(leaderProjectIds);
+        return new com.mkwang.backend.modules.request.dto.response.TlPendingAmountResponse(pendingAmount);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('REQUEST_APPROVE_TEAM_LEADER')")
     public TlApprovalDetailResponse getTlApprovalDetail(Long id, Long leaderId) {
         List<Long> leaderProjectIds = projectQueryService.getLeaderProjectIds(leaderId);
         if (leaderProjectIds.isEmpty()) {

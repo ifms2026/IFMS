@@ -23,6 +23,9 @@ public class CompanyFundResponse {
     /** Current balance tracked by Wallet(COMPANY_FUND) — authoritative. */
     private BigDecimal currentWalletBalance;
 
+    /** HEALTHY / LOW / CRITICAL, computed server-side against SystemConfig thresholds. */
+    private String fundHealth;
+
     /** Last known external bank balance entered by Accountant. */
     private BigDecimal externalBankBalance;
 

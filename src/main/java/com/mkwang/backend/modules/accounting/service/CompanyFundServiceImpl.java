@@ -32,6 +32,7 @@ public class CompanyFundServiceImpl implements CompanyFundService {
     private final AccountingJournalService accountingJournalService;
     private final com.mkwang.backend.modules.wallet.service.WalletFinancialEvidenceService financialEvidence;
     private final BankEvidenceService bankEvidence;
+    private final com.mkwang.backend.modules.config.service.SystemConfigService systemConfigService;
 
     @Override
     @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
@@ -156,7 +157,19 @@ public class CompanyFundServiceImpl implements CompanyFundService {
                 .bankScopeConfirmed(fund.isBankScopeConfirmed())
                 .lastStatementDate(fund.getLastStatementDate())
                 .lastStatementUpdatedBy(updatedBy)
+                .fundHealth(resolveFundHealth(walletBalance))
                 .build();
+    }
+
+    @Override
+    public String resolveFundHealth(BigDecimal walletBalance) {
+        BigDecimal healthyThreshold = systemConfigService.getAsBigDecimal(
+                "FUND_HEALTH_THRESHOLD_HEALTHY", new BigDecimal("500000000"));
+        BigDecimal lowThreshold = systemConfigService.getAsBigDecimal(
+                "FUND_HEALTH_THRESHOLD_LOW", new BigDecimal("100000000"));
+        if (walletBalance.compareTo(healthyThreshold) >= 0) return "HEALTHY";
+        if (walletBalance.compareTo(lowThreshold) >= 0) return "LOW";
+        return "CRITICAL";
     }
 
     private Long currentUserId() {

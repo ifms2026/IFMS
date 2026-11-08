@@ -6,7 +6,15 @@ import com.mkwang.backend.modules.accounting.dto.request.SystemTopupRequest;
 import com.mkwang.backend.modules.accounting.dto.request.UpdateBankStatementRequest;
 import com.mkwang.backend.modules.wallet.dto.response.TransactionResponse;
 
+import java.math.BigDecimal;
+
 public interface CompanyFundService {
+
+    /**
+     * Classify a company fund balance into HEALTHY / LOW / CRITICAL against the
+     * FUND_HEALTH_THRESHOLD_HEALTHY / FUND_HEALTH_THRESHOLD_LOW SystemConfig values.
+     */
+    String resolveFundHealth(BigDecimal balance);
 
     /**
      * Get company fund metadata and current wallet balance.
